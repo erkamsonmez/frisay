@@ -1,7 +1,7 @@
 {
   "label": "CNC Industrial",
   "description": "CNC takımlama, kesici takımlar ve endüstriyel ekipmanlar için teknik odaklı mağaza teması.",
-  "preview": "theme-preview.png",
+  "preview": "theme-preview.svg",
   "options": {
     "header": {
       "label": "Üst menü stili",
