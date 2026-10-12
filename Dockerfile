@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /var/www/html
 COPY . /var/www/html/
 COPY docker/frisay-entrypoint.sh /usr/local/bin/frisay-entrypoint
-RUN chmod +x /usr/local/bin/frisay-entrypoint \
+COPY docker/frisay-proxy.conf /etc/apache2/conf-available/frisay-proxy.conf
+RUN a2enconf frisay-proxy \
+    && chmod +x /usr/local/bin/frisay-entrypoint \
     && sed -i 's|^RewriteBase .*|RewriteBase /|' /var/www/html/.htaccess \
     && mkdir -p cache img/products img/returns img/invoices logs backups storage/digital /var/frisay-data \
     && chown -R www-data:www-data config cache img logs backups storage /var/frisay-data \
