@@ -1,0 +1,17 @@
+.git
+.github
+.gitignore
+.env
+.env.*
+config/env.php
+config/env0.php
+config/installed.lock
+cache/cache/*
+cache/force/*
+cache/pages/*
+logs/*.log
+backups/*
+img/products/*
+img/returns/*
+img/invoices/*
+storage/digital/*
