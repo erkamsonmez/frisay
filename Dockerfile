@@ -10,7 +10,8 @@ WORKDIR /var/www/html
 COPY . /var/www/html/
 COPY docker/frisay-entrypoint.sh /usr/local/bin/frisay-entrypoint
 COPY docker/frisay-proxy.conf /etc/apache2/conf-available/frisay-proxy.conf
-RUN a2enconf frisay-proxy \
+COPY docker/frisay-security.conf /etc/apache2/conf-available/frisay-security.conf
+RUN a2enconf frisay-proxy frisay-security \
     && chmod +x /usr/local/bin/frisay-entrypoint \
     && sed -i 's|^RewriteBase .*|RewriteBase /|' /var/www/html/.htaccess \
     && mkdir -p cache img/products img/returns img/invoices logs backups storage/digital /var/frisay-data \
