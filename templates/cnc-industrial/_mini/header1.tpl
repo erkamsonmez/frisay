@@ -30,7 +30,7 @@
           <a href="{$domain}cart" class="cnc-cart-link" aria-label="Sepete git">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 4h2l2.2 11h11.6l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
             <span>Sepetim</span>
-            <span class="cnc-cart-link__count sm-cart-count-badge{if !$cart.count|default:0} d-none{/if}">{$cart.count|default:0}</span>
+            <span class="cnc-cart-link__count sm-cart-count-badge{if $cart.count|default:0 == 0} d-none{/if}">{$cart.count|default:0}</span>
           </a>
         </div>
       </div>
@@ -50,7 +50,7 @@
           </a>
           <a class="sm-icon-btn cnc-mobile-cart" href="{$domain}cart" aria-label="Sepetim">
             <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 4h2l2.2 11h11.6l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
-            <span class="sm-icon-btn__badge sm-cart-count-badge{if !$cart.count|default:0} d-none{/if}">{$cart.count|default:0}</span>
+            <span class="sm-icon-btn__badge sm-cart-count-badge{if $cart.count|default:0 == 0} d-none{/if}">{$cart.count|default:0}</span>
           </a>
         </div>
       </div>
