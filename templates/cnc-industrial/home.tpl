@@ -98,7 +98,7 @@
       {include file='./productList.tpl' products=$block.products id=$block.category.id_category}
     </section>
   {/foreach}
-  {if !$featuredProducts|@count && !$dealProducts|@count && !$homeCategories|@count && !$categoryBlocks|@count}
+  {if $featuredProducts|@count == 0 && $dealProducts|@count == 0 && $homeCategories|@count == 0 && $categoryBlocks|@count == 0}
     <div class="cnc-empty-shop"><span>YENİ KOLEKSİYON</span><h2>Ürün kataloğumuz hazırlanıyor.</h2><p>Teknik ürün gruplarımız yakında burada olacak.</p><a href="{$domain}contact">İletişime geçin ↗</a></div>
   {/if}
   <section class="cnc-help-banner">
