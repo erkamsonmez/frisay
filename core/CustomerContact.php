@@ -10,10 +10,11 @@ class CustomerContact
 	}
 
 	/** @return array{success: bool, message: string, mode?: string, url?: string} */
-	public static function send(array $customer, string $channel, string $message): array
+	public static function send(array $customer, string $channel, string $message, string $subject = ''): array
 	{
 		$message = trim($message);
 		$channel = strtolower(trim($channel));
+		$subject = trim($subject);
 
 		if ($message === '') {
 			return ['success' => false, 'message' => adminT('Message is required')];
@@ -24,7 +25,7 @@ class CustomerContact
 		}
 
 		if ($channel === 'email') {
-			return self::sendEmail($customer, $message);
+			return self::sendEmail($customer, $message, $subject);
 		}
 
 		return ['success' => false, 'message' => adminT('Invalid contact channel')];
@@ -79,7 +80,7 @@ class CustomerContact
 	}
 
 	/** @return array{success: bool, message: string, mode?: string} */
-	private static function sendEmail(array $customer, string $message): array
+	private static function sendEmail(array $customer, string $message, string $subject = ''): array
 	{
 		$email = trim((string) ($customer['email'] ?? ''));
 
@@ -88,10 +89,12 @@ class CustomerContact
 		}
 
 		$siteName = Settings::get('SITE_NAME') ?: 'FShop';
-		$name = htmlspecialchars((string) ($customer['user_full_name'] ?? ''), ENT_QUOTES, 'UTF-8');
+		$mailSubject = $subject !== ''
+			? $subject
+			: ($siteName . ' - ' . adminT('Message from store'));
 		$body = '<p>' . nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8'), false) . '</p>';
 
-		if (!Mail::send($email, $siteName . ' - ' . adminT('Message from store'), $body)) {
+		if (!Mail::send($email, $mailSubject, $body)) {
 			$error = Mail::getLastError();
 
 			return [

@@ -123,7 +123,7 @@ class IyzicoModule extends ModuleBase
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}
@@ -679,7 +679,7 @@ class IyzicoModule extends ModuleBase
 			return;
 		}
 
-		Order::updateStatus((int) $order['id_order'], Order::STATUS_PROCESSING);
+		Order::markPaidByGateway((int) $order['id_order']);
 	}
 
 	private static function expectedAmount(?array $order, ?array $pending): float

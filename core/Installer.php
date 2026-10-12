@@ -74,8 +74,13 @@ class Installer
 		try {
 			$pdo = self::pdo($config, false);
 			$pdo->query('SELECT 1');
+			$name = trim((string) ($config['db_name'] ?? ''));
 
-			return ['success' => true, 'message' => 'Database connection successful'];
+			if ($name !== '' && self::databaseExists($pdo, $name)) {
+				return ['success' => true, 'message' => 'Database connection successful'];
+			}
+
+			return ['success' => true, 'message' => 'Database connection successful. The database will be created during setup.'];
 		} catch (Throwable $e) {
 			return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
 		}
@@ -100,7 +105,7 @@ class Installer
 		$withDemo = !empty($data['install_demo']);
 		$shopLang = strtolower(trim((string) ($data['shop_lang'] ?? 'en')));
 		$adminLang = strtolower(trim((string) ($data['admin_lang'] ?? 'en')));
-		$theme = trim((string) ($data['theme'] ?? 'blue'));
+		$theme = self::resolveThemeName((string) ($data['theme'] ?? 'default'));
 
 		if (!in_array($shopLang, ['tr', 'en'], true)) {
 			$shopLang = 'en';
@@ -108,10 +113,6 @@ class Installer
 
 		if (!in_array($adminLang, ['tr', 'en'], true)) {
 			$adminLang = 'en';
-		}
-
-		if (!in_array($theme, ['shopmore'], true)) {
-			$theme = 'shopmore';
 		}
 
 		if ($dbName === '' || $dbUser === '') {
@@ -156,12 +157,25 @@ class Installer
 		}
 
 		try {
-			$pdo = self::pdo($dbConfig, true);
+			@set_time_limit(180);
+			ignore_user_abort(true);
+			$pdo = self::connectAndEnsureDatabase($dbConfig);
+			self::dropAllTables($pdo);
 			self::runSqlFile($pdo, self::rootPath() . '/install/schema.sql');
 			self::runSqlFileIfExists($pdo, self::rootPath() . '/install/patch_taxes.sql');
 
 			if ($withDemo) {
-				self::runSqlFile($pdo, self::rootPath() . '/install/seed_demo.sql');
+				try {
+					self::runSqlFile($pdo, self::rootPath() . '/install/seed_demo.sql');
+				} catch (Throwable $demoEx) {
+					// Demo is optional; leftover PK=1 rows on retry must not abort install.
+				}
+			}
+
+			try {
+				self::bootstrapStorefront($pdo, $withDemo);
+			} catch (Throwable $bootEx) {
+				// Starter modules / homepage layout must not abort install.
 			}
 
 			$shopToken = bin2hex(random_bytes(16));
@@ -208,19 +222,25 @@ class Installer
 				'ADMIN_URI' => 'admin',
 			]);
 
-			self::updateRewriteBase($rewriteBase);
+			try {
+				self::updateRewriteBase($rewriteBase);
 
-			if (is_file(self::rootPath() . '/core/Admin.php')) {
-				require_once self::rootPath() . '/config/app.php';
-				require_once self::rootPath() . '/core/Admin.php';
+				if (is_file(self::rootPath() . '/core/Admin.php')) {
+					require_once self::rootPath() . '/config/app.php';
+					require_once self::rootPath() . '/core/Admin.php';
 
-				if (class_exists('App', false)) {
-					App::boot();
+					if (class_exists('App', false)) {
+						App::boot();
+					}
+
+					Admin::syncHtaccessRewrite();
 				}
-
-				Admin::syncHtaccessRewrite();
+			} catch (Throwable $e) {
+				// env.php is already written; htaccess sync must not abort install.
 			}
+
 			file_put_contents(self::lockPath(), date('c') . PHP_EOL);
+			self::clearCompileCache();
 
 			if ($withDemo) {
 				self::refreshDemoCurrencyPrices($dbConfig);
@@ -256,6 +276,17 @@ class Installer
 		$pdo->exec("SET NAMES utf8mb4");
 
 		return $pdo;
+	}
+
+	private static function dropAllTables(PDO $pdo): void
+	{
+		$pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+		$tables = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
+		foreach ($tables as $table) {
+			$name = str_replace('`', '``', (string) $table);
+			$pdo->exec('DROP TABLE IF EXISTS `' . $name . '`');
+		}
+		$pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 	}
 
 	private static function runSqlFile(PDO $pdo, string $path): void
@@ -318,6 +349,61 @@ class Installer
 		if (file_put_contents($path, $content) === false) {
 			throw new RuntimeException('config/env.php could not be written');
 		}
+
+		if (function_exists('opcache_invalidate')) {
+			@opcache_invalidate($path, true);
+		}
+	}
+
+	private static function databaseExists(PDO $pdo, string $name): bool
+	{
+		$stmt = $pdo->prepare('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ? LIMIT 1');
+		$stmt->execute([$name]);
+
+		return (bool) $stmt->fetchColumn();
+	}
+
+	private static function connectAndEnsureDatabase(array $config): PDO
+	{
+		$name = trim((string) ($config['db_name'] ?? ''));
+
+		if ($name === '' || !preg_match('/^[A-Za-z0-9_-]+$/', $name)) {
+			throw new RuntimeException('Invalid database name.');
+		}
+
+		$pdo = self::pdo($config, false);
+		$safe = str_replace('`', '``', $name);
+		$pdo->exec('CREATE DATABASE IF NOT EXISTS `' . $safe . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+		$pdo->exec('USE `' . $safe . '`');
+
+		return $pdo;
+	}
+
+	private static function clearCompileCache(): void
+	{
+		foreach ([self::rootPath() . '/cache/force', self::rootPath() . '/cache/cache'] as $dir) {
+			if (is_dir($dir)) {
+				self::clearCacheDir($dir);
+			}
+		}
+	}
+
+	private static function clearCacheDir(string $dir): void
+	{
+		foreach (scandir($dir) ?: [] as $entry) {
+			if ($entry === '.' || $entry === '..' || $entry === 'index.php' || $entry === '.htaccess') {
+				continue;
+			}
+
+			$path = $dir . '/' . $entry;
+
+			if (is_file($path)) {
+				@unlink($path);
+			} elseif (is_dir($path)) {
+				self::clearCacheDir($path);
+				@rmdir($path);
+			}
+		}
 	}
 
 	private static function updateRewriteBase(string $rewriteBase): void
@@ -342,6 +428,468 @@ class Installer
 		}
 
 		file_put_contents($htaccess, $content);
+	}
+
+	/** @return list<string> */
+	public static function availableThemes(): array
+	{
+		$dir = self::rootPath() . '/templates';
+		$themes = [];
+
+		foreach (scandir($dir) ?: [] as $entry) {
+			if ($entry === '.' || $entry === '..' || $entry === 'admin') {
+				continue;
+			}
+
+			$path = $dir . '/' . $entry;
+
+			if (is_dir($path) && is_file($path . '/header.tpl')) {
+				$themes[] = $entry;
+			}
+		}
+
+		sort($themes);
+
+		return $themes;
+	}
+
+	public static function resolveThemeName(string $theme): string
+	{
+		$theme = preg_replace('/[^a-z0-9_-]/', '', strtolower(trim($theme))) ?: 'theme4';
+		$available = self::availableThemes();
+
+		if (in_array($theme, $available, true)) {
+			return $theme;
+		}
+
+		if (in_array('theme4', $available, true)) {
+			return 'theme4';
+		}
+
+		if (in_array('default', $available, true)) {
+			return 'default';
+		}
+
+		return $available[0] ?? 'default';
+	}
+
+	public static function ensureStorefront(?PDO $pdo = null): void
+	{
+		if ($pdo === null) {
+			$envFile = self::rootPath() . '/config/env.php';
+
+			if (!is_file($envFile)) {
+				throw new RuntimeException('Shop is not installed.');
+			}
+
+			$env = require $envFile;
+			$pdo = self::pdo([
+				'db_host' => (string) ($env['DB_HOST'] ?? 'localhost'),
+				'db_name' => (string) ($env['DB_NAME'] ?? ''),
+				'db_user' => (string) ($env['DB_USER'] ?? ''),
+				'db_pass' => (string) ($env['DB_PASS'] ?? ''),
+			], true);
+		}
+
+		self::bootstrapStorefront($pdo, false);
+	}
+
+	private static function bootstrapStorefront(PDO $pdo, bool $withDemo = false): void
+	{
+		$productCount = (int) $pdo->query('SELECT COUNT(*) FROM products')->fetchColumn();
+
+		if ($productCount === 0 && $withDemo) {
+			try {
+				self::runSqlFile($pdo, self::rootPath() . '/install/seed_demo.sql');
+			} catch (Throwable $e) {
+				// Catalog seed is best-effort; module bootstrap still runs.
+			}
+		}
+
+		self::installStarterModules($pdo);
+		self::seedStarterMedia($pdo);
+
+		if ($withDemo) {
+			self::applyDemoThemePreset($pdo);
+		} else {
+			self::seedTheme4HomeLayout($pdo);
+		}
+
+		try {
+			$pdo->exec('UPDATE categories SET show_on_home = 1, home_position = id_category WHERE id_category IN (2, 3, 4)');
+		} catch (Throwable $e) {
+			// ignore
+		}
+	}
+
+	private static function installStarterModules(PDO $pdo): void
+	{
+		$starters = [
+			'slider' => ['1.0.0', ['home_slider', 'home_promo_slider']],
+			'main-menu' => ['1.3.0', ['main_menu', 'footer_menu']],
+			'theme4' => ['2.6.0', ['home']],
+		];
+
+		foreach ($starters as $name => $meta) {
+			$version = $meta[0];
+			$hooks = $meta[1];
+			$sqlFile = self::rootPath() . '/modules/' . $name . '/install.sql';
+
+			if (is_file($sqlFile)) {
+				self::runSqlFileIfExists($pdo, $sqlFile);
+			}
+
+			$exists = $pdo->prepare('SELECT id_module FROM modules WHERE name = ? LIMIT 1');
+			$exists->execute([$name]);
+
+			if (!$exists->fetch()) {
+				$insert = $pdo->prepare('INSERT INTO modules (name, version, active, installed) VALUES (?, ?, 1, 1)');
+				$insert->execute([$name, $version]);
+			} else {
+				$update = $pdo->prepare('UPDATE modules SET active = 1, installed = 1, version = ? WHERE name = ?');
+				$update->execute([$version, $name]);
+			}
+
+			$position = 0;
+
+			foreach ($hooks as $hook) {
+				$hookStmt = $pdo->prepare(
+					'INSERT IGNORE INTO module_display_hooks (module_name, hook_name, position) VALUES (?, ?, ?)'
+				);
+				$hookStmt->execute([$name, $hook, $position]);
+				$position++;
+			}
+		}
+	}
+
+	private static function applyDemoThemePreset(PDO $pdo): void
+	{
+		$presetDir = self::rootPath() . '/install/presets';
+		$jsonPath = $presetDir . '/theme4-demo.json';
+
+		if (!is_file($jsonPath)) {
+			self::seedTheme4HomeLayout($pdo);
+
+			return;
+		}
+
+		$decoded = json_decode((string) file_get_contents($jsonPath), true);
+
+		if (!is_array($decoded)) {
+			self::seedTheme4HomeLayout($pdo);
+
+			return;
+		}
+
+		try {
+			$pdo->exec(
+				"CREATE TABLE IF NOT EXISTS `theme4_settings` (
+				  `id` INT(11) NOT NULL AUTO_INCREMENT,
+				  `title` varchar(255) NOT NULL,
+				  `value` TEXT NOT NULL,
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+			);
+		} catch (Throwable $e) {
+			return;
+		}
+
+		$settings = is_array($decoded['settings'] ?? null) ? $decoded['settings'] : [];
+
+		foreach ($settings as $title => $value) {
+			self::upsertTheme4Setting($pdo, (string) $title, (string) $value);
+		}
+
+		$copies = [
+			$presetDir . '/theme4-demo-colors.css' => self::rootPath() . '/templates/theme4/css/colors.css',
+			$presetDir . '/theme4-demo-custom.css' => self::rootPath() . '/templates/theme4/css/custom.css',
+			$presetDir . '/theme4-demo-theme-settings.css' => self::rootPath() . '/modules/theme4/assets/css/theme-settings.css',
+			$presetDir . '/theme4-demo-custom.js' => self::rootPath() . '/templates/theme4/js/custom.js',
+		];
+
+		foreach ($copies as $from => $to) {
+			if (!is_file($from)) {
+				continue;
+			}
+
+			$dir = dirname($to);
+
+			if (!is_dir($dir)) {
+				@mkdir($dir, 0755, true);
+			}
+
+			@copy($from, $to);
+		}
+
+		$menu = is_array($decoded['menu'] ?? null) ? $decoded['menu'] : [];
+
+		if ($menu !== []) {
+			try {
+				$pdo->exec('DELETE FROM main_menu_items');
+				$insert = $pdo->prepare(
+					'INSERT INTO main_menu_items (label, link_type, link_value, target, position, active, show_header, show_mobile, show_footer)
+					 VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)'
+				);
+
+				foreach ($menu as $item) {
+					if (!is_array($item)) {
+						continue;
+					}
+
+					$insert->execute([
+						(string) ($item['label'] ?? ''),
+						(string) ($item['link_type'] ?? 'custom'),
+						(string) ($item['link_value'] ?? ''),
+						'_self',
+						(int) ($item['position'] ?? 0),
+						(int) ($item['show_header'] ?? 1),
+						(int) ($item['show_mobile'] ?? 1),
+						(int) ($item['show_footer'] ?? 0),
+					]);
+				}
+			} catch (Throwable $e) {
+				// menu table may not exist
+			}
+		}
+
+		$slides = is_array($decoded['slider'] ?? null) ? $decoded['slider'] : [];
+
+		if ($slides !== []) {
+			try {
+				$pdo->exec('DELETE FROM slider_slides');
+				$insert = $pdo->prepare(
+					'INSERT INTO slider_slides (slide_group, title, subtitle, button_text, link_url, image_file, position, active)
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+				);
+
+				foreach ($slides as $slide) {
+					if (!is_array($slide)) {
+						continue;
+					}
+
+					$insert->execute([
+						(string) ($slide['slide_group'] ?? 'hero'),
+						(string) ($slide['title'] ?? ''),
+						(string) ($slide['subtitle'] ?? ''),
+						(string) ($slide['button_text'] ?? 'Keşfet'),
+						(string) ($slide['link_url'] ?? ''),
+						(string) ($slide['image_file'] ?? 'slide_4.jpg'),
+						(int) ($slide['position'] ?? 0),
+						(int) ($slide['active'] ?? 1),
+					]);
+				}
+			} catch (Throwable $e) {
+				// slider table may not exist
+			}
+		}
+	}
+
+	private static function upsertTheme4Setting(PDO $pdo, string $title, string $value): void
+	{
+		$title = trim($title);
+
+		if ($title === '') {
+			return;
+		}
+
+		$exists = $pdo->prepare('SELECT id FROM theme4_settings WHERE title = ? LIMIT 1');
+		$exists->execute([$title]);
+
+		if ($exists->fetch()) {
+			$update = $pdo->prepare('UPDATE theme4_settings SET value = ? WHERE title = ?');
+			$update->execute([$value, $title]);
+
+			return;
+		}
+
+		$insert = $pdo->prepare('INSERT INTO theme4_settings (title, value) VALUES (?, ?)');
+		$insert->execute([$title, $value]);
+	}
+
+	private static function seedStarterMedia(PDO $pdo): void
+	{
+		$defaultImg = self::rootPath() . '/img/default.jpg';
+		$productDir = self::rootPath() . '/img/products';
+
+		if (!is_dir($productDir)) {
+			@mkdir($productDir, 0755, true);
+		}
+
+		if (is_file($defaultImg)) {
+			for ($i = 1; $i <= 10; $i++) {
+				$dest = $productDir . '/' . $i . '.jpg';
+
+				if (!is_file($dest)) {
+					@copy($defaultImg, $dest);
+				}
+			}
+
+			$slideDir = self::rootPath() . '/modules/slider/assets/img/slides';
+
+			if (!is_dir($slideDir)) {
+				@mkdir($slideDir, 0755, true);
+			}
+
+			$slideSource = $defaultImg;
+			$defaultSize = (int) filesize($defaultImg);
+
+			foreach (scandir($slideDir) ?: [] as $file) {
+				if (!preg_match('/\.(jpe?g|png|webp)$/i', $file)) {
+					continue;
+				}
+
+				if (in_array($file, ['welcome.jpg', 'slide_4.jpg'], true)) {
+					continue;
+				}
+
+				$path = $slideDir . '/' . $file;
+				$size = (int) @filesize($path);
+
+				if ($size > 120000 && $size !== $defaultSize) {
+					$slideSource = $path;
+					break;
+				}
+			}
+
+			foreach (['welcome.jpg', 'slide_4.jpg'] as $slideName) {
+				$slideDest = $slideDir . '/' . $slideName;
+				$destSize = is_file($slideDest) ? (int) filesize($slideDest) : 0;
+
+				if ($destSize === 0 || $destSize === $defaultSize) {
+					@copy($slideSource, $slideDest);
+				}
+			}
+		}
+
+		try {
+			$slideCount = (int) $pdo->query('SELECT COUNT(*) FROM slider_slides')->fetchColumn();
+
+			if ($slideCount === 0) {
+				$pdo->exec(
+					"INSERT INTO slider_slides (slide_group, title, subtitle, button_text, link_url, image_file, position, active)
+					 VALUES ('hero', 'Yeni sezon', 'Seçili ürünlerde fırsatlar', 'Keşfet', '', 'welcome.jpg', 0, 1)"
+				);
+			} else {
+				$pdo->exec(
+					"UPDATE slider_slides
+					 SET title = IF(title = '', 'Yeni sezon', title),
+					     subtitle = IF(subtitle = '', 'Seçili ürünlerde fırsatlar', subtitle),
+					     button_text = IF(button_text = '' OR button_text = 'View', 'Keşfet', button_text)
+					 WHERE slide_group = 'hero'"
+				);
+			}
+		} catch (Throwable $e) {
+			// slider table may not exist yet
+		}
+	}
+
+	private static function seedTheme4HomeLayout(PDO $pdo): void
+	{
+		try {
+			$pdo->exec(
+				"CREATE TABLE IF NOT EXISTS `theme4_settings` (
+				  `id` INT(11) NOT NULL AUTO_INCREMENT,
+				  `title` varchar(255) NOT NULL,
+				  `value` TEXT NOT NULL,
+				  PRIMARY KEY (`id`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+			);
+		} catch (Throwable $e) {
+			return;
+		}
+
+		$layout = [
+			'rows' => [
+				[
+					'id' => 'rowslider',
+					'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+					'cols' => [[
+						'id' => 'columnslider',
+						'width' => ['mobile' => 12, 'tablet' => 12, 'desktop' => 12],
+						'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+						'widgets' => [[
+							'id' => 'w_slider',
+							'type' => 'hook',
+							'settings' => ['hook' => 'home_slider'],
+						]],
+					]],
+				],
+				[
+					'id' => 'rowproducts',
+					'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+					'cols' => [[
+						'id' => 'columnproducts',
+						'width' => ['mobile' => 12, 'tablet' => 12, 'desktop' => 12],
+						'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+						'widgets' => [[
+							'id' => 'w_products',
+							'type' => 'category_products',
+							'settings' => [
+								'id_category' => 0,
+								'limit' => 12,
+								'title' => 'Öne çıkan ürünler',
+								'show_link' => 0,
+								'layout' => 'grid',
+							],
+						]],
+					]],
+				],
+				[
+					'id' => 'rowelectronics',
+					'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+					'cols' => [[
+						'id' => 'columnelectronics',
+						'width' => ['mobile' => 12, 'tablet' => 12, 'desktop' => 12],
+						'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+						'widgets' => [[
+							'id' => 'w_electronics',
+							'type' => 'category_products',
+							'settings' => [
+								'id_category' => 4,
+								'limit' => 8,
+								'title' => 'Elektronik',
+								'show_link' => 1,
+								'layout' => 'grid',
+							],
+						]],
+					]],
+				],
+				[
+					'id' => 'rowhomebottom',
+					'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+					'cols' => [[
+						'id' => 'columnhomebottom',
+						'width' => ['mobile' => 12, 'tablet' => 12, 'desktop' => 12],
+						'hide' => ['mobile' => 0, 'tablet' => 0, 'desktop' => 0],
+						'widgets' => [[
+							'id' => 'w_home_bottom',
+							'type' => 'hook',
+							'settings' => ['hook' => 'home_bottom'],
+						]],
+					]],
+				],
+			],
+		];
+
+		$json = json_encode($layout, JSON_UNESCAPED_UNICODE);
+
+		if (!is_string($json) || $json === '') {
+			return;
+		}
+
+		$exists = $pdo->prepare('SELECT id, value FROM theme4_settings WHERE title = ? LIMIT 1');
+		$exists->execute(['HOME_LAYOUT']);
+		$row = $exists->fetch();
+
+		if (!$row || trim((string) ($row['value'] ?? '')) === '' || trim((string) ($row['value'] ?? '')) === '{"rows":[]}') {
+			if ($row) {
+				$update = $pdo->prepare('UPDATE theme4_settings SET value = ? WHERE title = ?');
+				$update->execute([$json, 'HOME_LAYOUT']);
+			} else {
+				$insert = $pdo->prepare('INSERT INTO theme4_settings (title, value) VALUES (?, ?)');
+				$insert->execute(['HOME_LAYOUT', $json]);
+			}
+		}
 	}
 
 	private static function refreshDemoCurrencyPrices(array $dbConfig): void

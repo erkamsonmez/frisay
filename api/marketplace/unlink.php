@@ -23,6 +23,10 @@ if ($platform === 'hepsiburada') {
 	$result = Hepsiburada\ProductSyncService::unlinkProduct($idProduct);
 } elseif ($platform === 'n11') {
 	$result = N11\ProductSyncService::unlinkProduct($idProduct);
+} elseif ($platform === 'prestashop') {
+	$result = Prestashop\ProductSyncService::unlinkProduct($idProduct);
+} elseif ($platform === 'frisay') {
+	$result = Frisay\ProductSyncService::unlinkProduct($idProduct);
 } else {
 	$result = Trendyol\ProductSyncService::unlinkProduct($idProduct);
 }

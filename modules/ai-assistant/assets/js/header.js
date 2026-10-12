@@ -9,6 +9,18 @@
 		return;
 	}
 
+	var dockFab = document.getElementById('aiAssistDockFab');
+
+	if (dockFab) {
+		dockFab.addEventListener('click', function (e) {
+			e.preventDefault();
+			if (btn.disabled) {
+				return;
+			}
+			btn.click();
+		});
+	}
+
 	var translateModeSelect = document.getElementById('aiTranslateMode');
 
 	if (translateModeSelect && cfg.mode === 'translate') {
@@ -125,7 +137,8 @@
 	function runSummary() {
 		if (window.AiAssistantModal) {
 			window.AiAssistantModal.loading(
-				cfg.mode === 'dashboard' ? 'Panel analiz ediliyor' : 'Sayfa özetleniyor',
+				cfg.mode === 'dashboard' ? 'Panel analiz ediliyor'
+					: (cfg.mode === 'orders' ? 'Siparişler analiz ediliyor' : 'Sayfa özetleniyor'),
 				'Lütfen bekleyin…'
 			);
 		}
@@ -140,7 +153,8 @@
 			}
 
 			openAnalysis(
-				cfg.mode === 'dashboard' ? 'Panel analizi' : 'Sayfa özeti',
+				cfg.mode === 'dashboard' ? 'Panel analizi'
+					: (cfg.mode === 'orders' ? 'Sipariş analizi' : 'Sayfa özeti'),
 				data.analysis || '',
 				data.message || ''
 			);

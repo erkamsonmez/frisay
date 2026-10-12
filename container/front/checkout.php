@@ -21,11 +21,13 @@
 	$cartRequiresShipping = Cart::requiresShipping($cart);
 
 	$paymentMethods = Module::getPaymentMethods();
-	$defaultPayment = isset($paymentMethods['bank_transfer'])
-		? 'bank_transfer'
-		: (array_key_first($paymentMethods) ?: 'bank_transfer');
+	$defaultPayment = Order::resolveDefaultPaymentMethod($paymentMethods);
 
-	if (Order::getSelectedPaymentMethod() === '') {
+	if (!Tools::isSubmit('placeOrder')) {
+		if ($defaultPayment !== '') {
+			Order::setSelectedPaymentMethod($defaultPayment);
+		}
+	} elseif (Order::getSelectedPaymentMethod() === '') {
 		Order::setSelectedPaymentMethod($defaultPayment);
 	} elseif (!isset($paymentMethods[Order::getSelectedPaymentMethod()]) && $paymentMethods !== []) {
 		Order::setSelectedPaymentMethod($defaultPayment);
@@ -119,10 +121,11 @@
 			]);
 
 			if ($result['success']) {
-				// Ödeme modülü yönlendirme istediyse oraya (ör. PayTR), yoksa onay sayfasına
+				// Ödeme modülü yönlendirme istediyse oraya (ör. PayTR), yoksa onay sayfasına.
+				// Misafir siparişte my-account korumalı olduğu için girişe düşmesin.
 				$target = !empty($result['redirect'])
 					? $result['redirect']
-					: $domain . 'my-account?order=' . (int) $result['id_order'];
+					: $domain . 'checkout-success?id=' . (int) $result['id_order'];
 
 				header('Location: ' . $target);
 				exit;
@@ -142,13 +145,31 @@
 
 	$giftWrapEnabled = Order::isGiftWrapEnabled();
 	$giftWrapFee = Order::getGiftWrapFeeSetting();
+	$billingOpen = trim((string) ($formData['company_name'] ?? '')) !== ''
+		|| trim((string) ($formData['tax_office'] ?? '')) !== ''
+		|| trim((string) ($formData['tax_number'] ?? '')) !== '';
+
+	$legalDistance = Cms::getBySlug('mesafeli-satis');
+	$legalPrivacy = Cms::getBySlug('gizlilik');
+
+	if (is_array($legalDistance) && strpos((string) ($legalDistance['content'] ?? ''), '{$') !== false) {
+		$legalDistance['content'] = '';
+	}
+
+	if (is_array($legalPrivacy) && strpos((string) ($legalPrivacy['content'] ?? ''), '{$') !== false) {
+		$legalPrivacy['content'] = '';
+	}
 
 	$smarty->assign([
+		'billingOpen' => $billingOpen,
+		'legalDistance' => $legalDistance,
+		'legalPrivacy' => $legalPrivacy,
 		'checkoutTotals' => $checkoutTotals,
 		'orderError' => $orderError,
 		'addresses' => $addresses,
 		'selectedAddressId' => $selectedAddressId,
 		'formData' => $formData,
+		'selectedPaymentMethod' => (string) ($formData['payment_method'] ?? $defaultPayment),
 		'paymentMethods' => $paymentMethods,
 		'cartHasVirtual' => Cart::hasVirtualProducts($cart),
 		'cartRequiresShipping' => $cartRequiresShipping,
@@ -162,3 +183,12 @@
 			['name' => translate('Checkout'), 'url' => ''],
 		],
 	]);
+
+	if (class_exists('Module', false)) {
+		Module::refreshHook($smarty, 'order_payment', [
+			'formData' => $formData,
+			'selectedPaymentMethod' => (string) ($formData['payment_method'] ?? $defaultPayment),
+			'paymentMethods' => $paymentMethods,
+			'cart' => $cart,
+		]);
+	}

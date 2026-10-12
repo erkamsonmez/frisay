@@ -3,8 +3,9 @@
 	--pe-gap: 1.25rem;
 	--pe-card-radius: 14px;
 	--pe-accent: var(--adm-accent);
-	max-width: 1280px;
-	margin: 0 auto 5rem;
+	max-width: none;
+	width: 100%;
+	margin: 0 0 5rem;
 }
 
 .pe-topbar {
@@ -372,6 +373,78 @@
 	border-radius: 12px;
 	background: #f8fafc;
 	padding: 1rem;
+}
+
+.variation-table {
+	width: 100%;
+	margin-bottom: 0.65rem;
+}
+
+.variation-table th,
+.variation-table td {
+	padding: 0.4rem 0.45rem;
+	vertical-align: middle;
+}
+
+.variation-table .form-control {
+	width: 100%;
+	min-width: 0;
+}
+
+.variation-table .variation-row__actions {
+	width: 1%;
+	white-space: nowrap;
+	text-align: center;
+}
+
+.variation-row__actions-inner {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.4rem;
+}
+
+.variation-row__actions .form-switch {
+	padding-left: 0;
+	margin: 0;
+	min-height: 0;
+	display: flex;
+	align-items: center;
+}
+
+.variation-row__actions .form-check-input {
+	width: 2.35rem;
+	height: 1.2rem;
+	margin: 0;
+	cursor: pointer;
+	float: none;
+}
+
+.variation-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: #dc2626;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.variation-remove:hover,
+.variation-remove:focus-visible {
+	background: #fef2f2;
+	color: #b91c1c;
+}
+
+.variation-remove svg {
+	width: 16px;
+	height: 16px;
+	pointer-events: none;
 }
 
 .product-editor .adminSaveButton {

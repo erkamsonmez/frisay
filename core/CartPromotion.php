@@ -251,6 +251,147 @@ class CartPromotion
 		) ?: [];
 	}
 
+	/**
+	 * Product-page “Çok Al Az Öde” cards from active cart promotions (same product qty).
+	 * Qty=1 is omitted (already shown as the main price). Multiple nth-item rules stack.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public static function getProductPageOffers(float $unitPrice): array
+	{
+		self::ensureSchema();
+		$unitPrice = max(0.0, $unitPrice);
+
+		if ($unitPrice <= 0) {
+			return [];
+		}
+
+		$promotions = self::resolveActivePromotions(PHP_FLOAT_MAX);
+
+		if ($promotions === []) {
+			return [];
+		}
+
+		$nthPromos = [];
+		$buyXPromos = [];
+		$targetQtys = [];
+
+		foreach ($promotions as $promotion) {
+			if ($promotion['promo_type'] === 'buy_x_pay_y') {
+				$buyQty = max(2, (int) $promotion['buy_qty']);
+				$payQty = max(1, (int) $promotion['pay_qty']);
+
+				if ($buyQty - $payQty <= 0) {
+					continue;
+				}
+
+				$buyXPromos[] = $promotion;
+				$targetQtys[$buyQty] = true;
+				continue;
+			}
+
+			$position = max(2, (int) $promotion['item_position']);
+			$nthPromos[] = $promotion;
+			$targetQtys[$position] = true;
+
+			if ((int) ($promotion['repeat_every'] ?? 0) === 1) {
+				for ($q = $position * 2; $q <= min(12, $position * 3); $q += $position) {
+					$targetQtys[$q] = true;
+				}
+			}
+		}
+
+		if ($targetQtys === []) {
+			return [];
+		}
+
+		ksort($targetQtys);
+		$usePercentBadge = false;
+
+		foreach ($nthPromos as $promo) {
+			if (($promo['item_discount_type'] ?? '') === 'percent') {
+				$usePercentBadge = true;
+				break;
+			}
+		}
+
+		if (!$usePercentBadge && $buyXPromos !== [] && $nthPromos === []) {
+			$usePercentBadge = true;
+		}
+
+		$out = [];
+
+		foreach (array_keys($targetQtys) as $qty) {
+			$qty = (int) $qty;
+
+			if ($qty < 2) {
+				continue;
+			}
+
+			$total = self::simulateSameProductTotal($unitPrice, $qty, $nthPromos, $buyXPromos);
+			$full = $unitPrice * $qty;
+			$saved = max(0.0, $full - $total);
+			$avg = $total / $qty;
+			$pct = $full > 0 ? (int) round(($saved / $full) * 100) : 0;
+			$savingsFormatted = Tools::displayPrice($saved);
+
+			$badge = '';
+
+			if ($saved > 0.0001) {
+				$badge = $usePercentBadge
+					? '%' . max(1, $pct) . ' ' . translate('discount')
+					: $savingsFormatted . ' ' . translate('discount');
+			}
+
+			$out[] = [
+				'min_qty' => $qty,
+				'unit_price' => round($avg, 2),
+				'total' => round($total, 2),
+				'discount_pct' => max(0, $pct),
+				'badge_is_percent' => $usePercentBadge,
+				'savings' => round($saved, 2),
+				'savings_formatted' => $savingsFormatted,
+				'badge' => $badge,
+				'label' => $qty . ' x ' . Tools::displayPrice($avg),
+				'unit_price_formatted' => Tools::displayPrice(round($avg, 2)),
+				'total_formatted' => Tools::displayPrice(round($total, 2)),
+			];
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param list<array<string, mixed>> $nthPromos
+	 * @param list<array<string, mixed>> $buyXPromos
+	 */
+	private static function simulateSameProductTotal(
+		float $unitPrice,
+		int $qty,
+		array $nthPromos,
+		array $buyXPromos
+	): float {
+		$units = [];
+
+		for ($i = 0; $i < $qty; $i++) {
+			$units[] = ['unit_price' => $unitPrice];
+		}
+
+		$discount = 0.0;
+
+		foreach ($nthPromos as $promotion) {
+			$discount += self::calculateNthItem($units, $promotion);
+		}
+
+		foreach ($buyXPromos as $promotion) {
+			$discount += self::calculateBuyXPayY($units, $promotion);
+		}
+
+		$full = $unitPrice * $qty;
+
+		return max(0.0, round($full - $discount, 2));
+	}
+
 	/** @param array<int, array{unit_price: float}> $units */
 	private static function calculateNthItem(array $units, array $promotion): float
 	{

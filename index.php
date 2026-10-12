@@ -21,10 +21,21 @@
 		StoreStatus::renderMaintenance();
 	}
 
+	Routes::redirectPrestashopFrontIfNeeded();
+
 	$container = Security::sanitizeContainerSlug((string) Tools::getValue('container'));
 
 	if ($container === '') {
 		$container = 'home';
+	}
+
+	$sensitiveFront = [
+		'checkout', 'cart', 'login', 'register', 'my-account',
+		'forgot-password', 'reset-password', 'card-payment',
+	];
+
+	if (Customer::isLoggedIn() || in_array($container, $sensitiveFront, true)) {
+		App::sendNoStoreHeaders();
 	}
 	Routes::redirectLegacyIfNeeded($container);
 

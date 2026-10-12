@@ -145,10 +145,10 @@ class BankwireModule extends ModuleBase
 	public function renderDisplayHook(string $hook, array $context = []): ?string
 	{
 		if ($hook === 'order_payment') {
-			$html = $this->renderFrontTemplate('order_payment', [
+			$html = $this->renderFrontTemplate('order_payment', array_merge($context, [
 				'bankwireDiscountPercent' => self::getDiscountPercent(),
 				'bankwireDiscountLabel' => self::formatDiscountPercentLabel(self::getDiscountPercent()),
-			]);
+			]));
 
 			return $html !== '' ? $html : null;
 		}

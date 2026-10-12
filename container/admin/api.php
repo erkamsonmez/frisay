@@ -11,6 +11,7 @@ ApiKey::ensureSchema();
 $flash = '';
 $flashType = 'success';
 $newApiKey = '';
+$newWsKey = '';
 
 if (Tools::isSubmit('saveApiEnabled')) {
 	$postToken = (string) Tools::getValue('token');
@@ -42,6 +43,7 @@ if (Tools::isSubmit('createApiKey')) {
 
 		if ($result['ok'] && !empty($result['api_key'])) {
 			$newApiKey = (string) $result['api_key'];
+			$newWsKey = (string) ($result['ws_key'] ?? substr($newApiKey, 0, 32));
 		}
 	}
 }
@@ -78,6 +80,7 @@ if (Tools::isSubmit('regenApiKey')) {
 
 		if ($result['ok'] && !empty($result['api_key'])) {
 			$newApiKey = (string) $result['api_key'];
+			$newWsKey = (string) ($result['ws_key'] ?? substr($newApiKey, 0, 32));
 		}
 	}
 }
@@ -92,6 +95,18 @@ if (Tools::isSubmit('deleteApiKey')) {
 		$result = ApiKey::delete((int) Tools::getValue('id_api_key'));
 		$flash = $result['message'];
 		$flashType = $result['ok'] ? 'success' : 'danger';
+	}
+}
+
+if (Tools::isSubmit('clearPsWsLog')) {
+	$postToken = (string) Tools::getValue('token');
+
+	if (!hash_equals($adminToken, $postToken)) {
+		$flash = adminT('Invalid request');
+		$flashType = 'danger';
+	} else {
+		PsWebService::clearRequestLogs();
+		$flash = 'Prapazar / PrestaShop istek kaydı silindi';
 	}
 }
 
@@ -125,17 +140,26 @@ $apiDocs = [
     ],
 ];
 
+$psWsLogs = [];
+foreach (PsWebService::getRequestLogs(100) as $row) {
+	$row['query_json'] = json_encode($row['query'] ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	$psWsLogs[] = $row;
+}
+
 $smarty->assign([
 	'flash' => $flash,
 	'flashType' => $flashType,
 	'newApiKey' => $newApiKey,
+	'newWsKey' => $newWsKey,
 	'apiEnabled' => Settings::get('WEBAPI_ENABLED') === '1',
 	'apiKeys' => ApiKey::getList(),
 	'permissionCatalog' => ApiKey::permissionCatalog(),
 	'editKey' => $editKey,
 	'webApiUrl' => rtrim($domain, '/') . '/api/v1/',
+	'psWsUrl' => rtrim($domain, '/') . '/api/',
 	'apiDocs' => $apiDocs,
 	'apiDocsPortalUrl' => $apiDocsBase,
+	'psWsLogs' => $psWsLogs,
 ]);
 
 AdminPage::add('api', 'API Keys');

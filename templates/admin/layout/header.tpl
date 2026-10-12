@@ -3,6 +3,7 @@
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="refresh" content="900">
 	<title>{if $pageTitle}{$pageTitle|escape} | {/if}Admin — {$siteName|escape}</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com">
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,7 +25,7 @@
 	{/if}
 	<link rel="icon" type="image/x-icon" href="{$domain}img/faviconAdmin.ico">
 </head>
-<body class="admin-body">
+<body class="admin-body{if $adminBodyClass|default:''} {$adminBodyClass|escape}{/if}">
 <script>
 try {
 	if (localStorage.getItem('fshop.admin.sidebarCollapsed') === '1' && window.innerWidth >= 992) {
@@ -56,8 +57,33 @@ try {
 		</div>
 
 		<nav class="sidebar-menu" id="adminSidebarMenu" data-accordion="1">
-			<div class="nav-accordion is-open" data-accordion-group="general">
-				<button type="button" class="nav-accordion__toggle" aria-expanded="true">
+			<div class="nav-accordion is-open nav-accordion--favorites" data-accordion-group="favorites">
+				<button type="button" class="nav-accordion__toggle" aria-expanded="true" title="{'Favorites'|adminT}">
+					<span class="nav-accordion__icon"><i data-lucide="star"></i></span>
+					<span class="nav-accordion__label">{'Favorites'|adminT}</span>
+					<svg class="nav-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+				</button>
+				<div class="nav-accordion__body">
+					<div id="adminFavList">
+						{foreach $adminFavoriteItems as $favItem}
+						<a href="{$favItem.url|escape}" class="menu-item{if $favItem.active} active{/if}" data-menu-key="{$favItem.key|escape}"{if $favItem.target} target="{$favItem.target|escape}" rel="noopener"{/if}>
+							<span class="menu-item__icon"><i data-lucide="{$favItem.icon|escape}"></i></span>
+							<span class="menu-item__label">{$favItem.label|adminT|escape}</span>
+							{if $favItem.badge > 0}<span class="nav-badge">{$favItem.badge}</span>{/if}
+							<button type="button" class="menu-fav-star is-on" data-menu-key="{$favItem.key|escape}" aria-pressed="true" title="{'Remove from favorites'|adminT}">
+								<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+							</button>
+						</a>
+						{/foreach}
+					</div>
+					{if !$adminFavoriteItems|@count}
+					<p class="admin-fav-empty" id="adminFavEmpty">{'No favorite menus yet'|adminT}</p>
+					{/if}
+				</div>
+			</div>
+
+			<div class="nav-accordion" data-accordion-group="general">
+				<button type="button" class="nav-accordion__toggle" aria-expanded="false" title="{'General'|adminT}">
 					<span class="nav-accordion__icon"><i data-lucide="layout-dashboard"></i></span>
 					<span class="nav-accordion__label">{'General'|adminT}</span>
 					<svg class="nav-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -66,6 +92,10 @@ try {
 					<a href="{$adminUrl}dashboard" class="menu-item {if $pageName == 'dashboard'}active{/if}">
 						<span class="menu-item__icon"><i data-lucide="layout-dashboard"></i></span>
 						<span class="menu-item__label">{'Dashboard'|adminT}</span>
+					</a>
+					<a href="{$adminUrl}welcome" class="menu-item {if $pageName == 'welcome'}active{/if}">
+						<span class="menu-item__icon"><i data-lucide="rocket"></i></span>
+						<span class="menu-item__label">{'Welcome'|adminT}</span>
 					</a>
 					<a href="{$adminUrl}customers" class="menu-item {if $pageName == 'customers' || $pageName == 'customer'}active{/if}">
 						<span class="menu-item__icon"><i data-lucide="users"></i></span>
@@ -92,7 +122,7 @@ try {
 			</div>
 
 			<div class="nav-accordion" data-accordion-group="sales">
-				<button type="button" class="nav-accordion__toggle" aria-expanded="false">
+				<button type="button" class="nav-accordion__toggle" aria-expanded="false" title="{'Sales'|adminT}">
 					<span class="nav-accordion__icon"><i data-lucide="shopping-bag"></i></span>
 					<span class="nav-accordion__label">{'Sales'|adminT}</span>
 					<svg class="nav-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -132,7 +162,7 @@ try {
 			</div>
 
 			<div class="nav-accordion" data-accordion-group="catalog">
-				<button type="button" class="nav-accordion__toggle" aria-expanded="false">
+				<button type="button" class="nav-accordion__toggle" aria-expanded="false" title="{'Catalog'|adminT}">
 					<span class="nav-accordion__icon"><i data-lucide="package"></i></span>
 					<span class="nav-accordion__label">{'Catalog'|adminT}</span>
 					<svg class="nav-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -185,7 +215,7 @@ try {
 			</div>
 
 			<div class="nav-accordion" data-accordion-group="marketplace">
-				<button type="button" class="nav-accordion__toggle" aria-expanded="false">
+				<button type="button" class="nav-accordion__toggle" aria-expanded="false" title="{'Marketplace'|adminT}">
 					<span class="nav-accordion__icon"><i data-lucide="store"></i></span>
 					<span class="nav-accordion__label">{'Marketplace'|adminT}</span>
 					<svg class="nav-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -218,7 +248,7 @@ try {
 			</div>
 
 			<div class="nav-accordion" data-accordion-group="system">
-				<button type="button" class="nav-accordion__toggle" aria-expanded="false">
+				<button type="button" class="nav-accordion__toggle" aria-expanded="false" title="{'System'|adminT}">
 					<span class="nav-accordion__icon"><i data-lucide="settings-2"></i></span>
 					<span class="nav-accordion__label">{'System'|adminT}</span>
 					<svg class="nav-accordion__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
@@ -256,6 +286,10 @@ try {
 						<span class="menu-item__icon"><i data-lucide="zap"></i></span>
 						<span class="menu-item__label">{'Performance'|adminT}</span>
 					</a>
+					<a href="{$adminUrl}security" class="menu-item {if $pageName == 'security'}active{/if}">
+						<span class="menu-item__icon"><i data-lucide="shield"></i></span>
+						<span class="menu-item__label">{'Security'|adminT}</span>
+					</a>
 					<a href="{$adminUrl}api" class="menu-item {if $pageName == 'api'}active{/if}">
 						<span class="menu-item__icon"><i data-lucide="link-2"></i></span>
 						<span class="menu-item__label">{'API'|adminT}</span>
@@ -277,6 +311,10 @@ try {
 	</aside>
 
 	<div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+	<div id="adminSidebarFlyout" class="sidebar-flyout" hidden>
+		<div class="sidebar-flyout__title"></div>
+		<div class="sidebar-flyout__items"></div>
+	</div>
 
 	<div class="admin-main">
 		<header class="header">
@@ -284,7 +322,7 @@ try {
 				<button type="button" class="header-menu-btn" id="mobileMenuBtn" aria-label="{'Toggle menu'|adminT}">
 					<i data-lucide="menu"></i>
 				</button>
-				{if $pageName != 'dashboard' && $pageTitle}
+				{if $pageTitle}
 				<div class="header-page-title d-none d-md-block">
 					<h1>{$pageTitle|escape}</h1>
 				</div>
@@ -345,8 +383,9 @@ try {
 					</ul>
 				</div>
 				<div class="dropdown">
-					<button class="header-icon-btn header-icon-btn--round dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{'Language'|adminT}">
-						<i data-lucide="globe"></i>
+					<button class="header-add-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{'Language'|adminT}">
+						<span>{if $adminLang == 'en'}ENGLISH{else}TÜRKÇE{/if}</span>
+						<svg class="header-add-btn__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
 					</button>
 					<ul class="dropdown-menu dropdown-menu-end shadow-sm">
 						{foreach $adminLangSwitcher as $langItem}
@@ -378,14 +417,19 @@ try {
 						<li><a class="dropdown-item" href="{$adminUrl}account">{'My Account'|adminT}</a></li>
 						<li><a class="dropdown-item" href="{$adminUrl}settings">{'Settings'|adminT}</a></li>
 						<li><hr class="dropdown-divider"></li>
-						<li><a class="dropdown-item text-danger" href="{$adminUrl}logout">{'Sign Out'|adminT}</a></li>
+						<li>
+							<form method="post" action="{$adminUrl}logout" class="mb-0">
+								<input type="hidden" name="token" value="{$adminToken|escape}">
+								<button type="submit" class="dropdown-item text-danger">{'Sign Out'|adminT}</button>
+							</form>
+						</li>
 					</ul>
 				</div>
 			</div>
 		</header>
 
 		<div class="main-wrapper">
-			{if $pageName != 'dashboard' && $pageTitle}
+			{if $pageTitle}
 			<div class="admin-page-head d-md-none">
 				<h1>{$pageTitle|escape}</h1>
 			</div>

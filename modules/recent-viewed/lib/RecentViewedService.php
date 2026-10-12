@@ -87,23 +87,139 @@ class RecentViewedService
 			return [];
 		}
 
-		$ids = array_slice(self::getStoredIds(), 0, self::getDisplayLimit());
+		return self::loadProducts(array_slice(self::getStoredIds(), 0, self::getDisplayLimit()));
+	}
 
-		if ($ids === []) {
+	/**
+	 * @param int[] $excludeIds
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function getProductsForCart(array $excludeIds = []): array
+	{
+		if (!self::isEnabled()) {
 			return [];
 		}
 
+		$ids = self::filterIds(self::getStoredIds(), $excludeIds);
+
+		return self::loadProducts(array_slice($ids, 0, 6));
+	}
+
+	/**
+	 * @param int[] $excludeIds
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function getForYouProducts(array $excludeIds = []): array
+	{
+		$ids = self::filterIds(self::parseIdList((string) Settings::get('SANA_OZEL_PRODUCT_IDS')), $excludeIds);
+
+		return self::loadProducts(array_slice($ids, 0, 6), true);
+	}
+
+	public static function ensureCartHook(): void
+	{
+		$installed = (int) DB::getValue('SELECT installed FROM modules WHERE name = ? LIMIT 1', ['recent-viewed']);
+
+		if ($installed !== 1) {
+			return;
+		}
+
+		$exists = (int) DB::getValue(
+			'SELECT id_hook FROM module_display_hooks WHERE module_name = ? AND hook_name = ? LIMIT 1',
+			['recent-viewed', 'cart']
+		);
+
+		if ($exists > 0) {
+			return;
+		}
+
+		$position = (int) DB::getValue(
+			'SELECT MAX(position) FROM module_display_hooks WHERE module_name = ?',
+			['recent-viewed']
+		);
+
+		DB::insert('module_display_hooks', [
+			'module_name' => 'recent-viewed',
+			'hook_name' => 'cart',
+			'position' => $position + 1,
+		]);
+	}
+
+	/**
+	 * @param int[] $ids
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function loadProducts(array $ids, bool $inStockOnly = false): array
+	{
 		$products = [];
 
 		foreach ($ids as $id) {
-			$row = Product::getById((int) $id);
+			$id = (int) $id;
 
-			if ($row) {
-				$products[] = $row;
+			if ($id <= 0) {
+				continue;
 			}
+
+			$row = Product::getById($id);
+
+			if (!$row) {
+				continue;
+			}
+
+			if ($inStockOnly && empty($row['in_stock'])) {
+				continue;
+			}
+
+			$products[] = $row;
 		}
 
 		return $products;
+	}
+
+	/**
+	 * @param int[] $ids
+	 * @param int[] $excludeIds
+	 * @return int[]
+	 */
+	private static function filterIds(array $ids, array $excludeIds): array
+	{
+		$exclude = [];
+
+		foreach ($excludeIds as $id) {
+			$id = (int) $id;
+
+			if ($id > 0) {
+				$exclude[$id] = true;
+			}
+		}
+
+		$out = [];
+
+		foreach ($ids as $id) {
+			$id = (int) $id;
+
+			if ($id > 0 && empty($exclude[$id])) {
+				$out[] = $id;
+			}
+		}
+
+		return array_values(array_unique($out));
+	}
+
+	/** @return int[] */
+	private static function parseIdList(string $raw): array
+	{
+		$ids = [];
+
+		foreach (preg_split('/[,\s]+/', $raw) ?: [] as $id) {
+			$id = (int) $id;
+
+			if ($id > 0) {
+				$ids[] = $id;
+			}
+		}
+
+		return array_values(array_unique($ids));
 	}
 
 	/** @param array<string, mixed> $input */

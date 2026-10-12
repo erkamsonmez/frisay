@@ -5,6 +5,75 @@
  */
 
 /**
+ * Mağaza kök yolu (PWA scope). Kök kurulumda "/" döner; alt klasörde "/fshop/" gibi.
+ * Asla sabit /fshop/ varsaymaz; URL'nin ilk segmentini klasör sanmaz.
+ *
+ * @param string $scriptName Örn. /manifest.php veya /fshop/sw.php
+ * @return string trailing slash ile (örn. "/" veya "/fshop/")
+ */
+function fshop_pwa_resolve_scope($scriptName = '')
+{
+	$normalize = static function ($path) {
+		$path = str_replace('\\', '/', trim((string) $path));
+
+		if ($path === '' || $path === '/' || $path === '.') {
+			return '/';
+		}
+
+		return '/' . trim($path, '/') . '/';
+	};
+
+	$pdo = fshop_pwa_pdo();
+
+	if ($pdo instanceof PDO) {
+		try {
+			$stmt = $pdo->prepare('SELECT value FROM settings WHERE title = ? LIMIT 1');
+
+			$stmt->execute(['DOMAIN']);
+			$domainRow = $stmt->fetch();
+			$domain = is_array($domainRow) ? trim((string) ($domainRow['value'] ?? '')) : '';
+
+			if ($domain !== '') {
+				$path = (string) parse_url($domain, PHP_URL_PATH);
+				$path = trim(str_replace('\\', '/', $path), '/');
+
+				if ($path !== '') {
+					return $normalize($path);
+				}
+
+				// DOMAIN kökte (https://ornek.com/) → scope /
+				return '/';
+			}
+
+			$stmt->execute(['FOLDER']);
+			$folderRow = $stmt->fetch();
+			$folder = is_array($folderRow) ? trim((string) ($folderRow['value'] ?? ''), '/') : '';
+
+			if ($folder !== '') {
+				return $normalize($folder);
+			}
+		} catch (Exception $e) {
+			// devam
+		}
+	}
+
+	$script = str_replace('\\', '/', (string) $scriptName);
+
+	if ($script === '') {
+		$script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+	}
+
+	// /manifest.php → /   |   /fshop/manifest.php → /fshop/
+	if ($script !== '' && $script !== '/') {
+		$dir = str_replace('\\', '/', (string) dirname($script));
+
+		return $normalize($dir);
+	}
+
+	return '/';
+}
+
+/**
  * @return PDO|null
  */
 function fshop_pwa_pdo()

@@ -10,6 +10,12 @@
 	$pLink 		= '';
 	$isNew 		= $id <= 0;
 
+	if (!empty($_SESSION['admin_flash']) && is_array($_SESSION['admin_flash'])) {
+		$flash = (string) ($_SESSION['admin_flash']['message'] ?? '');
+		$flashType = (string) ($_SESSION['admin_flash']['type'] ?? 'success');
+		unset($_SESSION['admin_flash']);
+	}
+
 	if (!$isNew && !$product) {
 		http_response_code(404);
 		AdminPage::add('404', 'Product not found');
@@ -325,6 +331,7 @@
 		'virtual_file' 		=> '',
 		'virtual_file_name' => '',
 		'images' 			=> [],
+		'extra_category_ids' => [],
 	];
 
 	$licenseStats = ['available' => 0, 'used' => 0];
@@ -407,6 +414,7 @@
 		],
 		'shopCurrencyLabel' => Currency::label(),
 		'taxOptions' => Tax::getProductOptions((float) ($form['vat'] ?? Tax::getDefaultRate())),
+		'extraCategoryIds' => array_map('intval', $form['extra_category_ids'] ?? []),
 	]);
 
 	AdminPage::add('product', $isNew ? 'New Product' : 'Edit product');

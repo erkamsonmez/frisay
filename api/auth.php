@@ -82,6 +82,22 @@ switch ($action) {
 		]);
 		break;
 
+	case 'check-email':
+		$email = strtolower(trim((string) Tools::getValue('email')));
+		echo json_encode([
+			'success' => true,
+			'exists' => Customer::emailIsRegistered($email),
+		]);
+		break;
+
+	case 'check-phone':
+		$phone = (string) Tools::getValue('phone');
+		echo json_encode([
+			'success' => true,
+			'exists' => Customer::phoneIsRegistered($phone),
+		]);
+		break;
+
 	default:
 		http_response_code(400);
 		echo json_encode(['success' => false, 'message' => 'Geçersiz işlem']);

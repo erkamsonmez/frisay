@@ -2,8 +2,12 @@
 	'use strict';
 
 	function getSelectedVariationId() {
-		var selected = document.querySelector('[name="id_variation"]:checked, select[name="id_variation"]');
+		var hidden = document.getElementById('selectedVariationId');
+		if (hidden && hidden.value) {
+			return parseInt(hidden.value, 10) || 0;
+		}
 
+		var selected = document.querySelector('[name="id_variation"]:checked, select[name="id_variation"]');
 		if (!selected) {
 			return 0;
 		}
@@ -39,6 +43,17 @@
 				variationInput.value = String(getSelectedVariationId());
 			}
 
+			var emailInput = form.querySelector('[name="email"]');
+			var email = emailInput ? String(emailInput.value || '').trim() : '';
+
+			if (!email) {
+				showMessage(messageEl, 'E-posta gerekli', 'error');
+				if (emailInput) {
+					emailInput.focus();
+				}
+				return;
+			}
+
 			var submitBtn = form.querySelector('[type="submit"]');
 
 			if (submitBtn) {
@@ -61,15 +76,14 @@
 				.then(function (data) {
 					showMessage(messageEl, data.message || '', data.success ? 'success' : 'error');
 
-					if (data.success) {
-						var emailInput = form.querySelector('[name="email"]');
-						var savedEmail = emailInput ? emailInput.value : '';
+					if (data.success && typeof window.showToast === 'function') {
+						window.showToast(data.message, 'success');
+					}
 
+					if (data.success && emailInput) {
+						var savedEmail = emailInput.value;
 						form.reset();
-
-						if (emailInput && savedEmail !== '') {
-							emailInput.value = savedEmail;
-						}
+						emailInput.value = savedEmail;
 					}
 				})
 				.catch(function () {

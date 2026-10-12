@@ -35,10 +35,12 @@
 					<button class="btn btn-outline-secondary" type="button" id="copyFeedUrl">Kopyala</button>
 					<a href="{$feedUrl|escape}" target="_blank" class="btn btn-outline-primary">Önizle</a>
 				</div>
-				<div class="d-flex gap-4 mt-2 text-muted small">
+				<div class="d-flex gap-4 mt-2 text-muted small flex-wrap">
 					<span>Son yenileme: <strong id="lastRegen">{$lastRegen|escape}</strong></span>
-					<span>Önbellek: <strong>{if $cacheExists}Mevcut{else}Yok{/if}</strong></span>
+					<span>Önbellek: <strong>{if !$cacheExists}Yok{elseif $cacheExpired}Süresi doldu ({$cacheAgeMin} dk önce){else}Geçerli — {$cacheRemainingMin} dk kaldı{/if}</strong></span>
 				</div>
+				<p class="small text-muted mb-0 mt-2">XML, süre dolunca kendiliğinden üretilmez. Feed URL’si istenince veya cron çalışınca yenilenir.</p>
+				<p class="small font-monospace text-muted mb-0">{$cronFeedsUrl|escape}</p>
 				<div class="mt-3 d-flex flex-wrap gap-2">
 					<button class="btn btn-dark btn-sm" id="btnRegen">
 						<span id="regenSpinner" class="spinner-border spinner-border-sm d-none me-1"></span>

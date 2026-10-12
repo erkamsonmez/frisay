@@ -73,6 +73,90 @@ class Pagination
 		return $map[$sort];
 	}
 
+	/**
+	 * Admin list column sort from ?sort=&dir= (first click DESC, second ASC).
+	 *
+	 * @param array<string, string> $columns map of request key => SQL expression (no ASC/DESC)
+	 * @param array<string, mixed> $queryParams preserved GET params for header links
+	 * @return array{
+	 *   sort: string,
+	 *   dir: string,
+	 *   order_by: string,
+	 *   query: array<string, mixed>,
+	 *   links: array<string, array{url: string, active: bool, dir: string, next_dir: string}>
+	 * }
+	 */
+	public static function adminColumnSort(
+		array $columns,
+		string $defaultSort,
+		string $defaultDir,
+		string $baseUrl,
+		array $queryParams = [],
+		?string $requestSort = null,
+		?string $requestDir = null
+	): array {
+		$sort = trim((string) ($requestSort !== null ? $requestSort : Tools::getValue('sort', $defaultSort)));
+		$dir = strtolower(trim((string) ($requestDir !== null ? $requestDir : Tools::getValue('dir', $defaultDir))));
+
+		if ($sort === '' || !isset($columns[$sort])) {
+			$sort = $defaultSort;
+		}
+
+		if ($dir !== 'asc' && $dir !== 'desc') {
+			$dir = strtolower($defaultDir) === 'asc' ? 'asc' : 'desc';
+		}
+
+		if (!isset($columns[$sort])) {
+			$keys = array_keys($columns);
+			$sort = (string) ($keys[0] ?? $defaultSort);
+			$dir = 'desc';
+		}
+
+		$orderBy = $columns[$sort] . ' ' . strtoupper($dir);
+		$query = $queryParams;
+		$query['sort'] = $sort;
+		$query['dir'] = $dir;
+
+		$links = [];
+
+		foreach ($columns as $key => $_expr) {
+			$nextDir = ($sort === $key && $dir === 'desc') ? 'asc' : 'desc';
+			$linkQuery = $queryParams;
+			$linkQuery['sort'] = $key;
+			$linkQuery['dir'] = $nextDir;
+			unset($linkQuery['page']);
+
+			$links[$key] = [
+				'url' => self::buildQueryUrl($baseUrl, $linkQuery),
+				'active' => $sort === $key,
+				'dir' => $sort === $key ? $dir : '',
+				'next_dir' => $nextDir,
+			];
+		}
+
+		return [
+			'sort' => $sort,
+			'dir' => $dir,
+			'order_by' => $orderBy,
+			'query' => $query,
+			'links' => $links,
+		];
+	}
+
+	/**
+	 * @param array<string, mixed> $params
+	 */
+	public static function buildQueryUrl(string $baseUrl, array $params): string
+	{
+		$params = array_filter($params, static function ($value) {
+			return $value !== null && $value !== '';
+		});
+
+		$qs = http_build_query($params);
+
+		return $baseUrl . ($qs !== '' ? '?' . $qs : '');
+	}
+
 	public static function getSortOptions(): array
 	{
 		$options = [

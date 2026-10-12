@@ -20,7 +20,7 @@
 		$editModule = Theme::resolveEditModule($requestedTheme);
 
 		if ($editModule !== null) {
-			header('Location: ' . Admin::url('module-' . $editModule));
+			header('Location: ' . Admin::url('module-' . $editModule) . '?theme=' . rawurlencode($requestedTheme));
 			exit;
 		}
 	}

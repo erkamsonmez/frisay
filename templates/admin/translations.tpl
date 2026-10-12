@@ -75,32 +75,46 @@
 	</form>
 </div>
 
-<form method="get" action="{$adminUrl}translations" class="admin-panel p-3 mb-3">
+<form method="get" action="{$adminUrl}translations" id="admTranslationsFilterForm">
 	<input type="hidden" name="scope" value="{$uiScope|escape}">
-	<div class="row g-2 align-items-end">
-		<div class="col-md-3">
-			<label class="form-label" for="uiLang">{'Target language'|adminT}</label>
-			<select name="lang" id="uiLang" class="form-select form-select-sm" onchange="this.form.submit()">
-				{foreach $uiLanguages as $lang}
-					{if $lang.code != 'en'}
-					<option value="{$lang.code|escape}"{if $lang.code == $uiTargetLang} selected{/if}>{$lang.label|escape} ({$lang.code|escape})</option>
-					{/if}
-				{/foreach}
-			</select>
-		</div>
-		<div class="col-md-3">
-			<label class="form-label" for="uiFilter">{'Filter'|adminT}</label>
-			<select name="filter" id="uiFilter" class="form-select form-select-sm" onchange="this.form.submit()">
-				<option value="all"{if $uiFilter == 'all'} selected{/if}>{'All keys'|adminT}</option>
-				<option value="missing"{if $uiFilter == 'missing'} selected{/if}>{'Missing only'|adminT}</option>
-			</select>
-		</div>
-		<div class="col-md-4">
-			<label class="form-label" for="uiQuery">{'Search'|adminT}</label>
-			<input type="search" name="q" id="uiQuery" class="form-control form-control-sm" value="{$uiQuery|escape}" placeholder="{'Search key or text…'|adminT}">
-		</div>
-		<div class="col-md-2">
-			<button type="submit" class="btn btn-outline-dark btn-sm w-100">{'Apply'|adminT}</button>
+	<div class="admin-panel p-3 mb-3">
+		<div class="mp-filter-card mb-0">
+			<div class="mp-filter-header">
+				<div>
+					<div class="mp-filter-title">
+						{include file='admin/partials/filter-funnel-icon.tpl'}
+						{'Filters'|adminT}
+					</div>
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-md-4 mb-3">
+					<label for="uiLang">{'Target language'|adminT}</label>
+					<select name="lang" id="uiLang" class="form-select form-select-sm">
+						{foreach $uiLanguages as $lang}
+							{if $lang.code != 'en'}
+							<option value="{$lang.code|escape}"{if $lang.code == $uiTargetLang} selected{/if}>{$lang.label|escape} ({$lang.code|escape})</option>
+							{/if}
+						{/foreach}
+					</select>
+				</div>
+				<div class="col-md-4 mb-3">
+					<label for="uiFilter">{'Filter'|adminT}</label>
+					<select name="filter" id="uiFilter" class="form-select form-select-sm">
+						<option value="all"{if $uiFilter == 'all'} selected{/if}>{'All keys'|adminT}</option>
+						<option value="missing"{if $uiFilter == 'missing'} selected{/if}>{'Missing only'|adminT}</option>
+					</select>
+				</div>
+				<div class="col-md-4 mb-3">
+					<label for="uiQuery">{'Search'|adminT}</label>
+					<input type="search" name="q" id="uiQuery" class="form-control form-control-sm" value="{$uiQuery|escape}" placeholder="{'Search key or text…'|adminT}">
+				</div>
+			</div>
+			<div class="mp-filter-actions">
+				<div class="mp-filter-actions__btns">
+					<button type="submit" class="btn btn-warning">{'Apply'|adminT}</button>
+				</div>
+			</div>
 		</div>
 	</div>
 </form>

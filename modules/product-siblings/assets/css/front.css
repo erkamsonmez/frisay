@@ -1,0 +1,89 @@
+.psib-options {
+	margin: 0.65rem 0 0.15rem;
+}
+
+.psib-options__label {
+	font-size: 0.88rem;
+	font-weight: 700;
+	color: #0f172a;
+	margin-bottom: 0.5rem;
+}
+
+.psib-options__list {
+	display: flex;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	gap: 0.5rem;
+	overflow-x: auto;
+	padding-bottom: 2px;
+	-webkit-overflow-scrolling: touch;
+}
+
+.psib-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.45rem;
+	flex: 0 0 auto;
+	width: auto;
+	max-width: 168px;
+	min-width: 0;
+	padding: 0.4rem 0.65rem 0.4rem 0.4rem;
+	border: 1.5px solid #d7dee8;
+	border-radius: 12px;
+	background: #fff;
+	color: inherit;
+	text-decoration: none;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.psib-option:hover {
+	border-color: #94a3b8;
+	color: inherit;
+}
+
+.psib-option.is-active {
+	border-color: #64748b;
+	border-width: 2px;
+	box-shadow: 0 0 0 1px rgba(100, 116, 139, 0.15);
+}
+
+.psib-option__media {
+	flex: 0 0 40px;
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	overflow: hidden;
+	background: #f1f5f9;
+	display: grid;
+	place-items: center;
+}
+
+.psib-option__media img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.psib-option__body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.08rem;
+	min-width: 0;
+	line-height: 1.25;
+}
+
+.psib-option__body strong {
+	display: block;
+	max-width: 110px;
+	font-size: 0.84rem;
+	font-weight: 700;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.psib-option__body small {
+	font-size: 0.72rem;
+	color: #64748b;
+	white-space: nowrap;
+}

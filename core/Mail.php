@@ -159,7 +159,7 @@ class Mail
 			. '<p>Merhaba <strong>' . $name . '</strong>,</p>'
 			. '<p>' . htmlspecialchars($siteName, ENT_QUOTES, 'UTF-8') . ' ailesine katıldığınız için teşekkür ederiz. Hesabınız başarıyla oluşturuldu.</p>'
 			. '<p>Siparişlerinizi takip etmek ve alışverişe devam etmek için hesabınıza giriş yapabilirsiniz.</p>'
-			. '<p style="margin:24px 0;"><a href="' . $loginUrl . '" style="display:inline-block;padding:12px 24px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:6px;">Giriş Yap</a></p>';
+			. self::ctaButton($loginUrl, 'Giriş Yap');
 
 		return self::send($to, $siteName . ' - Hoş geldiniz', $body);
 	}
@@ -173,7 +173,7 @@ class Mail
 		$body = '<h2 style="margin:0 0 16px;">Şifre Sıfırlama</h2>'
 			. '<p>Merhaba <strong>' . $name . '</strong>,</p>'
 			. '<p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın. Bu bağlantı 1 saat geçerlidir.</p>'
-			. '<p style="margin:24px 0;"><a href="' . $url . '" style="display:inline-block;padding:12px 24px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:6px;">Şifremi Sıfırla</a></p>'
+			. self::ctaButton($url, 'Şifremi Sıfırla')
 			. '<p style="font-size:13px;color:#666;">Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>'
 			. '<p style="font-size:12px;color:#999;word-break:break-all;">' . $url . '</p>';
 
@@ -189,11 +189,217 @@ class Mail
 		$body = '<h2 style="margin:0 0 16px;">Yönetim Paneli Şifre Sıfırlama</h2>'
 			. '<p>Merhaba <strong>' . $name . '</strong>,</p>'
 			. '<p>Yönetim paneli şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın. Bu bağlantı 1 saat geçerlidir.</p>'
-			. '<p style="margin:24px 0;"><a href="' . $url . '" style="display:inline-block;padding:12px 24px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:6px;">Şifremi Sıfırla</a></p>'
+			. self::ctaButton($url, 'Şifremi Sıfırla')
 			. '<p style="font-size:13px;color:#666;">Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.</p>'
 			. '<p style="font-size:12px;color:#999;word-break:break-all;">' . $url . '</p>';
 
 		return self::send($to, $siteName . ' - Yönetim Paneli Şifre Sıfırlama', $body);
+	}
+
+	/**
+	 * @param array<string, mixed> $order
+	 */
+	public static function sendOrderConfirmation(array $order): bool
+	{
+		$to = trim((string) ($order['customer_email'] ?? ''));
+
+		if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+			return false;
+		}
+
+		$siteName = Settings::get('SITE_NAME') ?: 'FShop';
+		$reference = trim((string) ($order['reference'] ?? ''));
+		$subject = $siteName . ' — Siparişiniz alındı' . ($reference !== '' ? ' #' . $reference : '');
+
+		return self::send($to, $subject, self::buildOrderConfirmationBody($order));
+	}
+
+	/** @return array<string, string> */
+	public static function getSampleTypes(): array
+	{
+		return [
+			'order_admin' => 'New order (admin)',
+			'order_customer' => 'Order confirmation (customer)',
+			'welcome' => 'Welcome',
+			'password' => 'Forgot password',
+			'stock' => 'Out of stock',
+			'layout' => 'Layout test',
+		];
+	}
+
+	public static function sendSample(string $to, string $type): bool
+	{
+		global $domain;
+
+		$to = trim($to);
+		$type = preg_replace('/[^a-z_]/', '', strtolower($type)) ?: 'layout';
+		$siteName = Settings::get('SITE_NAME') ?: 'FShop';
+		$base = rtrim((string) $domain, '/');
+
+		if ($type === 'welcome') {
+			return self::sendWelcome($to, 'Test Kullanıcı');
+		}
+
+		if ($type === 'password') {
+			return self::sendPasswordReset($to, 'Test Kullanıcı', $base . '/reset-password?token=test');
+		}
+
+		if ($type === 'order_customer') {
+			$order = self::sampleOrder();
+			$reference = trim((string) ($order['reference'] ?? ''));
+			$subject = $siteName . ' — Siparişiniz alındı' . ($reference !== '' ? ' #' . $reference : '') . ' [TEST]';
+
+			return self::send($to, $subject, self::buildOrderConfirmationBody($order));
+		}
+
+		if ($type === 'order_admin') {
+			return self::sendAdminNewOrder($to, self::sampleOrder(), true);
+		}
+
+		if ($type === 'stock') {
+			$product = [
+				'id_product' => 1,
+				'product_name' => 'Örnek ürün',
+				'stock_code' => 'SKU-1001',
+			];
+			$subject = $siteName . ' — Kritik stok: ' . $product['product_name'] . ' [TEST]';
+
+			return self::send($to, $subject, self::buildCriticalStockBody($product, 0, 5, 0, '#'));
+		}
+
+		$body = '<h2 style="margin:0 0 16px;">Örnek e-posta</h2>'
+			. '<p>Merhaba <strong>Ali Yılmaz</strong>,</p>'
+			. self::infoBox('<p style="margin:0;">Bu bir şablon testidir. Sipariş, hoş geldiniz ve diğer mailler aynı çerçeveyi kullanır.</p>')
+			. self::ctaButton('#', 'Örnek buton');
+
+		return self::send($to, 'Test Mail - ' . $siteName, $body);
+	}
+
+	/**
+	 * @param array<string, mixed> $order
+	 */
+	public static function sendAdminNewOrder(string $to, array $order, bool $isTest = false): bool
+	{
+		$reference = trim((string) ($order['reference'] ?? ''));
+		$idOrder = (int) ($order['id_order'] ?? 0);
+
+		if ($reference === '' && $idOrder > 0) {
+			$reference = (string) $idOrder;
+		}
+
+		$siteName = Settings::get('SITE_NAME') ?: 'FShop';
+		$subject = $siteName . ' — Yeni sipariş' . ($reference !== '' ? ' #' . $reference : '');
+
+		if ($isTest) {
+			$subject .= ' [TEST]';
+		}
+
+		return self::send($to, $subject, self::buildAdminNewOrderBody($order));
+	}
+
+	/**
+	 * @param array<string, mixed> $order
+	 */
+	private static function buildAdminNewOrderBody(array $order): string
+	{
+		$customer = htmlspecialchars(trim((string) ($order['customer_name'] ?? '')), ENT_QUOTES, 'UTF-8');
+		$total = (string) ($order['total_formatted'] ?? Tools::displayPrice((float) ($order['total'] ?? 0)));
+		$idOrder = (int) ($order['id_order'] ?? 0);
+		$reference = trim((string) ($order['reference'] ?? ''));
+
+		if ($reference === '') {
+			$reference = $idOrder > 0 ? (string) $idOrder : '';
+		}
+
+		$referenceHtml = htmlspecialchars($reference !== '' ? $reference : '—', ENT_QUOTES, 'UTF-8');
+		$adminUrl = htmlspecialchars(class_exists('Admin', false) ? Admin::url('order?id=' . $idOrder) : '#', ENT_QUOTES, 'UTF-8');
+
+		return '<h2 style="margin:0 0 16px;">Yeni sipariş</h2>'
+			. self::infoBox(
+				'<p style="margin:0 0 8px;"><strong>Sipariş no:</strong> ' . $referenceHtml . '</p>'
+				. '<p style="margin:0 0 8px;"><strong>Müşteri:</strong> ' . ($customer !== '' ? $customer : 'Misafir') . '</p>'
+				. '<p style="margin:0;"><strong>Toplam:</strong> ' . htmlspecialchars($total, ENT_QUOTES, 'UTF-8') . '</p>'
+			)
+			. self::ctaButton($adminUrl, 'Siparişi görüntüle');
+	}
+
+	/**
+	 * @param array<string, mixed> $product
+	 */
+	public static function buildCriticalStockBody(
+		array $product,
+		int $newStock,
+		int $threshold,
+		int $idVariation = 0,
+		string $adminUrl = '#'
+	): string {
+		$name = htmlspecialchars((string) ($product['product_name'] ?? 'Ürün'), ENT_QUOTES, 'UTF-8');
+		$stockCode = htmlspecialchars((string) ($product['stock_code'] ?? ''), ENT_QUOTES, 'UTF-8');
+		$variationNote = '';
+
+		if ($idVariation > 0 && class_exists('ProductVariation', false)) {
+			$variation = ProductVariation::getById($idVariation);
+			$label = trim((string) ($variation['label'] ?? ''));
+
+			if ($label !== '') {
+				$variationNote = ' (' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . ')';
+			}
+		}
+
+		return '<h2 style="margin:0 0 16px;">Kritik stok uyarısı</h2>'
+			. self::infoBox(
+				'<p style="margin:0 0 8px;"><strong>Ürün:</strong> ' . $name . $variationNote . '</p>'
+				. ($stockCode !== '' ? '<p style="margin:0 0 8px;"><strong>Stok kodu:</strong> ' . $stockCode . '</p>' : '')
+				. '<p style="margin:0 0 8px;"><strong>Güncel stok:</strong> ' . $newStock . '</p>'
+				. '<p style="margin:0;"><strong>Eşik:</strong> ' . $threshold . ' ve altı</p>'
+			)
+			. self::ctaButton($adminUrl, 'Ürünü düzenle', '#b91c1c');
+	}
+
+	/** @return array<string, mixed> */
+	private static function sampleOrder(): array
+	{
+		$id = (int) DB::getValue('SELECT id_order FROM orders ORDER BY id_order DESC LIMIT 1');
+
+		if ($id > 0) {
+			$order = Order::getByIdAdmin($id);
+
+			if (is_array($order) && $order) {
+				return $order;
+			}
+		}
+
+		$price = 1321.58;
+
+		return [
+			'id_order' => 21336,
+			'reference' => 'ECZ0021336',
+			'customer_name' => 'Test Müşteri',
+			'customer_email' => 'test@example.com',
+			'total' => $price,
+			'total_formatted' => Tools::displayPrice($price),
+			'subtotal' => $price,
+			'subtotal_formatted' => Tools::displayPrice($price),
+			'shipping' => 0,
+			'shipping_formatted' => Tools::displayPrice(0),
+			'status' => 1,
+			'status_label' => 'Ödeme Bekliyor',
+			'payment_method' => 'bankwire',
+			'payment_label' => 'Havale / EFT',
+			'items' => [[
+				'product_name' => 'Örnek ürün',
+				'variation_label' => '',
+				'qty' => 1,
+				'qty_label' => '1 adet',
+				'total' => $price,
+				'total_formatted' => Tools::displayPrice($price),
+			]],
+			'coupon_discount' => 0,
+			'promotion_discount' => 0,
+			'payment_discount' => 0,
+			'manual_discount' => 0,
+			'has_gift_wrap' => false,
+		];
 	}
 
 	private static function encodeHeader(string $text): string
@@ -231,6 +437,188 @@ class Mail
 			. '<tr><td style="padding:28px 24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;color:#333333;">'
 			. $body
 			. '</td></tr></table>';
+	}
+
+	public static function ctaButton(string $url, string $label, string $bg = '#1a1a1a'): string
+	{
+		$bg = preg_match('/^#[0-9a-fA-F]{3,8}$/', $bg) ? $bg : '#1a1a1a';
+
+		return '<p style="margin:24px 0;"><a href="' . $url . '" style="display:inline-block;padding:12px 24px;background:' . $bg . ';color:#fff;text-decoration:none;border-radius:6px;">'
+			. htmlspecialchars($label, ENT_QUOTES, 'UTF-8')
+			. '</a></p>';
+	}
+
+	public static function infoBox(string $innerHtml): string
+	{
+		return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 16px;background:#f5f5f5;border:1px solid #eeeeee;">'
+			. '<tr><td style="padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#333333;">'
+			. $innerHtml
+			. '</td></tr></table>';
+	}
+
+	private static function buildOrderConfirmationBody(array $order): string
+	{
+		global $domain;
+
+		$name = htmlspecialchars(trim((string) ($order['customer_name'] ?? '')), ENT_QUOTES, 'UTF-8');
+		$reference = htmlspecialchars(trim((string) ($order['reference'] ?? '')), ENT_QUOTES, 'UTF-8');
+		$idOrder = (int) ($order['id_order'] ?? 0);
+		$payment = htmlspecialchars((string) ($order['payment_label'] ?? ''), ENT_QUOTES, 'UTF-8');
+		$status = htmlspecialchars((string) ($order['status_label'] ?? ''), ENT_QUOTES, 'UTF-8');
+		$orderUrl = htmlspecialchars(rtrim((string) $domain, '/') . '/my-account?order=' . $idOrder, ENT_QUOTES, 'UTF-8');
+		$hello = $name !== '' ? 'Merhaba <strong>' . $name . '</strong>,' : 'Merhaba,';
+
+		$html = '<h2 style="margin:0 0 16px;">Siparişiniz alındı</h2>'
+			. '<p>' . $hello . ' siparişiniz için teşekkür ederiz. Detaylar aşağıdadır.</p>'
+			. self::infoBox(
+				'<p style="margin:0 0 8px;"><strong>Sipariş no:</strong> ' . ($reference !== '' ? $reference : '#' . $idOrder) . '</p>'
+				. '<p style="margin:0 0 8px;"><strong>Durum:</strong> ' . $status . '</p>'
+				. '<p style="margin:0;"><strong>Ödeme:</strong> ' . $payment . '</p>'
+			)
+			. self::buildOrderItemsTable($order)
+			. self::ctaButton($orderUrl, 'Siparişi görüntüle');
+
+		$note = trim((string) Settings::get('ORDER_SUCCESS_NOTE'));
+
+		if ($note !== '') {
+			$html .= '<p style="margin:16px 0 0;padding:12px 14px;background:#ecfdf5;border-left:3px solid #20B968;border-radius:6px;font-size:13px;color:#166534;">'
+				. nl2br(htmlspecialchars($note, ENT_QUOTES, 'UTF-8'), false)
+				. '</p>';
+		}
+
+		return $html;
+	}
+
+	/**
+	 * @param array<string, mixed> $order
+	 */
+	private static function buildOrderItemsTable(array $order): string
+	{
+		$items = is_array($order['items'] ?? null) ? $order['items'] : [];
+		$rows = '';
+
+		foreach ($items as $item) {
+			$name = htmlspecialchars(trim((string) ($item['product_name'] ?? '')), ENT_QUOTES, 'UTF-8');
+			$variation = trim((string) ($item['variation_label'] ?? ''));
+
+			if ($variation !== '') {
+				$name .= ' <span style="color:#888888;">(' . htmlspecialchars($variation, ENT_QUOTES, 'UTF-8') . ')</span>';
+			}
+
+			$qty = self::formatOrderQty($item);
+			$lineTotal = htmlspecialchars((string) ($item['total_formatted'] ?? Tools::displayPrice((float) ($item['total'] ?? 0))), ENT_QUOTES, 'UTF-8');
+
+			$rows .= '<tr>'
+				. '<td style="padding:10px 8px 10px 0;border-bottom:1px solid #eeeeee;font-size:14px;color:#333333;">' . $name . '</td>'
+				. '<td style="padding:10px 8px;border-bottom:1px solid #eeeeee;font-size:13px;color:#666666;text-align:center;white-space:nowrap;">' . htmlspecialchars($qty, ENT_QUOTES, 'UTF-8') . '</td>'
+				. '<td style="padding:10px 0 10px 8px;border-bottom:1px solid #eeeeee;font-size:14px;color:#333333;text-align:right;font-weight:bold;white-space:nowrap;">' . $lineTotal . '</td>'
+				. '</tr>';
+		}
+
+		if ($rows === '') {
+			$rows = '<tr><td colspan="3" style="padding:12px 0;color:#888888;">Ürün bilgisi bulunamadı.</td></tr>';
+		}
+
+		$html = '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0 8px;">'
+			. '<tr>'
+			. '<td style="padding:0 8px 8px 0;font-size:12px;color:#888888;font-weight:bold;">Ürün</td>'
+			. '<td style="padding:0 8px 8px;font-size:12px;color:#888888;font-weight:bold;text-align:center;">Adet</td>'
+			. '<td style="padding:0 0 8px 8px;font-size:12px;color:#888888;font-weight:bold;text-align:right;">Tutar</td>'
+			. '</tr>'
+			. $rows
+			. '</table>'
+			. self::buildOrderTotals($order);
+
+		return $html;
+	}
+
+	/**
+	 * @param array<string, mixed> $item
+	 */
+	private static function formatOrderQty(array $item): string
+	{
+		$label = trim((string) ($item['qty_label'] ?? ''));
+
+		if ($label !== '') {
+			return $label;
+		}
+
+		$qty = (float) ($item['qty'] ?? 0);
+
+		if (abs($qty - round($qty)) < 0.001) {
+			return (string) (int) round($qty) . ' adet';
+		}
+
+		return rtrim(rtrim(number_format($qty, 3, ',', ''), '0'), ',') . ' adet';
+	}
+
+	/**
+	 * @param array<string, mixed> $order
+	 */
+	private static function buildOrderTotals(array $order): string
+	{
+		$lines = [];
+		$lines[] = self::totalRow('Ara toplam', (string) ($order['subtotal_formatted'] ?? Tools::displayPrice((float) ($order['subtotal'] ?? 0))));
+
+		if ((float) ($order['coupon_discount'] ?? 0) > 0) {
+			$label = 'Kupon';
+			$code = trim((string) ($order['coupon_code'] ?? ''));
+
+			if ($code !== '') {
+				$label .= ' (' . $code . ')';
+			}
+
+			$lines[] = self::totalRow($label, '-' . (string) ($order['coupon_discount_formatted'] ?? Tools::displayPrice((float) $order['coupon_discount'])));
+		}
+
+		if ((float) ($order['promotion_discount'] ?? 0) > 0) {
+			$label = trim((string) ($order['promotion_name'] ?? ''));
+
+			if ($label === '') {
+				$label = 'Kampanya';
+			}
+
+			$lines[] = self::totalRow($label, '-' . (string) ($order['promotion_discount_formatted'] ?? Tools::displayPrice((float) $order['promotion_discount'])));
+		}
+
+		if ((float) ($order['payment_discount'] ?? 0) > 0) {
+			$label = trim((string) ($order['payment_discount_label'] ?? ''));
+
+			if ($label === '') {
+				$label = 'Ödeme indirimi';
+			}
+
+			$lines[] = self::totalRow($label, '-' . (string) ($order['payment_discount_formatted'] ?? Tools::displayPrice((float) $order['payment_discount'])));
+		}
+
+		if ((float) ($order['manual_discount'] ?? 0) > 0) {
+			$lines[] = self::totalRow('Sipariş indirimi', '-' . (string) ($order['manual_discount_formatted'] ?? Tools::displayPrice((float) $order['manual_discount'])));
+		}
+
+		$lines[] = self::totalRow('Kargo', (string) ($order['shipping_formatted'] ?? Tools::displayPrice((float) ($order['shipping'] ?? 0))));
+
+		if (!empty($order['has_gift_wrap'])) {
+			$gift = (float) ($order['gift_wrap_fee'] ?? 0) > 0
+				? (string) ($order['gift_wrap_fee_formatted'] ?? Tools::displayPrice((float) $order['gift_wrap_fee']))
+				: 'Ücretsiz';
+			$lines[] = self::totalRow('Hediye paketi', $gift);
+		}
+
+		$total = (string) ($order['total_formatted'] ?? Tools::displayPrice((float) ($order['total'] ?? 0)));
+		$lines[] = '<tr><td style="padding:12px 0 4px;font-size:16px;font-weight:bold;color:#333333;">Toplam</td>'
+			. '<td style="padding:12px 0 4px;font-size:16px;font-weight:bold;color:#333333;text-align:right;">' . htmlspecialchars($total, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+
+		return '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:8px 0 0;border-top:1px solid #eeeeee;">'
+			. implode('', $lines)
+			. '</table>';
+	}
+
+	private static function totalRow(string $label, string $value): string
+	{
+		return '<tr>'
+			. '<td style="padding:8px 0 0;font-size:13px;color:#666666;">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</td>'
+			. '<td style="padding:8px 0 0;font-size:13px;color:#333333;text-align:right;">' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '</td>'
+			. '</tr>';
 	}
 
 	private static function replaceLayoutPlaceholders(string $text): string

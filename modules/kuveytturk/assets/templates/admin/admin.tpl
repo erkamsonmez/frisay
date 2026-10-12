@@ -164,6 +164,20 @@
                                         <div class="col-md-3"><strong>Durum:</strong> {$log.status|escape}</div>
                                         <div class="col-md-3"><strong>Tarih:</strong> {$log.date_add}</div>
                                     </div>
+                                    {if $log.bank_fields}
+                                    <div class="table-responsive mb-3">
+                                        <table class="table table-sm table-bordered mb-0">
+                                            <tbody>
+                                                {foreach $log.bank_fields as $field}
+                                                <tr>
+                                                    <th class="bg-light" style="width:240px">{$field.label|escape}</th>
+                                                    <td><code class="user-select-all">{$field.value|escape}</code></td>
+                                                </tr>
+                                                {/foreach}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    {/if}
                                     <div class="mb-3">
                                         <strong>Banka Mesajı:</strong>
                                         <p class="text-dark bg-white p-2 rounded border mb-0 fw-bold">{$log.response_message|escape}</p>

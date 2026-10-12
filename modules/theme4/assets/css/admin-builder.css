@@ -1,0 +1,333 @@
+.t4-builder__rows {
+	min-height: 80px;
+}
+
+/* Rows are sibling blocks only — never nest visually while dragging */
+.t4-builder__rows > .t4-row {
+	position: relative;
+}
+
+.t4-builder__rows > .t4-sortable-ghost {
+	opacity: 0.45;
+}
+
+.t4-col {
+	background: #f8fafc !important;
+}
+
+.t4-widget-card {
+	box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.t4-widget-card label {
+	font-size: 12px;
+	font-weight: 600;
+	color: #475569;
+	margin-bottom: 4px;
+}
+
+.t4-widget-card .form-control,
+.t4-widget-card .form-select {
+	font-size: 13px;
+}
+
+.t4-row .card-header {
+	background: #f1f5f9;
+}
+
+.t4-drag-handle {
+	cursor: grab;
+	user-select: none;
+	color: #64748b;
+	font-size: 16px;
+	line-height: 1;
+	padding: 2px 4px;
+}
+
+.t4-drag-handle:active {
+	cursor: grabbing;
+}
+
+.t4-sortable-ghost {
+	opacity: 0.45;
+}
+
+.t4-sortable-chosen {
+	outline: 2px solid #0f172a;
+	outline-offset: 2px;
+}
+
+.t4-banner-preview {
+	display: block;
+	max-width: 220px;
+	max-height: 120px;
+	object-fit: cover;
+	border-radius: 8px;
+	border: 1px solid #e2e8f0;
+}
+
+.t4-settings-btn {
+	line-height: 1;
+	opacity: 0.65;
+}
+
+.t4-settings-btn:hover {
+	opacity: 1;
+}
+
+.t4-settings-btn svg {
+	display: block;
+}
+
+#t4BlockSettingsModal .font-monospace {
+	font-size: 12px;
+}
+
+#t4BlockSettingsModal .form-switch .form-check-input {
+	width: 2.5em;
+	height: 1.35em;
+	cursor: pointer;
+}
+
+.t4-switch-row [data-switch-no],
+.t4-switch-row [data-switch-yes] {
+	min-width: 2.2rem;
+	text-align: center;
+	font-size: 12px;
+}
+
+#t4TabCustom textarea.font-monospace {
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.form-control-color {
+	max-width: 3rem;
+	padding: 0.2rem;
+}
+
+body.t4-visual-on {
+	overflow: hidden;
+}
+
+body.t4-visual-on .sidebar,
+body.t4-visual-on .header,
+body.t4-visual-on .admin-page-head,
+body.t4-visual-on .cmdk-overlay {
+	display: none !important;
+}
+
+body.t4-visual-on .admin-main,
+body.t4-visual-on .main-wrapper,
+body.t4-visual-on .admin-content {
+	margin: 0 !important;
+	padding: 0 !important;
+	width: 100% !important;
+	max-width: none !important;
+	min-height: 100vh;
+}
+
+.t4-visual {
+	position: fixed;
+	inset: 0;
+	z-index: 20;
+	display: flex;
+	flex-direction: column;
+	background: #0f172a;
+}
+
+.t4-visual__bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	height: 48px;
+	padding: 0 12px;
+	background: #111827;
+	color: #fff;
+	flex-shrink: 0;
+	z-index: 22;
+}
+
+.t4-visual__exit {
+	color: #e5e7eb;
+	text-decoration: none;
+	font-size: 13px;
+}
+
+.t4-visual__brand {
+	font-size: 13px;
+	margin-right: 8px;
+}
+
+.t4-visual__frame {
+	flex: 1;
+	width: 100%;
+	border: 0;
+	background: #fff;
+}
+
+.t4-drawer {
+	display: none !important;
+}
+
+.t4-visual-source {
+	position: static;
+	width: auto;
+	max-width: none;
+	background: transparent;
+	border: 0;
+	overflow: visible;
+	padding: 0;
+	transform: none;
+	pointer-events: auto;
+	visibility: visible;
+}
+
+.t4-visual-source.is-open {
+	transform: none;
+	pointer-events: auto;
+	visibility: visible;
+}
+
+body.t4-visual-on .modal {
+	--bs-modal-width: 960px;
+}
+
+body.t4-visual-on #t4EditModal .modal-dialog {
+	max-width: min(960px, calc(100vw - 24px));
+}
+
+body.t4-visual-on #t4EditModal .modal-body {
+	min-height: 420px;
+}
+
+.t4-visual-source.is-chrome {
+	display: none !important;
+}
+
+.t4-chrome-panel [data-t4-chrome-section][hidden] {
+	display: none !important;
+}
+
+[data-t4-section-actions][hidden] {
+	display: none !important;
+}
+
+.t4-visual-source .nav-tabs,
+.t4-visual-source #t4TabExport,
+.t4-visual-source [data-t4-add-row],
+.t4-visual-source [data-t4-reset],
+.t4-visual-source .t4-builder > .d-flex.justify-content-between,
+.t4-visual-source form > .mt-3,
+.t4-visual-source .card-footer {
+	display: none !important;
+}
+
+.t4-visual-source:not(.is-colors) #t4TabColors,
+.t4-visual-source:not(.is-custom) #t4TabCustom,
+.t4-visual-source:not(.is-theme) #t4TabTheme {
+	display: none !important;
+}
+
+.t4-visual-source.is-colors #t4TabHome,
+.t4-visual-source.is-colors #t4TabHeader,
+.t4-visual-source.is-colors #t4TabFooter,
+.t4-visual-source.is-colors #t4TabTheme,
+.t4-visual-source.is-colors #t4TabCustom,
+.t4-visual-source.is-custom #t4TabHome,
+.t4-visual-source.is-custom #t4TabHeader,
+.t4-visual-source.is-custom #t4TabFooter,
+.t4-visual-source.is-custom #t4TabTheme,
+.t4-visual-source.is-custom #t4TabColors,
+.t4-visual-source.is-theme #t4TabHome,
+.t4-visual-source.is-theme #t4TabHeader,
+.t4-visual-source.is-theme #t4TabFooter,
+.t4-visual-source.is-theme #t4TabColors,
+.t4-visual-source.is-theme #t4TabCustom {
+	display: none !important;
+}
+
+.t4-visual-source.is-colors #t4TabColors,
+.t4-visual-source.is-custom #t4TabCustom,
+.t4-visual-source.is-theme #t4TabTheme {
+	display: block !important;
+	opacity: 1;
+}
+
+/* Non-block section inspect: hide settings / reorder chrome inside the card */
+.t4-inspect-mode:not(.t4-inspect-container) .is-inspect-row [data-row-settings],
+.t4-inspect-mode:not(.t4-inspect-container) .is-inspect-row [data-col-settings],
+.t4-inspect-mode:not(.t4-inspect-container) .is-inspect-row [data-del-row],
+.t4-inspect-mode:not(.t4-inspect-container) .is-inspect-row [data-del-widget],
+.t4-inspect-mode:not(.t4-inspect-container) .is-inspecting [data-del-widget] {
+	display: none !important;
+}
+
+.t4-visual-source.is-home #t4TabHeader,
+.t4-visual-source.is-home #t4TabFooter,
+.t4-visual-source.is-header #t4TabHome,
+.t4-visual-source.is-header #t4TabFooter,
+.t4-visual-source.is-footer #t4TabHome,
+.t4-visual-source.is-footer #t4TabHeader {
+	display: none !important;
+}
+
+.t4-visual-source.is-home #t4TabHome,
+.t4-visual-source.is-header #t4TabHeader,
+.t4-visual-source.is-footer #t4TabFooter {
+	display: block !important;
+	opacity: 1;
+}
+
+.t4-inspect-mode .t4-row:not(.is-inspect-row) {
+	display: none !important;
+}
+
+.t4-inspect-mode .is-inspect-row .card-header,
+.t4-inspect-mode .is-inspect-row [data-add-col],
+.t4-inspect-mode .is-inspect-row [data-del-row],
+.t4-inspect-mode .is-inspect-row [data-add-widget],
+.t4-inspect-mode .is-inspect-row [data-del-col],
+.t4-inspect-mode .is-inspect-row [data-widget]:not(.is-inspecting) {
+	display: none !important;
+}
+
+.t4-inspect-mode .is-inspecting [data-widget-type] {
+	margin-bottom: 8px;
+}
+
+.t4-inspect-container.t4-inspect-mode .is-inspect-row .card-header {
+	display: flex !important;
+}
+
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-row-handle],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-row-settings],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-del-row],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-hide-badge],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-add-widget],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-del-widget],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-col-settings] {
+	display: none !important;
+}
+
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-add-col],
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-del-col] {
+	display: inline-flex !important;
+}
+
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-widget] {
+	display: block !important;
+}
+
+.t4-inspect-container.t4-inspect-mode .t4-container-hint {
+	display: block !important;
+}
+
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-cols] {
+	display: flex;
+	flex-wrap: wrap;
+}
+
+.t4-inspect-container.t4-inspect-mode .is-inspect-row [data-widget-type] {
+	margin-bottom: 8px;
+}

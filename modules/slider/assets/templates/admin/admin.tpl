@@ -9,9 +9,15 @@
 	<form method="post" class="row g-3 align-items-end">
 		<input type="hidden" name="saveSliderSettings" value="1">
 		<input type="hidden" name="token" value="{$adminToken}">
-		<div class="col-md-6">
+		<div class="col-md-5">
 			<label class="form-label">Kampanya slaytı başlığı</label>
 			<input type="text" name="promo_title" class="form-control" value="{$promoTitle|escape}" placeholder="En Avantajlı Fırsatlar">
+		</div>
+		<div class="col-md-4">
+			<div class="form-check mt-4">
+				<input type="checkbox" name="promo_hide_title" id="promoHideTitle" class="form-check-input" value="1"{if $promoHideTitle|default:false} checked{/if}>
+				<label class="form-check-label" for="promoHideTitle">Başlığı gizle</label>
+			</div>
 		</div>
 		<div class="col-md-3">
 			<button type="submit" class="btn btn-dark">Kaydet</button>

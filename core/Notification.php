@@ -78,8 +78,9 @@ class Notification
 			return null;
 		}
 
-		$row = DB::getRow(
-			'SELECT * FROM user_notifications WHERE id_notification = ? AND id_user = ? LIMIT 1',
+		$row = DB::getRowSafe(
+			'user_notifications',
+			'id_notification = ? AND id_user = ?',
 			[$idNotification, $idUser]
 		);
 
@@ -119,7 +120,8 @@ class Notification
 			. 'Toplam: ' . Tools::displayPrice($total);
 
 		$link = $idOrder > 0 ? 'my-account?order=' . $idOrder : 'my-account';
-		self::notifyUser($idUser, 'order_placed', $title, $message, $link);
+		self::create($idUser, 'order_placed', $title, $message, $link);
+		self::dispatchWebPush($idUser, $title, $message, $link);
 	}
 
 	public static function orderStatusChanged(array $order, int $oldStatus, int $newStatus): void
@@ -144,7 +146,11 @@ class Notification
 	{
 		$refLine = 'Sipariş No: ' . $reference . "\n\n";
 
-		if ($newStatus === Order::STATUS_PROCESSING && $oldStatus === Order::STATUS_PENDING) {
+		if ($newStatus === Order::STATUS_PAID) {
+			return $refLine . 'Ödemeniz alındı. Siparişiniz onay bekliyor.';
+		}
+
+		if ($newStatus === Order::STATUS_PROCESSING && ($oldStatus === Order::STATUS_PENDING || $oldStatus === Order::STATUS_PAID)) {
 			if ($payment === 'bank_transfer') {
 				return $refLine . 'Havale ödemeniz onaylandı. Siparişiniz hazırlanmaya başlandı.';
 			}

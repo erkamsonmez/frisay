@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 if (!defined('IN_SCRIPT')) {
 	exit;
@@ -30,12 +30,14 @@ if ($send !== null && (string) $send === '0') {
 $type = strtolower(trim((string) Tools::getValue('type', 'orders')));
 $platform = strtolower(trim((string) Tools::getValue('platform', 'trendyol')));
 
-if (!in_array($platform, ['trendyol', 'hepsiburada', 'n11'], true)) {
+if (!Marketplace::isOrderPlatform($platform)) {
 	$platform = 'trendyol';
 }
 
 if ($type === 'questions' || $type === 'qna') {
-	if ($platform === 'hepsiburada') {
+	if ($platform === 'prestashop' || $platform === 'frisay') {
+		$result = ['ok' => true, 'message' => 'Bu pazaryerinde soru-cevap yok', 'count' => 0];
+	} elseif ($platform === 'hepsiburada') {
 		$result = Hepsiburada\QuestionService::syncQuestions(1, 50);
 	} elseif ($platform === 'n11') {
 		$result = N11\QuestionService::syncQuestions(0, 50);
@@ -45,20 +47,11 @@ if ($type === 'questions' || $type === 'qna') {
 } else {
 	$start = trim((string) Tools::getValue('start_date', ''));
 	$end = trim((string) Tools::getValue('end_date', ''));
-
-	if ($platform === 'hepsiburada') {
-		$result = Hepsiburada\OrderService::syncOrders(
-			$start !== '' ? $start : null,
-			$end !== '' ? $end : null
-		);
-	} elseif ($platform === 'n11') {
-		$result = N11\OrderService::syncOrders();
-	} else {
-		$result = Trendyol\OrderService::syncOrders(
-			$start !== '' ? $start : null,
-			$end !== '' ? $end : null
-		);
-	}
+	$result = Marketplace::syncOrdersForPlatform(
+		$platform,
+		$start !== '' ? $start : null,
+		$end !== '' ? $end : null
+	);
 }
 
 echo json_encode([

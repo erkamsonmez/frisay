@@ -53,10 +53,14 @@
 				<div class="col-md-6"><strong>{'Date:'|adminT}</strong> {$order.date_formatted}</div>
 				<div class="col-md-6"><strong>{'Customer:'|adminT}</strong> {$order.customer_name|escape}</div>
 				<div class="col-md-6"><strong>{'Phone:'|adminT}</strong> {$order.customer_phone|escape}</div>
+				{if $orderContactEmail|default:'' != ''}
+				<div class="col-md-6"><strong>{'Email:'|adminT}</strong> {$orderContactEmail|escape}</div>
+				{/if}
 				{if $order.company_name}<div class="col-md-6"><strong>{'Company:'|adminT}</strong> {$order.company_name|escape}</div>{/if}
 				{if $order.tax_office}<div class="col-md-6"><strong>{'Tax office:'|adminT}</strong> {$order.tax_office|escape}</div>{/if}
 				{if $order.tax_number}<div class="col-md-6"><strong>{'Tax no / ID:'|adminT}</strong> {$order.tax_number|escape}</div>{/if}
 				<div class="col-12"><strong>{'Address:'|adminT}</strong> {$order.address_city|escape} / {$order.address_district|escape} — {$order.address_text|escape}</div>
+				<div class="col-md-6"><strong>{'Payment:'|adminT}</strong> {$order.payment_label|escape}</div>
 				{if $order.note}<div class="col-12"><strong>{'Note:'|adminT}</strong> {$order.note|escape}</div>{/if}
 				{if $order.cargo_company}<div class="col-md-6"><strong>{'Shipping:'|adminT}</strong> {$order.cargo_company|escape}</div>{/if}
 				{if $order.tracking_number}
@@ -112,6 +116,96 @@
 				</table>
 			</div>
 		</div>
+
+		{if $orderPaymentLog}
+		<div class="admin-panel mb-4" id="orderPaymentGateway">
+			<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+				<h2 class="h6 mb-0">{'Payment & bank response'|adminT}</h2>
+				{if $orderPaymentLog.status == 'completed'}
+				<span class="badge bg-success">{'Success'|adminT}</span>
+				{elseif $orderPaymentLog.status}
+				<span class="badge bg-secondary">{$orderPaymentLog.status|escape}</span>
+				{/if}
+			</div>
+			<p class="small text-muted mb-3">{'These values are needed for cancel / refund'|adminT}</p>
+			<div class="row g-2 small mb-3">
+				<div class="col-md-6"><strong>{'Payment method'|adminT}:</strong> {$orderPaymentLog.provider|escape}{if $order.payment_label && $order.payment_label != $orderPaymentLog.provider} <span class="text-muted">({$order.payment_label|escape})</span>{/if}</div>
+				<div class="col-md-6"><strong>{'Payment reference'|adminT}:</strong> <code class="user-select-all">{$orderPaymentLog.reference|escape}</code></div>
+				{if $orderPaymentLog.message}
+				<div class="col-12"><strong>{'Bank response'|adminT}:</strong> {$orderPaymentLog.message|escape}{if $orderPaymentLog.code} <span class="text-muted">({$orderPaymentLog.code|escape})</span>{/if}</div>
+				{/if}
+			</div>
+			{if $orderPaymentLog.fields}
+			<div class="table-responsive mb-3">
+				<table class="table table-sm table-bordered mb-0 order-bank-fields">
+					<tbody>
+						{foreach $orderPaymentLog.fields as $field}
+						<tr>
+							<th class="bg-light" style="width:240px">{$field.label|escape}</th>
+							<td><code class="user-select-all">{$field.value|escape}</code></td>
+						</tr>
+						{/foreach}
+					</tbody>
+				</table>
+			</div>
+			{/if}
+			{if $orderPaymentLog.raw}
+			<details class="mb-3">
+				<summary class="small text-muted" style="cursor:pointer">{'Raw bank XML'|adminT}</summary>
+				<pre class="bg-dark text-light p-3 rounded small mb-0 mt-2" style="max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-all;">{$orderPaymentLog.raw|escape}</pre>
+			</details>
+			{/if}
+			{if $orderPaymentLog.logs}
+			<h3 class="h6 mb-2">{'Gateway transactions'|adminT}</h3>
+			<div class="table-responsive">
+				<table class="table table-sm table-striped align-middle mb-0">
+					<thead>
+						<tr>
+							<th>#</th>
+							<th>{'Payment reference'|adminT}</th>
+							<th>{'Type'|adminT}</th>
+							<th>{'Amount'|adminT}</th>
+							<th>{'Code'|adminT}</th>
+							<th>{'Bank response'|adminT}</th>
+							<th>{'Status'|adminT}</th>
+							<th>{'Date'|adminT}</th>
+						</tr>
+					</thead>
+					<tbody>
+						{foreach $orderPaymentLog.logs as $payLog}
+						<tr>
+							<td>{$payLog.id_log|escape}</td>
+							<td><code>{$payLog.merchant_order_id|escape}</code></td>
+							<td><code>{$payLog.transaction_type|escape}</code></td>
+							<td>{$payLog.amount|number_format:2:',':'.'} TL</td>
+							<td>
+								{if $payLog.response_code == '00'}
+								<span class="badge bg-success">00</span>
+								{elseif $payLog.response_code}
+								<span class="badge bg-danger">{$payLog.response_code|escape}</span>
+								{else}
+								<span class="text-muted">-</span>
+								{/if}
+							</td>
+							<td>{$payLog.response_message|escape}</td>
+							<td>
+								{if $payLog.status == 'completed'}
+								<span class="badge bg-success">{'Success'|adminT}</span>
+								{elseif $payLog.status == 'failed' || $payLog.status == 'error'}
+								<span class="badge bg-danger">{'Failed'|adminT}</span>
+								{else}
+								<span class="badge bg-warning text-dark">{$payLog.status|escape}</span>
+								{/if}
+							</td>
+							<td>{$payLog.date_add|escape}</td>
+						</tr>
+						{/foreach}
+					</tbody>
+				</table>
+			</div>
+			{/if}
+		</div>
+		{/if}
 
 		{if $canEditOrder}
 		<form method="post" id="orderEditForm" class="admin-panel" style="display:none;">
@@ -278,6 +372,22 @@
 			<p class="mb-0 small text-muted">{'Payment:'|adminT} {$order.payment_label|escape}</p>
 		</div>
 
+		<div class="admin-panel mb-4">
+			<h2 class="h6 mb-3">{'Notify customer'|adminT}</h2>
+			<p class="small text-muted mb-3">{'Send full order details (address, city/district, products, discounts, payment, shipping) via WhatsApp or email.'|adminT}</p>
+			<div class="d-grid gap-2">
+				<button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#orderNotifyModal" data-channel="whatsapp"{if !$orderHasPhone} disabled{/if}>
+					{'Send order info via WhatsApp'|adminT}
+				</button>
+				<button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#orderNotifyModal" data-channel="email"{if !$orderHasEmail} disabled{/if}>
+					{'Send order info via email'|adminT}
+				</button>
+			</div>
+			{if !$orderHasPhone && !$orderHasEmail}
+			<p class="small text-danger mb-0 mt-2">{'Customer has no phone or email on file.'|adminT}</p>
+			{/if}
+		</div>
+
 		<div class="admin-panel">
 			<h2 class="h6 mb-3">{'Status and shipping'|adminT}</h2>
 			<form method="post">
@@ -356,6 +466,82 @@
 {/if}
 
 <p class="mt-3"><a href="{$adminUrl}orders">{'← Back to orders'|adminT}</a></p>
+
+<div class="modal fade" id="orderNotifyModal" tabindex="-1" aria-labelledby="orderNotifyModalLabel" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-lg">
+		<div class="modal-content">
+			<form method="post" id="orderNotifyForm">
+				<input type="hidden" name="sendOrderCustomerNotify" value="1">
+				<input type="hidden" name="token" value="{$adminToken}">
+				<div class="modal-header">
+					<h5 class="modal-title" id="orderNotifyModalLabel">{'Send order info'|adminT}</h5>
+					<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{'Close'|adminT}"></button>
+				</div>
+				<div class="modal-body">
+					<p class="small text-muted mb-3">
+						<strong>{$order.customer_name|escape}</strong>
+						{if $orderHasPhone}<br>{'Phone'|adminT}: {$order.customer_phone|escape}{/if}
+						{if $orderHasEmail}<br>{'Email'|adminT}: {$orderContactEmail|escape}{/if}
+					</p>
+					<div class="mb-3">
+						<label class="form-label" for="orderNotifyMessage">{'Message'|adminT}</label>
+						<textarea id="orderNotifyMessage" name="contact_message" class="form-control font-monospace" rows="14" required>{$orderNotifyMessage|escape}</textarea>
+						<div class="form-text">{'You can edit the message before sending. WhatsApp opens wa.me when Wapio is not configured.'|adminT}</div>
+					</div>
+					<div class="mb-0">
+						<label class="form-label d-block">{'Send via'|adminT}</label>
+						<div class="form-check">
+							<input class="form-check-input" type="radio" name="contact_channel" id="orderChannelWhatsapp" value="whatsapp"{if $orderHasPhone} checked{else} disabled{/if}>
+							<label class="form-check-label" for="orderChannelWhatsapp">
+								WhatsApp
+								{if $orderContactWapioReady}
+								<span class="text-muted small">({'via Wapio API'|adminT})</span>
+								{else}
+								<span class="text-muted small">({'opens wa.me link'|adminT})</span>
+								{/if}
+							</label>
+						</div>
+						<div class="form-check">
+							<input class="form-check-input" type="radio" name="contact_channel" id="orderChannelEmail" value="email"{if !$orderHasPhone && $orderHasEmail} checked{elseif !$orderHasEmail} disabled{/if}>
+							<label class="form-check-label" for="orderChannelEmail">{'Email'|adminT}</label>
+						</div>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">{'Cancel'|adminT}</button>
+					<button type="submit" class="btn btn-dark btn-sm"{if !$orderHasPhone && !$orderHasEmail} disabled{/if}>{'Send message'|adminT}</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+{if $contactRedirectUrl}
+<script>
+(function () {
+	var url = {$contactRedirectUrl|@json_encode nofilter};
+	if (url) {
+		window.open(url, '_blank', 'noopener');
+	}
+})();
+</script>
+{/if}
+
+<script>
+(function () {
+	var modal = document.getElementById('orderNotifyModal');
+	if (!modal) return;
+	modal.addEventListener('show.bs.modal', function (event) {
+		var btn = event.relatedTarget;
+		var channel = btn && btn.getAttribute('data-channel');
+		if (!channel) return;
+		var radio = modal.querySelector('input[name="contact_channel"][value="' + channel + '"]');
+		if (radio && !radio.disabled) {
+			radio.checked = true;
+		}
+	});
+})();
+</script>
 
 {if $canEditOrder}
 <script>

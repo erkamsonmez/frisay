@@ -30,6 +30,9 @@
 	<li class="nav-item">
 		<a class="nav-link{if $settingsTab == 'returns'} active{/if}" href="{$adminUrl}settings?tab=returns">{'Returns'|adminT}</a>
 	</li>
+	<li class="nav-item">
+		<a class="nav-link{if $settingsTab == 'payment'} active{/if}" href="{$adminUrl}settings?tab=payment">{'Payment'|adminT}</a>
+	</li>
 </ul>
 
 <div class="row g-4">
@@ -313,7 +316,7 @@
 						</div>
 					</div>
 					<div class="alert alert-light border small mt-3 mb-0">
-						<strong>{'Example:'|adminT}</strong> <code id="orderRefPreviewCode">{$orderRefPreview|escape}</code>
+						<strong>{'Example:'|adminT}</strong> <code id="orderRefPreviewCode" data-next-id="{$orderRefNextId|escape}">{$orderRefPreview|escape}</code>
 						<span class="text-muted ms-2">{'The next order number will look like this.'|adminT}</span>
 					</div>
 				</div>
@@ -329,6 +332,11 @@
 						<div class="form-text">{'0 = free gift wrap. Shown at checkout when enabled.'|adminT}</div>
 					</div>
 				</div>
+				<div class="admin-panel mb-4">
+					<h2 class="h6 mb-3">{'Checkout success note'|adminT}</h2>
+					<p class="small text-muted">{'Shown on the payment accepted page as a success message.'|adminT}</p>
+					<textarea name="ORDER_SUCCESS_NOTE" class="form-control" rows="3" maxlength="500" placeholder="Siparişler aynı gün saat 16:00'a kadar kargoya verilir">{$settingsValues.ORDER_SUCCESS_NOTE|escape}</textarea>
+				</div>
 			</div>
 
 			<div class="settings-tab-panel{if $settingsTab != 'returns'} d-none{/if}">
@@ -342,6 +350,47 @@
 				</div>
 			</div>
 
+			<div class="settings-tab-panel{if $settingsTab != 'payment'} d-none{/if}">
+				<div class="admin-panel mb-4">
+					<h2 class="h6 mb-3">{'Payment'|adminT}</h2>
+					<p class="small text-muted">{'Default payment and cargo are pre-selected at checkout. For you products appear on the cart page.'|adminT}</p>
+					<div class="mb-3">
+						<label class="form-label">{$settingsKeys.DEFAULT_PAYMENT_METHOD.label|adminT|escape}</label>
+						<select name="DEFAULT_PAYMENT_METHOD" class="form-select">
+							<option value="">{'Select'|adminT}</option>
+							{foreach $paymentMethods as $method}
+							<option value="{$method.id|escape}"{if $settingsValues.DEFAULT_PAYMENT_METHOD == $method.id} selected{/if}>{$method.label|escape}</option>
+							{/foreach}
+						</select>
+					</div>
+					<div class="mb-0">
+						<label class="form-label">{$settingsKeys.DEFAULT_CARGO_ID.label|adminT|escape}</label>
+						<select name="DEFAULT_CARGO_ID" class="form-select">
+							<option value="0">{'Select'|adminT}</option>
+							{foreach $cargoCompanies as $cargoRow}
+							<option value="{$cargoRow.id_cargo}"{if $settingsValues.DEFAULT_CARGO_ID == $cargoRow.id_cargo} selected{/if}>{$cargoRow.name|escape}</option>
+							{/foreach}
+						</select>
+					</div>
+				</div>
+				<div class="admin-panel mb-4" id="sanaOzelPicker" data-search-url="{$productSearchUrl|escape}" data-token="{$adminToken|escape}">
+					<h2 class="h6 mb-3">{'For you products'|adminT}</h2>
+					<p class="small text-muted">{'These products are shown in the For you tab on the cart page.'|adminT}</p>
+					<input type="hidden" name="SANA_OZEL_PRODUCT_IDS" id="sanaOzelIds" value="{$settingsValues.SANA_OZEL_PRODUCT_IDS|escape}">
+					<label class="form-label">{'Search products...'|adminT}</label>
+					<input type="search" class="form-control mb-2" id="sanaOzelSearch" placeholder="{'Search products...'|adminT}" autocomplete="off">
+					<div id="sanaOzelResults" class="mb-3"></div>
+					<ul class="list-group" id="sanaOzelList">
+						{foreach $sanaOzelProducts as $p}
+						<li class="list-group-item d-flex justify-content-between align-items-center" data-id="{$p.id_product}">
+							<span><strong>#{$p.id_product}</strong> {$p.product_name|escape} <span class="text-muted small">{$p.price_formatted|escape}</span></span>
+							<button type="button" class="btn btn-sm btn-outline-danger" data-remove-sana>×</button>
+						</li>
+						{/foreach}
+					</ul>
+				</div>
+			</div>
+
 			<button type="submit" class="btn btn-dark">{'Save'|adminT}</button>
 		</form>
 
@@ -349,9 +398,17 @@
 		<form method="post" class="mt-3 d-flex flex-wrap gap-2 align-items-end">
 			<input type="hidden" name="testMail" value="1">
 			<input type="hidden" name="token" value="{$adminToken}">
-			<div class="flex-grow-1" style="min-width:220px;">
+			<div style="min-width:220px;flex:1;">
 				<label class="form-label small mb-1">{'Test email address'|adminT}</label>
 				<input type="email" name="test_email" class="form-control form-control-sm" placeholder="{$settingsValues.CONTACT_EMAIL|escape}">
+			</div>
+			<div style="min-width:220px;flex:1;">
+				<label class="form-label small mb-1">{'Email type'|adminT}</label>
+				<select name="test_mail_type" class="form-select form-select-sm">
+					{foreach $mailSampleTypes as $mailTypeKey => $mailTypeLabel}
+					<option value="{$mailTypeKey|escape}">{$mailTypeLabel|adminT|escape}</option>
+					{/foreach}
+				</select>
 			</div>
 			<button type="submit" class="btn btn-outline-secondary btn-sm">{'Send test email'|adminT}</button>
 		</form>
@@ -429,12 +486,174 @@
 			return;
 		}
 
-		refPadWrap.style.display = refMode.value === 'sequential' ? '' : 'none';
+		refPadWrap.style.display = (refMode.value === 'sequential' || refMode.value === 'order_id') ? '' : 'none';
 	}
 
 	if (refMode) {
-		refMode.addEventListener('change', syncRefPadVisibility);
+		refMode.addEventListener('change', function () {
+			syncRefPadVisibility();
+			updateRefPreview();
+		});
 		syncRefPadVisibility();
+	}
+
+	var refPrefix = document.querySelector('input[name="ORDER_REF_PREFIX"]');
+	var refPad = document.querySelector('input[name="ORDER_REF_PAD"]');
+	var refPreview = document.getElementById('orderRefPreviewCode');
+
+	function padOrderId(value, width) {
+		var text = String(Math.max(1, parseInt(value, 10) || 1));
+		width = Math.max(3, Math.min(10, parseInt(width, 10) || 5));
+		while (text.length < width) {
+			text = '0' + text;
+		}
+		return text;
+	}
+
+	function updateRefPreview() {
+		if (!refMode || !refPreview || refMode.value !== 'order_id') {
+			return;
+		}
+		var prefix = ((refPrefix && refPrefix.value) || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+		var nextId = refPreview.getAttribute('data-next-id') || '1';
+		refPreview.textContent = prefix + padOrderId(nextId, refPad ? refPad.value : 5);
+	}
+
+	if (refPrefix) {
+		refPrefix.addEventListener('input', updateRefPreview);
+	}
+	if (refPad) {
+		refPad.addEventListener('input', updateRefPreview);
+	}
+	updateRefPreview();
+
+	var picker = document.getElementById('sanaOzelPicker');
+	if (picker) {
+		var idsInput = document.getElementById('sanaOzelIds');
+		var listEl = document.getElementById('sanaOzelList');
+		var searchEl = document.getElementById('sanaOzelSearch');
+		var resultsEl = document.getElementById('sanaOzelResults');
+		var searchUrl = picker.getAttribute('data-search-url') || '';
+		var token = picker.getAttribute('data-token') || '';
+		var timer = null;
+		var items = [];
+
+		listEl.querySelectorAll('[data-id]').forEach(function (row) {
+			var id = Number(row.getAttribute('data-id') || 0);
+			if (id > 0) {
+				items.push({
+					id_product: id,
+					product_name: (row.querySelector('span') ? row.querySelector('span').textContent : '').trim(),
+					price_formatted: ''
+				});
+			}
+		});
+
+		function escapeHtml(value) {
+			return String(value)
+				.replace(/&/g, '&amp;')
+				.replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;')
+				.replace(/"/g, '&quot;');
+		}
+
+		function syncIds() {
+			idsInput.value = items.map(function (item) { return item.id_product; }).join(',');
+		}
+
+		function renderList() {
+			if (!items.length) {
+				listEl.innerHTML = '<li class="list-group-item text-muted small">Henüz ürün eklenmedi.</li>';
+				syncIds();
+				return;
+			}
+			listEl.innerHTML = items.map(function (item) {
+				return '<li class="list-group-item d-flex justify-content-between align-items-center" data-id="' + item.id_product + '">'
+					+ '<span><strong>#' + item.id_product + '</strong> ' + escapeHtml(item.product_name || '') + ' <span class="text-muted small">' + escapeHtml(item.price_formatted || '') + '</span></span>'
+					+ '<button type="button" class="btn btn-sm btn-outline-danger" data-remove-sana>×</button></li>';
+			}).join('');
+			syncIds();
+		}
+
+		function addItem(item) {
+			var id = Number(item.id_product || 0);
+			if (!id) {
+				return;
+			}
+			for (var i = 0; i < items.length; i++) {
+				if (Number(items[i].id_product) === id) {
+					return;
+				}
+			}
+			if (items.length >= 12) {
+				return;
+			}
+			items.push({
+				id_product: id,
+				product_name: item.product_name || '',
+				price_formatted: item.price_formatted || ''
+			});
+			renderList();
+		}
+
+		listEl.addEventListener('click', function (e) {
+			var btn = e.target.closest('[data-remove-sana]');
+			if (!btn) {
+				return;
+			}
+			var row = btn.closest('[data-id]');
+			var id = row ? Number(row.getAttribute('data-id')) : 0;
+			items = items.filter(function (item) { return Number(item.id_product) !== id; });
+			renderList();
+		});
+
+		syncIds();
+		if (picker.closest('form')) {
+			picker.closest('form').addEventListener('submit', syncIds);
+		}
+
+		function renderSearch(list) {
+			if (!list.length) {
+				resultsEl.innerHTML = '';
+				return;
+			}
+			resultsEl.innerHTML = '<div class="list-group">' + list.map(function (item) {
+				return '<button type="button" class="list-group-item list-group-item-action py-2" data-add-sana="' + item.id_product + '">'
+					+ '<strong>#' + item.id_product + '</strong> ' + escapeHtml(item.product_name || '')
+					+ ' <span class="text-muted small">' + escapeHtml(item.price_formatted || '') + '</span></button>';
+			}).join('') + '</div>';
+			resultsEl.querySelectorAll('[data-add-sana]').forEach(function (btn) {
+				btn.addEventListener('click', function () {
+					var id = Number(btn.getAttribute('data-add-sana'));
+					list.forEach(function (row) {
+						if (Number(row.id_product) === id) {
+							addItem(row);
+						}
+					});
+					resultsEl.innerHTML = '';
+					searchEl.value = '';
+				});
+			});
+		}
+
+		searchEl.addEventListener('input', function () {
+			if (timer) {
+				clearTimeout(timer);
+			}
+			timer = setTimeout(function () {
+				var q = searchEl.value.trim();
+				if (q.length < 2) {
+					resultsEl.innerHTML = '';
+					return;
+				}
+				var url = searchUrl + (searchUrl.indexOf('?') >= 0 ? '&' : '?') + 'q=' + encodeURIComponent(q) + '&token=' + encodeURIComponent(token);
+				fetch(url, { credentials: 'same-origin' }).then(function (res) { return res.json(); }).then(function (data) {
+					renderSearch((data && data.items) || []);
+				}).catch(function () {
+					resultsEl.innerHTML = '';
+				});
+			}, 280);
+		});
 	}
 })();
 </script>

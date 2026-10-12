@@ -40,17 +40,40 @@ class StorageService
 
     public function resolveFilePath(string $filePath): string
     {
+        $backupRoot = realpath($this->backupDir);
+        if ($backupRoot === false) {
+            return '';
+        }
+
+        $rootNorm = str_replace('\\', '/', $backupRoot);
         $normalized = str_replace('\\', '/', $filePath);
-        if ($normalized !== '' && file_exists($normalized)) {
-            return $normalized;
+        $baseName = basename($normalized);
+
+        $candidates = [];
+        if ($normalized !== '') {
+            $candidates[] = $normalized;
+        }
+        if ($baseName !== '' && $baseName !== '.' && $baseName !== '..') {
+            $candidates[] = $this->backupDir . $baseName;
         }
 
-        $candidate = $this->backupDir . basename($normalized);
-        if (file_exists($candidate)) {
-            return $candidate;
+        foreach ($candidates as $candidate) {
+            if (!file_exists($candidate)) {
+                continue;
+            }
+
+            $real = realpath($candidate);
+            if ($real === false) {
+                continue;
+            }
+
+            $realNorm = str_replace('\\', '/', $real);
+            if ($realNorm === $rootNorm || strpos($realNorm, $rootNorm . '/') === 0) {
+                return $real;
+            }
         }
 
-        return $normalized;
+        return '';
     }
 
     public function uploadToDestinations(int $backupId, string $localFilePath, array $destinationIds): array

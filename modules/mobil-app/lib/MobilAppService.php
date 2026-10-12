@@ -8,7 +8,7 @@ class MobilAppService
 {
 	private const TABLE = 'mobil_app_settings';
 	private const ROW_ID = 1;
-	private const CACHE_VERSION = 'v2';
+	private const CACHE_VERSION = 'v4';
 
 	public static function ensureSchema(): void
 	{
@@ -131,6 +131,19 @@ class MobilAppService
 	public static function getScopePath(): string
 	{
 		try {
+			$domain = trim((string) Settings::get('DOMAIN'));
+
+			if ($domain !== '') {
+				$path = trim(str_replace('\\', '/', (string) parse_url($domain, PHP_URL_PATH)), '/');
+
+				if ($path !== '') {
+					return '/' . $path . '/';
+				}
+
+				// https://ornek.com/ → kök
+				return '/';
+			}
+
 			$folder = trim((string) Settings::get('FOLDER'), '/');
 
 			if ($folder !== '' && $folder !== '/') {
@@ -147,15 +160,14 @@ class MobilAppService
 	{
 		$script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 
-		if (preg_match('#^(/.+?)/(?:manifest\.php|manifest\.json|sw\.php|sw\.js|pwa-icon\.php|index\.php)#', $script, $m)) {
-			return rtrim($m[1], '/') . '/';
-		}
+		if ($script !== '' && $script !== '/') {
+			$dir = str_replace('\\', '/', (string) dirname($script));
 
-		$uri = str_replace('\\', '/', (string) ($_SERVER['REQUEST_URI'] ?? ''));
-		$uri = (string) parse_url($uri, PHP_URL_PATH);
+			if ($dir === '/' || $dir === '.' || $dir === '') {
+				return '/';
+			}
 
-		if (preg_match('#^/([^/]+)/(?:manifest\.php|manifest\.json|sw\.js|sw\.php|pwa-icon\.php)#', $uri, $m)) {
-			return '/' . $m[1] . '/';
+			return rtrim($dir, '/') . '/';
 		}
 
 		return '/';

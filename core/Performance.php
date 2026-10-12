@@ -171,6 +171,7 @@ class Performance
 				'custom.css',
 				'style.css',
 				'pages.css',
+				'account-orders.css',
 				'notifications.css',
 				'cart-modal.css',
 				'fyazilim.css',
@@ -180,6 +181,18 @@ class Performance
 				'custom.css',
 				'style.css',
 				'pages.css',
+				'account-orders.css',
+				'notifications.css',
+				'cart-modal.css',
+			],
+			'shopnova' => [
+				'colors.css',
+				'custom.css',
+				'style.css',
+				'shopmore.css',
+				'shopnova.css',
+				'pages.css',
+				'account-orders.css',
 				'notifications.css',
 				'cart-modal.css',
 			],
@@ -189,8 +202,43 @@ class Performance
 				'style.css',
 				'shopmore.css',
 				'pages.css',
+				'account-orders.css',
 				'notifications.css',
 				'cart-modal.css',
+			],
+			'lumen' => [
+				'colors.css',
+				'custom.css',
+				'style.css',
+				'shopmore.css',
+				'pages.css',
+				'account-orders.css',
+				'notifications.css',
+				'cart-modal.css',
+				'app.css',
+				'lumen.css',
+			],
+			'default' => [
+				'colors.css',
+				'custom.css',
+				'style.css',
+				'shopmore.css',
+				'pages.css',
+				'hub.css',
+				'account-orders.css',
+				'notifications.css',
+				'cart-modal.css',
+			],
+			'dress' => [
+				'colors.css',
+				'custom.css',
+				'style.css',
+				'shopmore.css',
+				'pages.css',
+				'account-orders.css',
+				'notifications.css',
+				'cart-modal.css',
+				'app.css',
 			],
 			'theme4' => [
 				'colors.css',
@@ -198,6 +246,10 @@ class Performance
 				'style.css',
 				'shopmore.css',
 				'pages.css',
+				'hub.css',
+				'account-orders.css',
+				'account-hub.css',
+				'auth.css',
 				'notifications.css',
 				'cart-modal.css',
 			],
@@ -206,6 +258,17 @@ class Performance
 				'colors.css',
 				'custom.css',
 				'app.css',
+				'cart-modal.css',
+			],
+			'healt' => [
+				'colors.css',
+				'custom.css',
+				'style.css',
+				'shopmore.css',
+				'shopnova.css',
+				'pages.css',
+				'account-orders.css',
+				'notifications.css',
 				'cart-modal.css',
 			],
 		];
@@ -218,6 +281,10 @@ class Performance
 
 		if ($pageCss !== null && preg_match('/^[a-zA-Z0-9_-]+\.css$/', $pageCss)) {
 			$files[] = $pageCss;
+		}
+
+		if ($theme === 'healt') {
+			$files[] = 'healt.css';
 		}
 
 		$cssDir = self::rootPath() . '/templates/' . $theme . '/css/';
@@ -555,7 +622,7 @@ class Performance
 			return false;
 		}
 
-		if (Tools::getValue('theme_preview') !== '' || Tools::getValue('q') !== '' || Tools::getValue('query') !== '') {
+		if (Tools::getValue('theme_preview') !== '' || Tools::getValue('t4_preview') !== '' || Tools::getValue('q') !== '' || Tools::getValue('query') !== '') {
 			return false;
 		}
 

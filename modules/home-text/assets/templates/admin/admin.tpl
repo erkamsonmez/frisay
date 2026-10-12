@@ -7,8 +7,8 @@
 		<div>
 			<h2 class="h5 mb-1">Ana Sayfa Metni</h2>
 			<p class="text-muted small mb-0">
-				Bu içerik mağaza ana sayfasında kategori bloklarının altında gösterilir
-				(<code>templates/fyazilim/home.tpl</code>).
+				Bu içerik mağaza ana sayfasında “Shop by Category” bloğunun altında gösterilir.
+				Boş kaydedilirse vitrinde yer kaplamaz.
 			</p>
 		</div>
 		<a href="{$moduleDetailUrl|escape}" class="btn btn-sm btn-outline-secondary">Modül detayı</a>

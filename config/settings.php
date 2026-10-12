@@ -24,14 +24,16 @@
 	Currency::handleSwitchRequest();
 
 	Performance::ensureDefaults();
+	SecuritySettings::ensureDefaults();
 	App::configureErrors();
 
 	App::sendSecurityHeaders();
 	Cookie::autoLoginFromRememberCookie();
+	SecuritySettings::enforceCustomerIdleTimeout();
 	$rootDir 	= Settings::get('FOLDER');
 	$domain		= Settings::get('DOMAIN');
 	CanonicalHost::redirectIfNeeded();
-	$theme		= Settings::get('THEME') ?: 'default';
+	$theme		= Theme::resolveActive((string) (Settings::get('THEME') ?: 'default'));
 	$previewTheme = (string) Tools::getValue('theme_preview');
 
 	if ($previewTheme !== '' && Theme::isValidName($previewTheme)) {
@@ -87,13 +89,15 @@
 	$menuCategories = Category::getMenuListWithChildren();
 	$favoriteCount = Favorite::getCount();
 
-	Module::bootstrap('front');
-	$moduleAssets = Module::getHeadAssets();
-	
 	function translate($text)
 	{
 		return Lang::translate((string) $text);
 	}
+
+	$smarty->registerPlugin('modifier', 'translate', 'translate');
+
+	Module::bootstrap('front');
+	$moduleAssets = Module::getHeadAssets();
 
 	$cartI18n = [
 		'empty' => translate('Cart is empty'),
@@ -176,6 +180,7 @@
 		'customer' 			=> $customer,
 		'isLoggedIn'		=> $isLoggedIn,
 		'menuCategories' 	=> $menuCategories,
+		'homeBrands' 		=> Brand::getPublicList(12),
 		'favoriteCount' 	=> $favoriteCount,
 		'notificationCount' => $notificationCount,
 		'headerNotifications' => $headerNotifications,
@@ -189,6 +194,9 @@
 			'header' => SiteAssets::resolveLogoUrl('header'),
 			'bar' => SiteAssets::resolveLogoUrl('bar'),
 			'footer' => SiteAssets::resolveLogoUrl('footer'),
+			'etbis' => SiteAssets::logoExists('etbis') ? SiteAssets::resolveLogoUrl('etbis') : '',
+			'play_store' => SiteAssets::logoExists('play_store') ? SiteAssets::resolveLogoUrl('play_store') : '',
+			'app_store' => SiteAssets::logoExists('app_store') ? SiteAssets::resolveLogoUrl('app_store') : '',
 		],
 		'footerDescription' => Settings::getFooterDescription(),
 		'moduleAssets' 		=> $moduleAssets,
@@ -198,11 +206,10 @@
 		'themeOptions'		=> $themeOptions,
 		'activeTheme'		=> $theme,
 	));
-// Hook render'dan ÖNCE: modül şablonlarında |translate kullanılabilsin
-	$smarty->registerPlugin('modifier', 'translate', 'translate');
 
 	$smarty->assign([
 		'hooks' => Module::getRenderedDisplayHooks(),
 	]);
 
 	Performance::bootstrapFront();
+	Module::runHook('front.ready');

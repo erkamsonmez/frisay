@@ -49,7 +49,6 @@
 <script src="{$adminJsDir|default:''}popper.min.js"></script>
 <script src="{$adminJsDir|default:''}bootstrap.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"></script>
-<script src="{$adminJsDir|default:''}admin.js?v={$smarty.now}"></script>
 <script>
 window.__adminI18n = {$adminI18n|@json_encode nofilter};
 window.__adminCmdk = {
@@ -61,6 +60,14 @@ window.__adminLivePoll = {
 	adminUrl: {$adminUrl|@json_encode nofilter},
 	intervalMs: 30000
 };
+window.__adminFavorites = {
+	url: {$adminFavoritesApiUrl|@json_encode nofilter},
+	token: {$adminToken|@json_encode nofilter},
+	keys: {$adminFavoriteKeys|@json_encode nofilter}
+};
+</script>
+<script src="{$adminJsDir|default:''}admin.js?v={$smarty.now}"></script>
+<script>
 if (window.lucide) { window.lucide.createIcons(); }
 </script>
 <script src="{$adminJsDir|default:''}admin-command.js?v={$smarty.now}"></script>

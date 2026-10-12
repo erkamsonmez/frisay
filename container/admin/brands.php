@@ -18,11 +18,30 @@
 		}
 	}
 	$activeFilter = Tools::getIsset('active') ? (int) Tools::getValue('active') : -1;
-	$brands = Brand::getAdminList($activeFilter);
+	$queryParams = array_filter([
+		'active' => $activeFilter >= 0 ? $activeFilter : null,
+	], static fn($v) => $v !== null && $v !== '');
+
+	$sortState = Pagination::adminColumnSort(
+		[
+			'id' => 'id_brand',
+			'name' => 'brand_name',
+			'status' => 'active',
+		],
+		'name',
+		'asc',
+		Admin::url('brands'),
+		$queryParams
+	);
+
+	$brands = Brand::getAdminList($activeFilter, 500, 0, $sortState['order_by']);
 
 	$smarty->assign([
 		'brands' 		=> $brands,
 		'activeFilter' 	=> $activeFilter,
+		'sortLinks' 	=> $sortState['links'],
+		'listSort' 		=> $sortState['sort'],
+		'listDir' 		=> $sortState['dir'],
 		'sonuc' 		=> $sonuc,
 	]);
 

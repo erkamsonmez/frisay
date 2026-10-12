@@ -55,6 +55,13 @@ class SanalposModule extends ModuleBase
 		return true;
 	}
 
+	public function boot(): void
+	{
+		if (!$this->allowsSimulation()) {
+			$this->isPayment = false;
+		}
+	}
+
 	public function getPaymentPageUrl(): string
 	{
 		global $domain;
@@ -64,11 +71,11 @@ class SanalposModule extends ModuleBase
 
 	public function renderDisplayHook(string $hook, array $context = []): ?string
 	{
-		if ($hook !== 'order_payment') {
+		if ($hook !== 'order_payment' || !$this->allowsSimulation()) {
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}
@@ -88,6 +95,14 @@ class SanalposModule extends ModuleBase
 	 */
 	public function chargeCard(array $card, float $amount): array
 	{
+		if (!$this->allowsSimulation()) {
+			return [
+				'success' => false,
+				'transaction_id' => '',
+				'message' => 'Kredi kartı tahsilatı için PayTR, iyzico veya ParamPOS gibi bir ödeme modülü yapılandırılmalıdır.',
+			];
+		}
+
 		// --- GERÇEK BANKA İSTEĞİ BURAYA GELECEK (örnek alanlar) ---
 		// $response = $this->httpPost('https://banka-api/odeme', [
 		// 	'merchant_id' => Settings::get('SANALPOS_MERCHANT_ID'),
@@ -154,5 +169,11 @@ class SanalposModule extends ModuleBase
 		$now = (int) date('Y') * 100 + (int) date('n');
 
 		return ($year * 100 + $month) >= $now;
+	}
+
+	/** Canlı ortamda simülasyon tahsilatı kapalıdır (`APP_ENV=production`). */
+	private function allowsSimulation(): bool
+	{
+		return class_exists('App') && !App::isProduction();
 	}
 }

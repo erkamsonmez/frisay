@@ -128,38 +128,76 @@ class App
 		}
 
 		$originSources = self::cspOriginSources();
+		$cdnSources = self::cspCdnSources();
+
+		$xFrame = class_exists('SecuritySettings', false)
+			? SecuritySettings::xFrameOption()
+			: 'SAMEORIGIN';
 
 		header('X-Content-Type-Options: nosniff');
-		header('X-Frame-Options: SAMEORIGIN');
+		header('X-Frame-Options: ' . $xFrame);
 		header('Referrer-Policy: strict-origin-when-cross-origin');
 		header('X-XSS-Protection: 1; mode=block');
 		header(
 			'Content-Security-Policy: '
-			. "default-src 'self'; "
+			. "default-src 'self' {$cdnSources}; "
 			. "base-uri 'self'; "
 			. "form-action 'self' https:; "
 			. "frame-ancestors 'self'; "
 			. "img-src 'self' data: https: blob:; "
 			. "font-src 'self' data: https:; "
 			. "style-src {$originSources} 'unsafe-inline' https:; "
-			. "script-src {$originSources} 'unsafe-inline' 'unsafe-eval' https:; "
-			. "worker-src {$originSources} blob: https:; "
+			. "script-src {$originSources} {$cdnSources} 'unsafe-inline' 'unsafe-eval' https:; "
+			. "worker-src {$originSources} {$cdnSources} blob: https:; "
+			. "child-src {$originSources} {$cdnSources} blob: https:; "
 			. "manifest-src {$originSources}; "
-			. "connect-src {$originSources} https: wss: blob:; "
-			. "frame-src 'self' https:;"
+			. "connect-src {$originSources} {$cdnSources} https: wss: blob:; "
+			. "frame-src 'self' https: {$cdnSources};"
 		);
 
-		if (self::isProduction()) {
-			header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+		header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 
-			$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-				|| (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
-				|| (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+		$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+			|| (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+			|| (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
 
-			if ($https) {
-				header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
-			}
+		$sendHsts = class_exists('SecuritySettings', false)
+			? SecuritySettings::hstsEnabled($https)
+			: ($https && self::isProduction());
+
+		if ($sendHsts) {
+			header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
 		}
+	}
+
+	/**
+	 * Known third-party CDNs used by storefront modules (OneSignal, reCAPTCHA, Meta Pixel…).
+	 * Listed explicitly so browsers that fall back to default-src still allow them.
+	 */
+	private static function cspCdnSources(): string
+	{
+		return implode(' ', [
+			'https://cdn.onesignal.com',
+			'https://api.onesignal.com',
+			'https://onesignal.com',
+			'https://*.onesignal.com',
+			'https://www.google.com',
+			'https://www.gstatic.com',
+			'https://www.recaptcha.net',
+			'https://connect.facebook.net',
+			'https://www.facebook.com',
+		]);
+	}
+
+	public static function sendNoStoreHeaders(): void
+	{
+		if (headers_sent()) {
+			return;
+		}
+
+		header('Cache-Control: no-store, no-cache, must-revalidate, private');
+		header('Pragma: no-cache');
+		header('Expires: 0');
 	}
 
 	/** CSP: 'self' + aktif istek ve DOMAIN ayarındaki origin'ler (www / www'siz uyumu). */

@@ -100,17 +100,40 @@ if (Tools::isSubmit('submitKuveytturk')) {
 		);
 
 		$result = $helper->sendPayGateRequest($paymentData);
+		$bankHtml = KuveytTurkHelper::ensurePlainBody((string) ($result['response'] ?? ''));
 
-		if (!empty($result['success']) && !empty($result['response'])) {
-			if (ob_get_level()) {
-				ob_clean();
+		// Hâlâ gzip ise asla ekrana basma
+		$stillCompressed = strlen($bankHtml) >= 2 && $bankHtml[0] === "\x1f" && $bankHtml[1] === "\x8b";
+
+		$looksLikeHtml = !$stillCompressed && $bankHtml !== '' && (
+			stripos($bankHtml, '<html') !== false
+			|| stripos($bankHtml, '<!doctype') !== false
+			|| stripos($bankHtml, '<form') !== false
+			|| stripos($bankHtml, '<script') !== false
+		);
+
+		if (!empty($result['success']) && $looksLikeHtml) {
+			while (ob_get_level() > 0) {
+				ob_end_clean();
 			}
+			if (function_exists('apache_setenv')) {
+				@apache_setenv('no-gzip', '1');
+			}
+			@ini_set('zlib.output_compression', '0');
+			header('Content-Type: text/html; charset=utf-8');
+			header('Content-Encoding: identity');
 			header('Content-Security-Policy: default-src * \'unsafe-inline\' \'unsafe-eval\' data: https:; form-action * https:;');
-			echo $result['response'];
+			echo $bankHtml;
 			exit;
 		}
 
-		$paymentError = !empty($result['error']) ? $result['error'] : 'KuveytTürk 3D Ödeme sunucusuna bağlanılamadı.';
+		if ($stillCompressed) {
+			$paymentError = 'Banka yanıtı açılamadı (gzip). Sunucuda zlib/gzip desteğini kontrol edin veya modül dosyalarını güncelleyin.';
+		} elseif (!empty($result['success']) && $bankHtml !== '' && !$looksLikeHtml) {
+			$paymentError = 'Banka 3D sayfası okunamadı. Lütfen tekrar deneyin.';
+		} else {
+			$paymentError = !empty($result['error']) ? $result['error'] : 'KuveytTürk 3D Ödeme sunucusuna bağlanılamadı.';
+		}
 
 		$helper->logTransaction(
 			(int) ($cart['id_cart'] ?? 0),

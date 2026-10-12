@@ -11,7 +11,7 @@ class KuveytturkModule extends ModuleBase
 {
 	public string $name = 'kuveytturk';
 	public string $title = 'KuveytTürk Sanal POS';
-	public string $version = '1.1.0';
+	public string $version = '1.1.1';
 	public string $description = 'KuveytTürk 3D Secure ile güvenli kredi/banka kartı ödemesi kabul edin.';
 	public string $author = 'FShop';
 
@@ -133,7 +133,7 @@ class KuveytturkModule extends ModuleBase
 		}
 
 		$helper = new KuveytTurkHelper();
-		$logs = $helper->getRecentLogs(50);
+		$logs = $helper->getRecentLogs(150);
 
 		$smarty->assign([
 			'kuveytturkMerchantId' => Settings::get('KUVEYTTURK_MERCHANT_ID'),
@@ -158,7 +158,7 @@ class KuveytturkModule extends ModuleBase
 			return null;
 		}
 
-		return $this->renderFrontTemplate('order_payment', []);
+		return $this->renderFrontTemplate('order_payment', $context);
 	}
 
 	public static function persistPendingCheckout(string $reference, array $pendingData, array $cartSummary): void

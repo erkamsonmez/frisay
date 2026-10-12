@@ -92,6 +92,7 @@ class TrendyolAdminPages
 			'importUrl' => $api . '?action=import-product',
 			'linkExistingUrl' => $api . '?action=link-existing',
 			'updateStockUrl' => $api . '?action=update-stock',
+			'salePauseUrl' => $api . '?action=sale-pause',
 			'assetsJsUrl' => $adminJs . '/marketplace-admin.js',
 			'importJsUrl' => $adminJs . '/marketplace-import.js',
 			'settingsUrl' => \Admin::url('marketplace-settings'),
@@ -130,6 +131,28 @@ class TrendyolAdminPages
 			$attrs = is_array($decoded) ? $decoded : [];
 		}
 
+		$variations = [];
+		$hasVariations = false;
+
+		if (class_exists('ProductVariation') && $idProduct > 0) {
+			$hasVariations = \ProductVariation::hasVariations($idProduct);
+
+			if ($hasVariations) {
+				foreach (\ProductVariation::getByProduct($idProduct, true) as $variation) {
+					$sale = \ProductVariation::getEffectivePrice($variation, (float) ($product['price'] ?? 0));
+					$variations[] = [
+						'id_variation' => (int) ($variation['id_variation'] ?? 0),
+						'label' => \ProductVariation::formatLabel($variation),
+						'sku' => (string) ($variation['sku'] ?? ''),
+						'barcode' => (string) ($variation['barcode'] ?? ''),
+						'stock' => (int) ($variation['stock'] ?? 0),
+						'price' => $variation['price'] !== null ? (float) $variation['price'] : null,
+						'sale_price' => $sale,
+					];
+				}
+			}
+		}
+
 		return array_merge($urls, [
 			'id_product' => $idProduct,
 			'mapping' => $mapping,
@@ -147,6 +170,9 @@ class TrendyolAdminPages
 			'ty_category_name' => '',
 			'ty_attributes' => $attrs,
 			'ty_attributes_json' => json_encode($attrs, JSON_UNESCAPED_UNICODE),
+			'ty_has_variations' => $hasVariations,
+			'ty_variations' => $variations,
+			'ty_variant_axis' => $hasVariations ? \ProductVariation::getAxis($idProduct) : '',
 		]);
 	}
 }

@@ -22,20 +22,8 @@ if (!class_exists('Admin')) { require_once dirname(__DIR__, 3) . '/core/Admin.ph
 Admin::requireModuleApiAuth();
 
 try {
-    @unlink(GoogleShoppingModule::cachePath());
-    $xml = GoogleShoppingModule::buildFeed();
-
-    // Ürün sayısını say
-    $dom = new DOMDocument();
-    $dom->loadXML($xml);
-    $count = $dom->getElementsByTagName('item')->length;
-
-    echo json_encode([
-        'success'      => true,
-        'message'      => 'Feed yenilendi. ' . $count . ' ürün işlendi.',
-        'product_count'=> $count,
-        'generated_at' => Settings::get('GSF_LAST_REGEN'),
-    ], JSON_UNESCAPED_UNICODE);
+    $result = GoogleShoppingModule::regenerate();
+    echo json_encode($result, JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {
     http_response_code(500);

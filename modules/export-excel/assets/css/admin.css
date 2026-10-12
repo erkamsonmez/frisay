@@ -1,6 +1,56 @@
-.export-excel-bar {
-	padding: 0.65rem 1rem;
-	border: 1px solid #e5e7eb;
-	border-radius: 10px;
-	background: #f8fafc;
+.admin-layout-hook--header .export-excel-toolbar {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.export-excel-toolbar {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.55rem;
+}
+
+.export-excel-group {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.35rem;
+	padding: 0.2rem 0.3rem 0.2rem 0.55rem;
+	border: 1px solid var(--adm-border, #e5e7eb);
+	border-radius: 12px;
+	background: var(--adm-surface, #fff);
+}
+
+.export-excel-group__label {
+	font-size: 0.72rem;
+	font-weight: 650;
+	color: var(--adm-muted, #6b7280);
+	white-space: nowrap;
+	padding-right: 0.15rem;
+}
+
+.export-excel-toolbar .btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+#exportExcelMount .export-excel-toolbar,
+.admin-toolbar__excel .export-excel-toolbar,
+.adm-orders-filter-actions__right .export-excel-toolbar {
+	position: static;
+	width: auto;
+	height: auto;
+	margin: 0;
+	overflow: visible;
+	clip: unset;
+	clip-path: none;
+	white-space: normal;
 }

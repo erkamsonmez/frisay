@@ -1,0 +1,68 @@
+# FriSay / FShop — Nginx location snippets (Apache .htaccess is ignored by Nginx).
+# Include these inside the server { } that points document root at this project.
+
+# Sensitive trees (never serve)
+location ~ ^/(logs|upgrade|cache|backups|config|core|container|storage|lang|tools)(/|$) {
+	deny all;
+	return 403;
+}
+
+location ~ ^/modules/.*\.php$ {
+	deny all;
+	return 403;
+}
+
+location ~ ^/img/.*\.php$ {
+	deny all;
+	return 403;
+}
+
+location ~* \.(sql|tpl|env)$ {
+	deny all;
+	return 403;
+}
+
+location ~ /\.(git|svn|ht) {
+	deny all;
+	return 403;
+}
+
+# Digital downloads / invoices / returns — PHP gateways only
+location ^~ /storage/ {
+	deny all;
+	return 403;
+}
+
+location ^~ /img/invoices/ {
+	deny all;
+	return 403;
+}
+
+location ^~ /img/returns/ {
+	deny all;
+	return 403;
+}
+
+location ^~ /img/contact/ {
+	deny all;
+	return 403;
+}
+
+# PrestaShop-compatible WebService (pretty URLs). Existing /api/*.php files still execute as PHP.
+location ^~ /api/v1 {
+	rewrite ^ /api/webapi.php last;
+}
+location = /api/cron {
+	rewrite ^ /api/cron.php last;
+}
+location = /api {
+	rewrite ^ /api/psws.php last;
+}
+location ~ ^/api/[A-Za-z0-9_/]+$ {
+	rewrite ^ /api/psws.php last;
+}
+
+# Front controller (adjust if the shop is in a subdirectory)
+location / {
+	try_files $uri $uri/ /index.php?$query_string;
+}

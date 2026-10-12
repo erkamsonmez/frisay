@@ -8,6 +8,9 @@
 	$js = 'product.js';
 	$css = 'product.css';
 	$idProduct = (int) Tools::getValue('id');
+	if ($idProduct <= 0) {
+		$idProduct = (int) Tools::getValue('id_product');
+	}
 	$product = Product::getById($idProduct);
 
 	if (!$product) {
@@ -48,16 +51,34 @@
 	$variationData = ProductVariation::getForStorefront($idProduct, (float) $product['price']);
 	$optionData = ProductOption::getForStorefront($idProduct);
 
-	$relatedData = Product::getRelatedForProduct($product, 5);
+	$relatedData = Product::getRelatedForProduct($product, 12);
+
+	$brandProducts = [];
+	$idBrand = (int) ($product['id_brand'] ?? 0);
+
+	if ($idBrand > 0) {
+		$brandRows = Product::getActiveList(null, 24, 0, 'newest', $idBrand);
+
+		foreach ($brandRows as $brandRow) {
+			if ((int) ($brandRow['id_product'] ?? 0) === $idProduct) {
+				continue;
+			}
+
+			if (empty($brandRow['in_stock'])) {
+				continue;
+			}
+
+			$brandProducts[] = $brandRow;
+
+			if (count($brandProducts) >= 12) {
+				break;
+			}
+		}
+	}
 
 	$havalePercent = Module::getPaymentModule('bank_transfer')
 		? (float) Module::getPaymentDiscount('bank_transfer', 100)['percent']
 		: (float) (Settings::get('BANKWIRE_DISCOUNT_PERCENT') ?: Settings::get('HAVALE') ?: 0);
-
-	$favoriteCount = (int) DB::getValue(
-		'SELECT COUNT(*) FROM favorites WHERE id_product = ?',
-		[$idProduct]
-	);
 
 	if (!empty(DB::execute("SHOW TABLES LIKE 'product_reviews'"))) {
 		$reviewStat = DB::execute(
@@ -97,9 +118,10 @@
 		'cargoPrice' 		=> $cargoHints['shipping_fee'],
 		'havale'			=> $havalePercent,
 		'isFavorite' 		=> Favorite::isFavorite($idProduct),
-		'favoriteCount' 	=> $favoriteCount,
 		'relatedProducts'	=> $relatedData['products'],
 		'relatedProductsTitle' => $relatedData['title'],
+		'brandProducts'		=> $brandProducts,
+		'cartPromoOffers' => CartPromotion::getProductPageOffers((float) $product['price']),
 		'hasVariations'     => !empty($variationData['has_variations']),
 		'variationGroups'   => $variationData['groups'],
 		'variationItemsJson' => Security::jsonForHtmlScript($variationData['items']),

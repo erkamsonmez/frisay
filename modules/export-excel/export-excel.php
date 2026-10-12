@@ -11,8 +11,8 @@ class ExportExcelModule extends ModuleBase
 {
 	public string $name = 'export-excel';
 	public string $title = 'Excel Aktarım';
-	public string $version = '1.0.0';
-	public string $description = 'Ürün içe/dışa aktarma ve sipariş dışa aktarma (admin header)';
+	public string $version = '1.2.0';
+	public string $description = 'Ürün yükle/güncelle ve fiyat-stok-maliyet Excel aktarımı (varyasyon dahil)';
 	public string $author = 'FShop';
 
 	public array $displayHooks = [
@@ -25,6 +25,7 @@ class ExportExcelModule extends ModuleBase
 
 	public array $apiActions = [
 		'export-products' => 'api/export-products.php',
+		'export-price-stock' => 'api/export-price-stock.php',
 		'export-orders' => 'api/export-orders.php',
 	];
 
@@ -69,7 +70,7 @@ class ExportExcelModule extends ModuleBase
 			return;
 		}
 
-		if (!Tools::isSubmit('exportExcelImportProducts')) {
+		if (!Tools::isSubmit('exportExcelImportProducts') && !Tools::isSubmit('exportExcelImportPriceStock')) {
 			return;
 		}
 
@@ -82,7 +83,11 @@ class ExportExcelModule extends ModuleBase
 			return;
 		}
 
-		$result = ExportExcelService::importProductsFromUpload($_FILES['excelFile'] ?? []);
+		if (Tools::isSubmit('exportExcelImportPriceStock')) {
+			$result = ExportExcelService::importPriceStockFromUpload($_FILES['excelPriceStockFile'] ?? []);
+		} else {
+			$result = ExportExcelService::importProductsFromUpload($_FILES['excelFile'] ?? []);
+		}
 		ExportExcelService::setFlash(
 			(string) ($result['message'] ?? ''),
 			!empty($result['success']) ? 'success' : 'danger'
@@ -188,6 +193,7 @@ class ExportExcelModule extends ModuleBase
 				'adminToken' => (string) $adminToken,
 				'domain' => $domainBase . '/',
 				'exportUrl' => $domainBase . '/api/module.php?m=export-excel&action=export-products',
+				'exportPriceStockUrl' => $domainBase . '/api/module.php?m=export-excel&action=export-price-stock',
 				'importAction' => Admin::url('products'),
 				'returnUrl' => $returnUrl,
 				'filterQ' => $query,
@@ -203,6 +209,13 @@ class ExportExcelModule extends ModuleBase
 			'customer' => Tools::getValue('customer'),
 			'date_from' => Tools::getValue('date_from'),
 			'date_to' => Tools::getValue('date_to'),
+			'payment_method' => Tools::getValue('payment_method'),
+			'sku' => Tools::getValue('sku'),
+			'product_name' => Tools::getValue('product_name'),
+			'tracking_number' => Tools::getValue('tracking_number'),
+			'cargo_company' => Tools::getValue('cargo_company'),
+			'channel' => Tools::getValue('channel'),
+			'sort' => Tools::getValue('sort'),
 		]);
 
 		return $this->renderAdminTemplate('admin_header', [
@@ -215,6 +228,13 @@ class ExportExcelModule extends ModuleBase
 			'filterCustomer' => $filters['customer'],
 			'filterDateFrom' => $filters['date_from'],
 			'filterDateTo' => $filters['date_to'],
+			'filterPayment' => $filters['payment_method'],
+			'filterSku' => $filters['sku'],
+			'filterProductName' => $filters['product_name'],
+			'filterTracking' => $filters['tracking_number'],
+			'filterCargo' => $filters['cargo_company'],
+			'filterChannel' => $filters['channel'],
+			'filterSort' => $filters['sort'],
 		]) ?: null;
 	}
 }

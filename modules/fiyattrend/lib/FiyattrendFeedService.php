@@ -32,12 +32,38 @@ class FiyattrendFeedService
 		return rtrim($domain, '/') . '/api/module.php?m=fiyattrend&action=feed&token=' . rawurlencode($token);
 	}
 
+	public static function ttlSeconds(): int
+	{
+		return max(60, (int) (Settings::get('FT_CACHE_TTL') ?: 360) * 60);
+	}
+
+	/** @return array{exists:bool,ttl:int,age:int,mtime:int,expired:bool,remaining:int,last_regen:string} */
+	public static function cacheInfo(): array
+	{
+		$path = self::cachePath();
+		$ttl = self::ttlSeconds();
+		$exists = is_file($path);
+		$mtime = $exists ? (int) filemtime($path) : 0;
+		$age = ($exists && $mtime > 0) ? max(0, time() - $mtime) : 0;
+		$expired = !$exists || $age >= $ttl;
+
+		return [
+			'exists' => $exists,
+			'ttl' => $ttl,
+			'age' => $age,
+			'mtime' => $mtime,
+			'expired' => $expired,
+			'remaining' => $expired ? 0 : ($ttl - $age),
+			'last_regen' => (string) (Settings::get('FT_LAST_REGEN') ?: ''),
+		];
+	}
+
 	public static function buildFeed(): string
 	{
 		$cachePath = self::cachePath();
-		$ttl = (int) (Settings::get('FT_CACHE_TTL') ?: 360) * 60;
+		$info = self::cacheInfo();
 
-		if (file_exists($cachePath) && (time() - filemtime($cachePath)) < $ttl) {
+		if ($info['exists'] && !$info['expired']) {
 			return (string) file_get_contents($cachePath);
 		}
 
@@ -64,10 +90,29 @@ class FiyattrendFeedService
 
 		return [
 			'success' => true,
+			'refreshed' => true,
 			'message' => 'Feed yenilendi. ' . $count . ' ürün işlendi.',
 			'product_count' => $count,
 			'generated_at' => Settings::get('FT_LAST_REGEN') ?: date('d.m.Y H:i'),
 		];
+	}
+
+	public static function refreshIfExpired(): array
+	{
+		$info = self::cacheInfo();
+
+		if ($info['exists'] && !$info['expired']) {
+			return [
+				'success' => true,
+				'refreshed' => false,
+				'message' => 'Önbellek hâlâ geçerli',
+				'age' => $info['age'],
+				'ttl' => $info['ttl'],
+				'generated_at' => $info['last_regen'],
+			];
+		}
+
+		return self::regenerate();
 	}
 
 	/** @return array{success: bool, total: int, preview: array<int, array<string, string>>, generated_at: string} */

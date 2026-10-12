@@ -118,6 +118,21 @@ class Product
 				 ADD COLUMN `sale_qty_min` decimal(12,3) NOT NULL DEFAULT 1.000 AFTER `sale_unit`,
 				 ADD COLUMN `sale_qty_step` decimal(12,3) NOT NULL DEFAULT 1.000 AFTER `sale_qty_min`"
 			);
+		} else {
+			$badPieceStep = DB::getValue(
+				"SELECT id_product FROM products
+				 WHERE (sale_unit = 'piece' OR sale_unit = '' OR sale_unit IS NULL)
+				 AND sale_qty_step > 0 AND sale_qty_step < 1
+				 LIMIT 1"
+			);
+			if ($badPieceStep) {
+				DB::execute(
+					"UPDATE products
+					 SET sale_qty_min = 1, sale_qty_step = 1
+					 WHERE (sale_unit = 'piece' OR sale_unit = '' OR sale_unit IS NULL)
+					 AND (sale_qty_step < 1 OR sale_qty_min < 1)"
+				);
+			}
 		}
 
 		$stockCol = DB::execute("SHOW COLUMNS FROM `products` LIKE 'stock'");
@@ -852,6 +867,30 @@ class Product
 		return self::countFiltered($filter);
 	}
 
+	/**
+	 * Append category scope to a product SQL query (alias `p`).
+	 *
+	 * @param array<int, scalar> $params
+	 * @param int[] $categoryIds
+	 */
+	public static function appendInCategoriesSql(string &$sql, array &$params, array $categoryIds): void
+	{
+		$categoryIds = array_values(array_unique(array_filter(array_map('intval', $categoryIds))));
+
+		if ($categoryIds === []) {
+			$sql .= ' AND 1 = 0';
+
+			return;
+		}
+
+		$placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
+		$sql .= ' AND p.id_category IN (' . $placeholders . ')';
+
+		foreach ($categoryIds as $id) {
+			$params[] = $id;
+		}
+	}
+
 	public static function countFiltered(CatalogFilter $filter): int
 	{
 		$sql = 'SELECT COUNT(*) FROM products p WHERE p.active = 1';
@@ -971,11 +1010,13 @@ class Product
 		int $activeFilter = -1,
 		int $limit = 30,
 		int $offset = 0,
-		int $idSupplier = 0
+		int $idSupplier = 0,
+		string $orderBy = 'p.id_product DESC',
+		array $filters = []
 	): array {
 		Supplier::ensureSchema();
 
-		$sql = 'SELECT p.*, b.brand_name, c.category_name, s.supplier_name, i.id_image
+		$sql = 'SELECT p.*, b.brand_name, c.category_name, c.category_link, s.supplier_name, i.id_image
 			FROM products p
 			INNER JOIN brands b ON p.id_brand = b.id_brand
 			INNER JOIN categories c ON p.id_category = c.id_category
@@ -983,35 +1024,10 @@ class Product
 			LEFT JOIN images i ON p.id_product = i.id_product AND i.cover = 1
 			WHERE 1=1';
 		$params = [];
+		$sql .= self::buildAdminFilterSql($query, $idCategory, $idBrand, $activeFilter, $idSupplier, $filters, $params);
 
-		if ($query !== '') {
-			$like = '%' . $query . '%';
-			$sql .= ' AND (p.product_name LIKE ? OR p.product_link LIKE ?)';
-			$params[] = $like;
-			$params[] = $like;
-		}
-
-		if ($idCategory > 0) {
-			$sql .= ' AND p.id_category = ?';
-			$params[] = $idCategory;
-		}
-
-		if ($idBrand > 0) {
-			$sql .= ' AND p.id_brand = ?';
-			$params[] = $idBrand;
-		}
-
-		if ($idSupplier > 0) {
-			$sql .= ' AND p.id_supplier = ?';
-			$params[] = $idSupplier;
-		}
-
-		if ($activeFilter >= 0) {
-			$sql .= ' AND p.active = ?';
-			$params[] = $activeFilter;
-		}
-
-		$sql .= ' ORDER BY p.id_product DESC LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
+		$orderBy = trim($orderBy) !== '' ? $orderBy : 'p.id_product DESC';
+		$sql .= ' ORDER BY ' . $orderBy . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
 
 		$rows = DB::execute($sql, $params) ?: [];
 
@@ -1022,6 +1038,7 @@ class Product
 			$row['image_url'] = self::getImageUrl(isset($row['id_image']) ? (int) $row['id_image'] : null);
 			$row['active_label'] = (int) $row['active'] === 1 ? 'Aktif' : 'Pasif';
 			$row['supplier_name'] = (string) ($row['supplier_name'] ?? '');
+			$row['preview_url'] = self::getLink($row);
 		}
 		unset($row);
 
@@ -1033,18 +1050,47 @@ class Product
 		int $idCategory = 0,
 		int $idBrand = 0,
 		int $activeFilter = -1,
-		int $idSupplier = 0
+		int $idSupplier = 0,
+		array $filters = []
 	): int {
 		Supplier::ensureSchema();
 
 		$sql = 'SELECT COUNT(*) FROM products p WHERE 1=1';
 		$params = [];
+		$sql .= self::buildAdminFilterSql($query, $idCategory, $idBrand, $activeFilter, $idSupplier, $filters, $params);
+
+		return (int) DB::getValue($sql, $params);
+	}
+
+	/**
+	 * @param array<string, mixed> $filters
+	 * @param array<int, mixed> $params
+	 */
+	private static function buildAdminFilterSql(
+		string $query,
+		int $idCategory,
+		int $idBrand,
+		int $activeFilter,
+		int $idSupplier,
+		array $filters,
+		array &$params
+	): string {
+		$sql = '';
 
 		if ($query !== '') {
 			$like = '%' . $query . '%';
-			$sql .= ' AND (p.product_name LIKE ? OR p.product_link LIKE ?)';
+			$sql .= ' AND (p.product_name LIKE ? OR p.product_link LIKE ? OR p.stock_code LIKE ? OR p.barcode LIKE ?)';
 			$params[] = $like;
 			$params[] = $like;
+			$params[] = $like;
+			$params[] = $like;
+		}
+
+		$stockCode = trim((string) ($filters['stock_code'] ?? ''));
+
+		if ($stockCode !== '') {
+			$sql .= ' AND p.stock_code LIKE ?';
+			$params[] = '%' . $stockCode . '%';
 		}
 
 		if ($idCategory > 0) {
@@ -1067,7 +1113,7 @@ class Product
 			$params[] = $activeFilter;
 		}
 
-		return (int) DB::getValue($sql, $params);
+		return $sql;
 	}
 
 	public static function getByIdAdmin(int $id): ?array
@@ -1246,13 +1292,18 @@ class Product
 		if ($productType !== 'physical') {
 			$saleUnit = SaleUnit::PIECE;
 		}
-		$saleQtyMin = (float) str_replace(',', '.', (string) ($data['sale_qty_min'] ?? ($saleUnit === SaleUnit::M2 ? '0.01' : '1')));
-		$saleQtyStep = (float) str_replace(',', '.', (string) ($data['sale_qty_step'] ?? ($saleUnit === SaleUnit::M2 ? '0.01' : '1')));
-		if ($saleQtyMin <= 0) {
-			$saleQtyMin = $saleUnit === SaleUnit::M2 ? 0.01 : 1.0;
-		}
-		if ($saleQtyStep <= 0) {
-			$saleQtyStep = $saleUnit === SaleUnit::M2 ? 0.01 : 1.0;
+		if ($saleUnit === SaleUnit::M2) {
+			$saleQtyMin = (float) str_replace(',', '.', (string) ($data['sale_qty_min'] ?? '0.01'));
+			$saleQtyStep = (float) str_replace(',', '.', (string) ($data['sale_qty_step'] ?? '0.01'));
+			if ($saleQtyMin <= 0) {
+				$saleQtyMin = 0.01;
+			}
+			if ($saleQtyStep <= 0) {
+				$saleQtyStep = 0.01;
+			}
+		} else {
+			$saleQtyMin = 1.0;
+			$saleQtyStep = 1.0;
 		}
 		$saleQtyMin = round($saleQtyMin, 3);
 		$saleQtyStep = round($saleQtyStep, 3);
@@ -1396,8 +1447,8 @@ class Product
 			'active' 			=> $active,
 		];
 
-		if ($id > 0) {
-			$oldStock = isset($existing) ? (float) ($existing['stock'] ?? 0) : 0;
+		if ($id > 0 && $existing) {
+			$oldStock = (float) ($existing['stock'] ?? 0);
 			$ok = DB::update('products', $row, 'id_product = :where_id', ['where_id' => $id]);
 
 			if ($ok === false) {
@@ -1443,6 +1494,10 @@ class Product
 			return ['success' => true, 'message' => 'Ürün güncellendi', 'id' => $id];
 		}
 
+		if ($id > 0) {
+			$row['id_product'] = $id;
+		}
+
 		$newId = DB::insert('products', $row);
 
 		if (!$newId) {
@@ -1450,6 +1505,9 @@ class Product
 		}
 
 		$newId = (int) $newId;
+		if ($id > 0) {
+			$newId = $id;
+		}
 
 		$langError = self::saveLangRows($newId, $langData);
 
@@ -1873,6 +1931,38 @@ class Product
 	}
 
 	/**
+	 * @return array{success: bool, message: string, id: int, active?: int}
+	 */
+	public static function toggleActive(int $id): array
+	{
+		if ($id <= 0) {
+			return self::fail('Ürün bulunamadı');
+		}
+
+		$product = self::getByIdAdmin($id);
+
+		if (!$product) {
+			return self::fail('Ürün bulunamadı');
+		}
+
+		$active = (int) ($product['active'] ?? 0) === 1 ? 0 : 1;
+		$ok = DB::update('products', ['active' => $active], 'id_product = :where_id', ['where_id' => $id]);
+
+		if ($ok === false) {
+			return self::fail('Durum güncellenemedi');
+		}
+
+		self::fireUpdatedHook($id, false);
+
+		return [
+			'success' => true,
+			'message' => $active === 1 ? 'Ürün aktif edildi' : 'Ürün pasif edildi',
+			'id' => $id,
+			'active' => $active,
+		];
+	}
+
+	/**
 	 * @param list<int|string> $ids
 	 * @return array{success: bool, message: string, count: int}
 	 */
@@ -1961,9 +2051,230 @@ class Product
 		}
 
 		ProductVariation::deleteByProduct($id);
+		ProductOption::deleteByProduct($id);
+		DB::execute('DELETE FROM product_lang WHERE id_product = ?', [$id]);
 		DB::execute('DELETE FROM products WHERE id_product = ?', [$id]);
 
 		return ['success' => true, 'message' => 'Ürün silindi', 'id' => $id];
+	}
+
+	/**
+	 * Admin listeden ürün kopyala: kayıt + görseller + varyasyonlar + seçenekler.
+	 *
+	 * @return array{success:bool,message:string,id?:int}
+	 */
+	public static function duplicateById(int $id): array
+	{
+		self::ensureSchema();
+		Lang::ensureSchema();
+
+		if ($id <= 0) {
+			return self::fail('Ürün bulunamadı');
+		}
+
+		$source = DB::getRowSafe('products', 'id_product = ?', [$id]);
+
+		if (!$source || !is_array($source)) {
+			return self::fail('Ürün bulunamadı');
+		}
+
+		$baseLink = trim((string) ($source['product_link'] ?? ''));
+		if ($baseLink === '') {
+			$baseLink = 'urun';
+		}
+
+		$newLink = self::makeUniqueProductLink($baseLink . '-kopya');
+		$newName = trim((string) ($source['product_name'] ?? 'Ürün'));
+		if (mb_stripos($newName, '(kopya)') === false) {
+			$newName = mb_substr($newName . ' (Kopya)', 0, 128);
+		}
+
+		$row = $source;
+		unset($row['id_product']);
+		$row['product_name'] = $newName;
+		$row['product_link'] = $newLink;
+		$row['stock_empty_at'] = null;
+
+		$stockCode = trim((string) ($row['stock_code'] ?? ''));
+		if ($stockCode !== '') {
+			$row['stock_code'] = mb_substr($stockCode . '-KOPYA', 0, 64);
+		}
+
+		// Sanal dosya / lisans paylaşılmasın
+		if ((string) ($row['product_type'] ?? '') === 'virtual') {
+			$row['virtual_file'] = '';
+			$row['virtual_file_name'] = '';
+		}
+
+		$newId = DB::insert('products', $row);
+
+		if (!$newId) {
+			return self::fail('Ürün kopyalanamadı');
+		}
+
+		$newId = (int) $newId;
+
+		$langRows = self::getLangRows($id);
+		$langData = [];
+
+		foreach ($langRows as $lang => $entry) {
+			if (!is_array($entry)) {
+				continue;
+			}
+
+			$langName = trim((string) ($entry['product_name'] ?? ''));
+			$langLink = trim((string) ($entry['product_link'] ?? ''));
+
+			if ($langName !== '' && mb_stripos($langName, '(kopya)') === false) {
+				$langName = mb_substr($langName . ' (Kopya)', 0, 128);
+			}
+
+			if ($langLink === '') {
+				$langLink = $newLink;
+			} else {
+				$langLink = self::makeUniqueProductLink($langLink . '-kopya', $lang);
+			}
+
+			$entry['product_name'] = $langName !== '' ? $langName : $newName;
+			$entry['product_link'] = $langLink;
+			$langData[$lang] = $entry;
+		}
+
+		if ($langData !== []) {
+			$langError = self::saveLangRows($newId, $langData);
+			if ($langError) {
+				DB::execute('DELETE FROM products WHERE id_product = ?', [$newId]);
+
+				return $langError;
+			}
+		}
+
+		foreach (self::getImages($id) as $image) {
+			$oldId = (int) ($image['id_image'] ?? 0);
+			$srcFile = dirname(__DIR__) . '/img/products/' . $oldId . '.jpg';
+
+			if ($oldId <= 0 || !is_file($srcFile)) {
+				continue;
+			}
+
+			$newImageId = DB::insert('images', [
+				'id_product' => $newId,
+				'cover' => (int) ($image['cover'] ?? 0),
+			]);
+
+			if (!$newImageId) {
+				continue;
+			}
+
+			$destFile = dirname(__DIR__) . '/img/products/' . (int) $newImageId . '.jpg';
+			if (!@copy($srcFile, $destFile)) {
+				DB::execute('DELETE FROM images WHERE id_image = ?', [(int) $newImageId]);
+			}
+		}
+
+		$variations = ProductVariation::getByProduct($id);
+		if ($variations !== []) {
+			$copyVariations = [];
+
+			foreach ($variations as $index => $variation) {
+				$sku = trim((string) ($variation['sku'] ?? ''));
+				if ($sku === '') {
+					$sku = 'VAR-' . $newId . '-' . ($index + 1);
+				} else {
+					$sku = mb_substr($sku . '-K', 0, 64);
+				}
+
+				$copyVariations[] = [
+					'sku' => $sku,
+					'barcode' => (string) ($variation['barcode'] ?? ''),
+					'options' => $variation['options'] ?? [],
+					'stock' => $variation['stock'] ?? 0,
+					'price' => $variation['price'] ?? null,
+					'active' => !empty($variation['active']),
+				];
+			}
+
+			$variationError = ProductVariation::saveForProduct($newId, $copyVariations, (float) ($row['price'] ?? 0));
+			if ($variationError) {
+				self::deleteById($newId);
+
+				return $variationError;
+			}
+		}
+
+		if (class_exists('ProductOption')) {
+			$optionGroups = ProductOption::getByProduct($id);
+			if ($optionGroups !== []) {
+				$copyGroups = [];
+
+				foreach ($optionGroups as $group) {
+					$copyGroups[] = [
+						'name' => (string) ($group['name'] ?? ''),
+						'required' => !empty($group['required']),
+						'values' => is_array($group['values'] ?? null) ? $group['values'] : [],
+					];
+				}
+
+				$optionError = ProductOption::saveForProduct($newId, $copyGroups);
+				if ($optionError) {
+					self::deleteById($newId);
+
+					return $optionError;
+				}
+			}
+		}
+
+		$setClass = self::productSetServiceClass();
+		if ($setClass && (string) ($row['product_type'] ?? '') === 'pack') {
+			$items = $setClass::getItems($id);
+			if ($items !== []) {
+				$packItems = [];
+				foreach ($items as $item) {
+					$packItems[] = [
+						'id_product' => (int) ($item['id_product'] ?? 0),
+						'qty' => (int) ($item['qty'] ?? 1),
+						'position' => (int) ($item['position'] ?? 0),
+					];
+				}
+				$setClass::saveItems($newId, $packItems);
+			}
+		}
+
+		self::fireUpdatedHook($newId, true);
+
+		return [
+			'success' => true,
+			'message' => 'Ürün kopyalandı',
+			'id' => $newId,
+		];
+	}
+
+	private static function makeUniqueProductLink(string $base, ?string $lang = null): string
+	{
+		$base = trim($base);
+		$base = preg_replace('/-+/', '-', $base) ?: 'urun';
+		$base = trim($base, '-');
+		$base = mb_substr($base, 0, 110);
+
+		if ($base === '') {
+			$base = 'urun';
+		}
+
+		$candidate = $base;
+		$i = 2;
+
+		while (!self::isLinkUnique($candidate, 0, $lang)) {
+			$suffix = '-' . $i;
+			$candidate = mb_substr($base, 0, 128 - strlen($suffix)) . $suffix;
+			$i++;
+
+			if ($i > 200) {
+				$candidate = $base . '-' . substr(md5(uniqid((string) mt_rand(), true)), 0, 6);
+				break;
+			}
+		}
+
+		return $candidate;
 	}
 
 	public static function deleteImage(int $idImage): array
@@ -2009,6 +2320,8 @@ class Product
 
 		$created = 0;
 		$updated = 0;
+		$variationsCreated = 0;
+		$variationsUpdated = 0;
 		$imagesImported = 0;
 		$categoriesCreated = 0;
 		$brandsCreated = 0;
@@ -2016,15 +2329,30 @@ class Product
 		$categoryCache = [];
 		$brandCache = [];
 
+		$productRows = [];
+		$variationRows = [];
+
 		for ($i = 1, $count = count($rows); $i < $count; $i++) {
 			if (self::isImportRowEmpty($rows[$i])) {
 				continue;
 			}
 
+			$lineNo = $i + 1;
+
+			if (self::isExcelVariationRow($rows[$i], $map)) {
+				$variationRows[] = [$rows[$i], $lineNo];
+			} else {
+				$productRows[] = [$rows[$i], $lineNo];
+			}
+		}
+
+		foreach (array_merge($productRows, $variationRows) as $entry) {
+			$row = $entry[0];
+			$lineNo = (int) $entry[1];
 			$result = self::importExcelRow(
-				$rows[$i],
+				$row,
 				$map,
-				$i + 1,
+				$lineNo,
 				$categoryCache,
 				$brandCache,
 				$categoriesCreated,
@@ -2036,11 +2364,17 @@ class Product
 
 				if (!empty($result['image_warnings'])) {
 					foreach ($result['image_warnings'] as $warning) {
-						$errors[] = 'Satır ' . ($i + 1) . ' görsel: ' . $warning;
+						$errors[] = 'Satır ' . $lineNo . ' görsel: ' . $warning;
 					}
 				}
 
-				if (!empty($result['created'])) {
+				if (!empty($result['variation'])) {
+					if (!empty($result['created'])) {
+						$variationsCreated++;
+					} else {
+						$variationsUpdated++;
+					}
+				} elseif (!empty($result['created'])) {
 					$created++;
 				} else {
 					$updated++;
@@ -2051,11 +2385,15 @@ class Product
 			$errors[] = $result['message'];
 		}
 
-		if ($created === 0 && $updated === 0 && $errors) {
+		if ($created === 0 && $updated === 0 && $variationsCreated === 0 && $variationsUpdated === 0 && $errors) {
 			return self::fail(implode(' ', array_slice($errors, 0, 3)));
 		}
 
 		$message = $created . ' ürün eklendi, ' . $updated . ' ürün güncellendi';
+
+		if ($variationsCreated > 0 || $variationsUpdated > 0) {
+			$message .= ', ' . $variationsCreated . ' varyasyon eklendi, ' . $variationsUpdated . ' varyasyon güncellendi';
+		}
 
 		if ($categoriesCreated > 0) {
 			$message .= ', ' . $categoriesCreated . ' kategori oluşturuldu';
@@ -2098,6 +2436,10 @@ class Product
 		int &$categoriesCreated,
 		int &$brandsCreated
 	): array {
+		if (self::isExcelVariationRow($row, $map)) {
+			return self::importExcelVariationRow($row, $map, $lineNo);
+		}
+
 		$barcode = self::importCell($row, $map, 'barcode');
 		$stockCode = self::importCell($row, $map, 'stock_code');
 
@@ -2152,6 +2494,11 @@ class Product
 				$defaultLang => $langFields,
 			],
 		];
+
+		if ($id > 0 && ProductVariation::hasVariations($id)) {
+			$existingProduct = self::getByIdAdmin($id);
+			$data['stock'] = (string) ($existingProduct['stock'] ?? $data['stock']);
+		}
 
 		$result = self::save($data, $id);
 
@@ -2311,7 +2658,7 @@ class Product
 	private static function buildImportColumnMap(array $headers): array
 	{
 		$aliases = [
-			'product_id' => ['product id'],
+			'product_id' => ['product id', 'ürün id', 'urun id', 'id'],
 			'product_name' => ['product name', 'ürün adı', 'urun adi'],
 			'barcode' => ['barcode', 'barkod'],
 			'stock_code' => ['stock code', 'stok kodu', 'sku'],
@@ -2329,6 +2676,10 @@ class Product
 			'brand_name' => ['brand name', 'marka', 'marka adı', 'marka adi'],
 			'images' => ['images', 'image', 'görseller', 'gorseller', 'gorsel'],
 			'active' => ['active', 'durum', 'aktif'],
+			'parent_stock_code' => ['parent stock code', 'ana stok kodu', 'üst stok kodu', 'parent sku'],
+			'variation' => ['variation', 'varyasyon', 'variant'],
+			'type' => ['type', 'tip', 'tür', 'tur'],
+			'variation_id' => ['variation id', 'varyasyon id', 'id_variation'],
 		];
 
 		$map = [];
@@ -2356,8 +2707,19 @@ class Product
 		}
 
 		$index = $map[$key];
+		$value = isset($row[$index]) ? trim((string) $row[$index]) : '';
 
-		return isset($row[$index]) ? trim((string) $row[$index]) : '';
+		if ($value === '') {
+			return '';
+		}
+
+		$value = Security::decodeOoxmlEscapes($value);
+
+		if (in_array($key, ['description', 'short_description'], true)) {
+			$value = preg_replace('/(?:\n\s*){3,}/', "\n\n", $value) ?? $value;
+		}
+
+		return trim($value);
 	}
 
 	private static function isImportRowEmpty(array $row): bool
@@ -2384,6 +2746,74 @@ class Product
 		}
 
 		return (int) $value > 0 ? 1 : 0;
+	}
+
+	private static function isExcelVariationRow(array $row, array $map): bool
+	{
+		$type = mb_strtolower(self::importCell($row, $map, 'type'), 'UTF-8');
+
+		if (in_array($type, ['variation', 'varyasyon', 'variant'], true)) {
+			return true;
+		}
+
+		if (in_array($type, ['product', 'ürün', 'urun', 'ana ürün', 'ana urun'], true)) {
+			return false;
+		}
+
+		return self::importCell($row, $map, 'parent_stock_code') !== ''
+			|| self::importCell($row, $map, 'variation') !== ''
+			|| self::importCell($row, $map, 'variation_id') !== '';
+	}
+
+	private static function importExcelVariationRow(array $row, array $map, int $lineNo): array
+	{
+		$parentStock = self::importCell($row, $map, 'parent_stock_code');
+		$parentId = (int) self::importCell($row, $map, 'product_id');
+
+		if ($parentId <= 0 && $parentStock !== '') {
+			$parentId = self::findIdByStockCode($parentStock);
+		}
+
+		if ($parentId <= 0 || !self::getByIdAdmin($parentId)) {
+			return self::fail('Satır ' . $lineNo . ': varyasyon için ana ürün bulunamadı (Product ID veya Parent Stock Code)');
+		}
+
+		$options = ProductVariation::parseOptionsLabel(self::importCell($row, $map, 'variation'));
+		$sku = self::importCell($row, $map, 'stock_code');
+		$priceRaw = self::importCell($row, $map, 'price');
+		$stockRaw = self::importCell($row, $map, 'stock');
+		$activeRaw = self::importCell($row, $map, 'active');
+		$item = [
+			'id_variation' => (int) self::importCell($row, $map, 'variation_id'),
+			'sku' => $sku,
+			'barcode' => self::importCell($row, $map, 'barcode'),
+			'options' => $options,
+		];
+
+		if ($priceRaw !== '') {
+			$item['price'] = $priceRaw;
+		}
+
+		if ($stockRaw !== '') {
+			$item['stock'] = $stockRaw;
+		}
+
+		if ($activeRaw !== '') {
+			$item['active'] = self::parseImportActive($activeRaw);
+		}
+
+		$result = ProductVariation::upsertOne($parentId, $item);
+
+		if (empty($result['success'])) {
+			return self::fail('Satır ' . $lineNo . ': ' . (string) ($result['message'] ?? 'varyasyon kaydedilemedi'));
+		}
+
+		return [
+			'success' => true,
+			'created' => !empty($result['created']),
+			'variation' => true,
+			'id' => (int) ($result['id'] ?? 0),
+		];
 	}
 
 	private static function fail(string $message): array

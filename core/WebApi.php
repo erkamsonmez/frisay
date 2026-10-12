@@ -983,6 +983,7 @@ class WebApi
 	{
 		$map = [
 			Order::STATUS_PENDING => 'AwaitingPayment',
+			Order::STATUS_PAID => 'PaymentAccepted',
 			Order::STATUS_PROCESSING => 'Picking',
 			Order::STATUS_SHIPPED => 'Shipped',
 			Order::STATUS_DELIVERED => 'Delivered',

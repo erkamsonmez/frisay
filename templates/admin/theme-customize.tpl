@@ -51,7 +51,11 @@
 						<div class="col-md-6">
 							<div class="border rounded p-3 h-100">
 								<div class="text-center mb-3 theme-logo-preview">
+									{if $logo.exists|default:false && $logo.url}
 									<img src="{$logo.url|escape}?v={$smarty.now}" alt="{$logo.label|escape}" class="img-fluid">
+									{else}
+									<div class="text-muted small py-4">Henüz yüklenmedi</div>
+									{/if}
 								</div>
 								<p class="small fw-semibold mb-2">{$logo.label|escape}</p>
 								<p class="small text-muted mb-2"><code>img/{$logo.file|escape}</code></p>
@@ -118,7 +122,7 @@
 
 			<div class="tab-pane fade" id="tc-home" role="tabpanel" aria-labelledby="tc-home-tab" tabindex="0">
 				{assign var=hasHomeOpts value=false}
-				{if isset($themeOptionDefs.header) || isset($themeOptionDefs.announcement) || isset($themeOptionDefs.tagline) || isset($themeOptionDefs.delivery_regions) || isset($themeOptionDefs.home_slider)}
+				{if isset($themeOptionDefs.header) || isset($themeOptionDefs.announcement) || isset($themeOptionDefs.tagline) || isset($themeOptionDefs.delivery_regions) || isset($themeOptionDefs.home_slider) || isset($themeOptionDefs.etbis_url) || isset($themeOptionDefs.play_store_url) || isset($themeOptionDefs.app_store_url)}
 					{assign var=hasHomeOpts value=true}
 				{/if}
 
@@ -128,7 +132,7 @@
 					<p class="text-muted small mb-3">{'Header, homepage messaging and related storefront options.'|adminT}</p>
 					<div class="row g-3">
 						{foreach $themeOptionDefs as $optKey => $optMeta}
-						{if $optKey == 'header' || $optKey == 'announcement' || $optKey == 'tagline' || $optKey == 'delivery_regions' || $optKey == 'home_slider'}
+						{if $optKey == 'header' || $optKey == 'announcement' || $optKey == 'tagline' || $optKey == 'delivery_regions' || $optKey == 'home_slider' || $optKey == 'etbis_url' || $optKey == 'play_store_url' || $optKey == 'app_store_url'}
 						<div class="col-md-6">
 							<label class="form-label small mb-1" for="opt_{$optKey|escape}">{$optMeta.label|escape}</label>
 							{if $optMeta.type == 'select'}
@@ -176,7 +180,7 @@
 			<div class="tab-pane fade" id="tc-advanced" role="tabpanel" aria-labelledby="tc-advanced-tab" tabindex="0">
 				{assign var=hasAdvanced value=false}
 				{foreach $themeOptionDefs as $optKey => $optMeta}
-				{if $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider'}
+				{if $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider' && $optKey != 'etbis_url' && $optKey != 'play_store_url' && $optKey != 'app_store_url'}
 					{assign var=hasAdvanced value=true}
 				{/if}
 				{/foreach}
@@ -187,7 +191,7 @@
 					<p class="text-muted small mb-3">{'Width, radius and less-used options. Saved to the <code>custom.css</code> file.'|adminT}</p>
 					<div class="row g-3">
 						{foreach $themeOptionDefs as $optKey => $optMeta}
-						{if $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider'}
+						{if $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider' && $optKey != 'etbis_url' && $optKey != 'play_store_url' && $optKey != 'app_store_url'}
 						<div class="col-md-6">
 							<label class="form-label small mb-1" for="opt_{$optKey|escape}">{$optMeta.label|escape}</label>
 							{if $optMeta.type == 'select'}

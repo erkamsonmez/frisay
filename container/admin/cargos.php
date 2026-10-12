@@ -47,6 +47,23 @@ if (Tools::isSubmit('saveCargo')) {
 		$flashType = $result['ok'] ? 'success' : 'danger';
 
 		if ($result['ok']) {
+			$savedId = (int) ($result['id'] ?? 0);
+			$uploadedLogo = $savedId > 0 && !empty($_FILES['logo']['tmp_name']);
+
+			if ($uploadedLogo) {
+				$logoResult = Cargo::uploadLogo($savedId, $_FILES['logo']);
+
+				if (!$logoResult['ok']) {
+					$flash = $result['message'] . ' — ' . $logoResult['message'];
+					$flashType = 'danger';
+				} else {
+					$flash = $result['message'] . ' · ' . $logoResult['message'];
+				}
+			} elseif ((int) Tools::getValue('remove_logo') === 1 && $savedId > 0) {
+				Cargo::deleteLogoFiles($savedId);
+				$flash = $result['message'] . ' · ' . adminT('Logo removed');
+			}
+
 			$editId = 0;
 		}
 	}

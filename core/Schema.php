@@ -101,7 +101,8 @@ class Schema
 
 		Admin::ensureSchema();
 
-		self::ensureSetting('THEME', 'blue');
+		self::ensureSetting('THEME', 'default');
+		self::remapStorefrontThemes();
 		self::ensureSetting('MAIL_DRIVER', 'php');
 		self::ensureSetting('MAIL_HEADER', '');
 		self::ensureSetting('MAIL_FOOTER', '');
@@ -266,6 +267,91 @@ class Schema
 
 		if ($exists === false) {
 			Settings::set($key, $default);
+		}
+	}
+
+	/** Dress → default; missing ShopNova folder → default; missing theme4 folder → default. Idempotent. */
+	public static function remapStorefrontThemes(): void
+	{
+		self::remapLegacyDressTheme();
+		self::remapMissingShopnovaTheme();
+		self::remapTheme4ToDefault();
+	}
+
+	private static function remapTheme4ToDefault(): void
+	{
+		if (Settings::get('THEME') !== 'theme4') {
+			return;
+		}
+
+		$root = dirname(__DIR__);
+
+		// theme4 is a real installable theme again when its folder exists.
+		if (is_dir($root . '/templates/theme4') && is_file($root . '/templates/theme4/header.tpl')) {
+			return;
+		}
+
+		$schemaFile = $root . '/templates/default/theme.schema.json';
+
+		if (!is_file($schemaFile) || !is_file($root . '/templates/default/header.tpl')) {
+			return;
+		}
+
+		Settings::set('THEME', 'default');
+
+		$oldOpts = Settings::get('THEME_OPTIONS_theme4');
+		$newOpts = Settings::get('THEME_OPTIONS_default');
+
+		if ($oldOpts !== '' && $newOpts === '') {
+			Settings::set('THEME_OPTIONS_default', $oldOpts);
+		}
+	}
+
+	private static function remapMissingShopnovaTheme(): void
+	{
+		if (Settings::get('THEME') !== 'shopnova') {
+			return;
+		}
+
+		$root = dirname(__DIR__);
+
+		if (is_dir($root . '/templates/shopnova')) {
+			return;
+		}
+
+		if (!is_dir($root . '/templates/default')) {
+			return;
+		}
+
+		Settings::set('THEME', 'default');
+
+		$oldOpts = Settings::get('THEME_OPTIONS_shopnova');
+		$newOpts = Settings::get('THEME_OPTIONS_default');
+
+		if ($oldOpts !== '' && $newOpts === '') {
+			Settings::set('THEME_OPTIONS_default', $oldOpts);
+		}
+	}
+
+	private static function remapLegacyDressTheme(): void
+	{
+		if (Settings::get('THEME') !== 'dress') {
+			return;
+		}
+
+		$defaultDir = dirname(__DIR__) . '/templates/default';
+
+		if (!is_dir($defaultDir)) {
+			return;
+		}
+
+		Settings::set('THEME', 'default');
+
+		$oldOpts = Settings::get('THEME_OPTIONS_dress');
+		$newOpts = Settings::get('THEME_OPTIONS_default');
+
+		if ($oldOpts !== '' && $newOpts === '') {
+			Settings::set('THEME_OPTIONS_default', $oldOpts);
 		}
 	}
 }

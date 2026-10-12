@@ -28,11 +28,15 @@ if (!FiyattrendFeedService::isEnabled()) {
 
 try {
 	$xml = FiyattrendFeedService::buildFeed();
+	$info = FiyattrendFeedService::cacheInfo();
 
 	header('Content-Type: application/xml; charset=UTF-8');
 	header('Content-Disposition: inline; filename="fiyattrend-feed.xml"');
 	header('X-Feed-Generator: FShop FiyatTrend Module');
-	header('Cache-Control: public, max-age=' . ((int) (Settings::get('FT_CACHE_TTL') ?: 360) * 60));
+	header('Cache-Control: public, max-age=' . (int) $info['remaining'] . ', must-revalidate');
+	if ($info['mtime'] > 0) {
+		header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $info['mtime']) . ' GMT');
+	}
 
 	echo $xml;
 } catch (Exception $e) {

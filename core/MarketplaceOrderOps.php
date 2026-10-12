@@ -42,7 +42,7 @@ class MarketplaceOrderOps
 		$platform = strtolower(trim($platform));
 		$orderNumber = trim($orderNumber);
 
-		if (!in_array($platform, ['trendyol', 'hepsiburada', 'n11'], true)) {
+		if (!Marketplace::isOrderPlatform($platform)) {
 			return ['ok' => false, 'message' => 'Geçersiz pazaryeri'];
 		}
 
@@ -58,6 +58,14 @@ class MarketplaceOrderOps
 
 		if ($platform === 'hepsiburada') {
 			return Hepsiburada\OrderService::importByOrderNumber($orderNumber);
+		}
+
+		if ($platform === 'prestashop') {
+			return Prestashop\OrderService::importByOrderNumber($orderNumber);
+		}
+
+		if ($platform === 'frisay') {
+			return Frisay\OrderService::importByOrderNumber($orderNumber);
 		}
 
 		return N11\OrderService::importByOrderNumber($orderNumber);
@@ -124,6 +132,10 @@ class MarketplaceOrderOps
 			$apiResult = Trendyol\OrderService::cancelOnMarketplace($order, $lines);
 		} elseif ($platform === 'hepsiburada') {
 			$apiResult = Hepsiburada\OrderService::cancelOnMarketplace($order, $lines);
+		} elseif ($platform === 'prestashop') {
+			$apiResult = Prestashop\OrderService::cancelOnMarketplace($order, $lines);
+		} elseif ($platform === 'frisay') {
+			$apiResult = Frisay\OrderService::cancelOnMarketplace($order, $lines);
 		} else {
 			$apiResult = N11\OrderService::cancelOnMarketplace($order, $lines);
 		}
@@ -180,10 +192,19 @@ class MarketplaceOrderOps
 					));
 
 					if ($code !== '') {
-						$idProduct = (int) (\DB::getValue(
-							'SELECT id_product FROM products WHERE stock_code = ? OR barcode = ? LIMIT 1',
-							[$code, $code]
-						) ?: 0);
+						if (class_exists('ProductVariation')) {
+							$variation = ProductVariation::findByCode($code);
+							if ($variation) {
+								$idProduct = (int) $variation['id_product'];
+								$line['id_variation'] = (int) $variation['id_variation'];
+							}
+						}
+						if ($idProduct <= 0) {
+							$idProduct = (int) (\DB::getValue(
+								'SELECT id_product FROM products WHERE stock_code = ? OR barcode = ? LIMIT 1',
+								[$code, $code]
+							) ?: 0);
+						}
 					}
 				}
 
@@ -191,13 +212,14 @@ class MarketplaceOrderOps
 					continue;
 				}
 
+				$idVariation = (int) ($line['id_variation'] ?? 0);
 				$product = Product::getByIdAdmin($idProduct);
-				$oldStock = $product ? Product::getStock($product) : 0;
+				$oldStock = $product ? Product::getStock($product, $idVariation) : 0;
 				$ref = trim((string) ($product['stock_code'] ?? '')) ?: (string) $idProduct;
 
 				if ($stockMode === 'restore') {
 					if ($stockDeducted === 1) {
-						Product::increaseStock($idProduct, $qty);
+						Product::increaseStock($idProduct, $qty, $idVariation);
 						$newStock = $oldStock + $qty;
 						MarketplaceLog::stockChange(
 							$platform,

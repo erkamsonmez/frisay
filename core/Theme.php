@@ -87,6 +87,88 @@ class Theme
 		return $edit;
 	}
 
+	/**
+	 * Currently rendered storefront folder (honours ?theme_preview=).
+	 */
+	public static function currentName(): string
+	{
+		if (defined('_THEME_REEL_DIR_')) {
+			$name = basename(str_replace('\\', '/', rtrim((string) _THEME_REEL_DIR_, '/\\')));
+
+			if ($name !== '' && self::isValidName($name)) {
+				return $name;
+			}
+		}
+
+		$active = class_exists('Settings', false) ? trim((string) Settings::get('THEME')) : '';
+
+		return self::isValidName($active) ? $active : 'default';
+	}
+
+	/**
+	 * Theme Edit chrome groups from theme.schema.json.
+	 *
+	 * @return array<string, array{label: string, fields: list<array{key: string, label: string, type: string}>}>
+	 */
+	public static function getChromeSchema(string $theme): array
+	{
+		$schema = self::loadSchema($theme);
+		$raw = is_array($schema) ? ($schema['chrome'] ?? null) : null;
+
+		if (!is_array($raw) || $raw === []) {
+			return [];
+		}
+
+		$out = [];
+
+		foreach ($raw as $sectionKey => $section) {
+			if (!is_string($sectionKey) || !preg_match('/^[a-z][a-z0-9_-]*$/', $sectionKey) || !is_array($section)) {
+				continue;
+			}
+
+			$fields = [];
+
+			foreach ($section['fields'] ?? [] as $field) {
+				if (!is_array($field)) {
+					continue;
+				}
+
+				$key = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($field['key'] ?? '')));
+
+				if ($key === '') {
+					continue;
+				}
+
+				$type = (string) ($field['type'] ?? 'text');
+
+				if ($type === 'textarea') {
+					$type = 'textarea';
+				} elseif ($type === 'checkbox') {
+					$type = 'checkbox';
+				} else {
+					$type = 'text';
+				}
+
+				$fields[] = [
+					'key' => $key,
+					'label' => (string) ($field['label'] ?? $key),
+					'type' => $type,
+				];
+			}
+
+			if ($fields === []) {
+				continue;
+			}
+
+			$out[$sectionKey] = [
+				'label' => (string) ($section['label'] ?? $sectionKey),
+				'fields' => $fields,
+			];
+		}
+
+		return $out;
+	}
+
 	public static function getPreviewUrl(string $theme, string $domain): string
 	{
 		$meta = self::getMeta($theme);
@@ -121,7 +203,7 @@ class Theme
 		}
 
 		foreach (scandir($dir) ?: [] as $entry) {
-			if ($entry === '.' || $entry === '..' || $entry === 'admin') {
+			if ($entry === '.' || $entry === '..' || $entry === 'admin' || $entry === 'admin1') {
 				continue;
 			}
 
@@ -178,8 +260,10 @@ class Theme
 			'nova' => 'FriSay Nova',
 			'restoran' => 'Restoran',
 			'chapan' => 'Chapan',
-			'dress' => 'Dress',
+			'dress' => 'Varsayılan Tema',
+			'theme4' => 'Theme4',
 			'prime' => 'Prime',
+			'healt' => 'Healt',
 			'fyazilim' => 'Frisay',
 		];
 
@@ -362,7 +446,7 @@ class Theme
 
 		$headers = self::discoverHeaderVariants($theme);
 
-		if ($headers !== []) {
+		if (count($headers) > 1) {
 			$defaultHeader = isset($headers['header2']) ? 'header2' : (string) array_key_first($headers);
 			$existingDefault = (string) ($defs['header']['default'] ?? '');
 
@@ -392,6 +476,7 @@ class Theme
 			'poppins' => 'Poppins',
 			'nunito' => 'Nunito',
 			'roboto' => 'Roboto',
+			'outfit' => 'Outfit',
 			'open-sans' => 'Open Sans',
 		];
 	}
@@ -430,6 +515,10 @@ class Theme
 			'roboto' => [
 				'font_family' => "'Roboto', sans-serif",
 				'google_font_url' => 'https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap',
+			],
+			'outfit' => [
+				'font_family' => "'Outfit', sans-serif",
+				'google_font_url' => 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap',
 			],
 			'open-sans' => [
 				'font_family' => "'Open Sans', sans-serif",
@@ -665,6 +754,26 @@ class Theme
 	{
 		return (bool) preg_match('/^[a-z0-9_-]+$/', $theme)
 			&& is_dir(self::templatesPath() . '/' . $theme);
+	}
+
+	public static function resolveActive(string $theme): string
+	{
+		$theme = self::sanitizeName($theme);
+
+		if ($theme === 'dress' && self::isValidName('default')) {
+			$theme = 'default';
+		}
+
+		// Legacy installs renamed theme4 → default; only remap if theme4 folder is gone.
+		if ($theme === 'theme4' && !self::isValidName('theme4') && self::isValidName('default')) {
+			$theme = 'default';
+		}
+
+		if (!self::isValidName($theme) && self::isValidName('default')) {
+			return 'default';
+		}
+
+		return $theme;
 	}
 
 	public static function sanitizeName(string $theme): string
@@ -1482,7 +1591,7 @@ class Theme
 			return ['success' => false, 'message' => 'Geçersiz tema'];
 		}
 
-		if (in_array($theme, ['admin', 'blue', 'restoran'], true)) {
+		if (in_array($theme, ['admin', 'default', 'blue', 'restoran'], true)) {
 			return ['success' => false, 'message' => 'Sistem teması silinemez'];
 		}
 

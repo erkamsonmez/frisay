@@ -1,17 +1,25 @@
 {include file='admin/marketplace/_nav.tpl'}
 <div class="mp-orders-page">
 	<div class="admin-panel p-3 mb-3">
-		<div class="mp-filter-card mb-0">
+		<div class="mp-filter-card mb-0 js-filter-collapse">
 			<div class="mp-filter-header">
-				<div class="mp-filter-title">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M22 3H2l8 9v7l4 2v-9l8-9z"/>
-					</svg>
-					Sipariş Filtreleri
+				<button type="button" class="mp-filter-toggle js-filter-collapse-toggle" aria-expanded="false" aria-controls="mpOrdersFilterBody">
+					<span class="mp-filter-title">
+						{include file='admin/partials/filter-funnel-icon.tpl'}
+						Sipariş Filtreleri
+					</span>
+					<svg class="mp-filter-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+				</button>
+				<div class="mp-filter-actions mp-filter-actions--header">
+					<div class="mp-filter-actions__btns">
+						<button type="submit" form="mpFilterForm" class="btn btn-warning">Ara</button>
+						<button type="button" id="mpExportBtn" class="btn btn-success">Excel'e Aktar</button>
+						<button type="button" id="mpImportOrderBtn" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mpImportModal">Sipariş Import</button>
+					</div>
 				</div>
-				<div class="mp-filter-sub">Tarih, müşteri, sipariş no ve ürün/stok koduna göre listele.</div>
 			</div>
 
+			<div class="mp-filter-collapse js-filter-collapse-body" id="mpOrdersFilterBody" hidden>
 			<form id="mpFilterForm" method="get" action="{$ordersUrl|escape}">
 				<div class="row">
 					<div class="col-md-4 mb-3">
@@ -21,6 +29,8 @@
 							<option value="trendyol"{if $marketplaceOrderPlatform == 'trendyol'} selected{/if}>Trendyol</option>
 							<option value="hepsiburada"{if $marketplaceOrderPlatform == 'hepsiburada'} selected{/if}>Hepsiburada</option>
 							<option value="n11"{if $marketplaceOrderPlatform == 'n11'} selected{/if}>N11</option>
+							<option value="prestashop"{if $marketplaceOrderPlatform == 'prestashop'} selected{/if}>PrestaShop</option>
+							<option value="frisay"{if $marketplaceOrderPlatform == 'frisay'} selected{/if}>FriSay</option>
 						</select>
 					</div>
 
@@ -61,15 +71,8 @@
 						</select>
 					</div>
 				</div>
-
-				<div class="mp-filter-actions">
-					<div style="display:flex;gap:10px;flex-wrap:wrap">
-						<button type="submit" class="btn btn-warning">Ara</button>
-						<button type="button" id="mpExportBtn" class="btn btn-success">Excel'e Aktar</button>
-						<button type="button" id="mpImportOrderBtn" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#mpImportModal">Sipariş Import</button>
-					</div>
-				</div>
 			</form>
+			</div>
 		</div>
 	</div>
 
@@ -97,26 +100,8 @@
 			</div>
 		</div>
 		<div class="p-0">
-			<div class="table-responsive adm-orders-shell">
-				<table class="table adm-orders-table mb-0 align-middle">
-					<thead>
-						<tr>
-							<th style="width:96px"><span class="visually-hidden">{'Select'|adminT}</span></th>
-							<th>{'Channel'|adminT}</th>
-							<th>{'Order date'|adminT}</th>
-							<th class="text-center" style="width:148px">{'Actions'|adminT}</th>
-							<th>{'Order no'|adminT}</th>
-							<th>{'Status'|adminT}</th>
-							<th>{'Customer'|adminT}</th>
-							<th>{'Payment'|adminT}</th>
-							<th>{'Cost'|adminT}</th>
-							<th>{'Total'|adminT}</th>
-						</tr>
-					</thead>
-					<tbody>
-						{include file='admin/partials/marketplace-order-list-rows.tpl'}
-					</tbody>
-				</table>
+			<div class="ps-order-list">
+				{include file='admin/partials/marketplace-order-rows.tpl'}
 			</div>
 		</div>
 	</div>
@@ -357,7 +342,7 @@
 		btn.addEventListener('click', function (e) {
 			e.preventDefault();
 			e.stopPropagation();
-			var row = btn.closest('.mp-order-row');
+			var row = btn.closest('.ps-order-card');
 			if (!row) return;
 			try {
 				openDrawer(JSON.parse(row.getAttribute('data-order') || '{}'));
@@ -409,7 +394,7 @@
 		var wantPlatform = params.get('platform') || '';
 		var wantOrder = params.get('order_number') || '';
 		var wantPackage = params.get('package_id') || '';
-		document.querySelectorAll('.mp-order-row').forEach(function (row) {
+		document.querySelectorAll('.ps-order-card').forEach(function (row) {
 			try {
 				var order = JSON.parse(row.getAttribute('data-order') || '{}');
 				if (String(order.order_number) === String(wantOrder)
@@ -439,6 +424,8 @@
 						<option value="trendyol">Trendyol</option>
 						<option value="hepsiburada">Hepsiburada</option>
 						<option value="n11">N11</option>
+						<option value="prestashop">PrestaShop</option>
+						<option value="frisay">FriSay</option>
 					</select>
 				</div>
 				<div class="mb-2">
@@ -555,7 +542,7 @@
 
 	document.querySelectorAll('.js-mp-refresh-order').forEach(function (btn) {
 		btn.addEventListener('click', function () {
-			var row = btn.closest('.mp-order-row');
+			var row = btn.closest('.ps-order-card');
 			var order = row ? parseOrder(row) : null;
 			if (!order) return;
 			busyStart(btn);
@@ -574,7 +561,7 @@
 
 	document.querySelectorAll('.js-mp-delete-order').forEach(function (btn) {
 		btn.addEventListener('click', function () {
-			var row = btn.closest('.mp-order-row');
+			var row = btn.closest('.ps-order-card');
 			var order = row ? parseOrder(row) : null;
 			if (!order) return;
 			var ask = window.AdminConfirm && AdminConfirm.ask
@@ -602,7 +589,7 @@
 
 	document.querySelectorAll('.js-mp-cancel-order').forEach(function (btn) {
 		btn.addEventListener('click', function () {
-			var row = btn.closest('.mp-order-row');
+			var row = btn.closest('.ps-order-card');
 			var order = row ? parseOrder(row) : null;
 			if (!order) return;
 			cancelCtx = order;

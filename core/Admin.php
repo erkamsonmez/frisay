@@ -28,8 +28,11 @@ class Admin
 		$email = trim(strtolower($email));
 		$identifier = RateLimit::loginIdentifier($email);
 
-		if (RateLimit::isLimited(RateLimit::SCOPE_ADMIN_LOGIN, $identifier, 8, 900)) {
-			return self::fail('Çok fazla başarısız giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.');
+		$maxAttempts = SecuritySettings::getAdminLoginMaxAttempts();
+		$windowSeconds = SecuritySettings::getAdminLoginWindowSeconds();
+
+		if (RateLimit::isLimited(RateLimit::SCOPE_ADMIN_LOGIN, $identifier, $maxAttempts, $windowSeconds)) {
+			return self::fail(SecuritySettings::loginLockMessage((int) ($windowSeconds / 60)));
 		}
 
 		if (!Validate::isEmail($email)) {
@@ -50,6 +53,20 @@ class Admin
 
 		session_regenerate_id(true);
 		$_SESSION['id_admin'] = (int) $row['id_admin'];
+		$_SESSION['admin_last_active'] = time();
+
+		return self::ok('Giriş başarılı');
+	}
+
+	public static function loginById(int $idAdmin): array
+	{
+		$row = DB::getRowSafe('admins', 'id_admin = ? AND active = 1', [$idAdmin]);
+		if (!$row) {
+			return self::fail('Admin bulunamadı');
+		}
+		session_regenerate_id(true);
+		$_SESSION['id_admin'] = (int) $row['id_admin'];
+		$_SESSION['admin_last_active'] = time();
 
 		return self::ok('Giriş başarılı');
 	}
@@ -138,8 +155,10 @@ class Admin
 			return self::fail(adminT('Passwords do not match'));
 		}
 
-		if (strlen($password) < 8) {
-			return self::fail(adminT('Password must be at least 8 characters'));
+		$passwordError = Security::validatePassword($password);
+
+		if ($passwordError) {
+			return self::fail($passwordError);
 		}
 
 		$row = self::findValidPasswordReset($token);
@@ -168,7 +187,7 @@ class Admin
 
 	public static function logout(): void
 	{
-		unset($_SESSION['id_admin']);
+		unset($_SESSION['id_admin'], $_SESSION['admin_last_active']);
 		session_regenerate_id(true);
 	}
 
@@ -409,8 +428,8 @@ class Admin
 			'orders_processing' => (int) DB::getValue('SELECT COUNT(*) FROM orders WHERE DATE(date_add) > DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND status = ?', [Order::STATUS_PROCESSING]),
 			'orders_cargo' => (int) DB::getValue('SELECT COUNT(*) FROM orders WHERE DATE(date_add) > DATE_SUB(CURDATE(), INTERVAL 7 DAY) AND status = ?', [Order::STATUS_SHIPPED]),
 			'orders_awaiting_shipment' => (int) DB::getValue(
-				'SELECT COUNT(*) FROM orders WHERE status IN (?, ?)',
-				[Order::STATUS_PROCESSING, Order::STATUS_PENDING]
+				'SELECT COUNT(*) FROM orders WHERE status IN (?, ?, ?)',
+				[Order::STATUS_PROCESSING, Order::STATUS_PAID, Order::STATUS_PENDING]
 			),
 			'orders_today' => $ordersToday,
 			'orders_yesterday' => $ordersYesterday,
@@ -530,7 +549,7 @@ class Admin
 		);
 
 		$listingsTotal = 0;
-		foreach (['trendyol_products', 'hepsiburada_products', 'n11_products'] as $table) {
+		foreach (['trendyol_products', 'hepsiburada_products', 'n11_products', 'prestashop_products', 'frisay_products'] as $table) {
 			$exists = DB::execute("SHOW TABLES LIKE '" . str_replace("'", "''", $table) . "'");
 			if (!empty($exists)) {
 				$listingsTotal += (int) DB::getValue('SELECT COUNT(*) FROM `' . $table . '`');
@@ -651,8 +670,8 @@ class Admin
 		);
 
 		$awaitingShipment = (int) DB::getValue(
-			'SELECT COUNT(*) FROM orders WHERE status IN (?, ?)',
-			[$pending, $processing]
+			'SELECT COUNT(*) FROM orders WHERE status IN (?, ?, ?)',
+			[$pending, Order::STATUS_PAID, $processing]
 		);
 		$processingCount = (int) DB::getValue(
 			'SELECT COUNT(*) FROM orders WHERE status = ?',
@@ -892,7 +911,7 @@ class Admin
 				'data' => [],
 				'marketplace_data' => [],
 				'colors' => [],
-				'marketplace_color' => '#F97316',
+				'marketplace_color' => '#F5A623',
 				'store_label' => 'Store sales',
 				'marketplace_label' => 'Marketplace sales',
 			];
@@ -903,7 +922,7 @@ class Admin
 			$labels[] = $cursor->format('d.m');
 			$data[] = round($byDay[$day] ?? 0.0, 2);
 			$mpData[] = round($mpByDay[$day] ?? 0.0, 2);
-			$colors[] = '#0D9488';
+			$colors[] = '#2457C5';
 		}
 
 		return [
@@ -911,7 +930,7 @@ class Admin
 			'data' => $data,
 			'marketplace_data' => $mpData,
 			'colors' => $colors,
-			'marketplace_color' => '#F97316',
+			'marketplace_color' => '#F5A623',
 			'store_label' => 'Store sales',
 			'marketplace_label' => 'Marketplace sales',
 		];
@@ -985,14 +1004,7 @@ class Admin
 		$key = strtolower(trim($key));
 		$base = rtrim((string) ($domain ?? ''), '/') . '/';
 
-		if ($key === 'frisay') {
-			return [
-				'icon_url' => $base . 'img/faviconAdmin.ico',
-				'icon_file' => 'faviconAdmin.ico',
-			];
-		}
-
-		if (in_array($key, ['trendyol', 'hepsiburada', 'n11'], true)) {
+		if (in_array($key, ['trendyol', 'hepsiburada', 'n11', 'prestashop', 'frisay'], true)) {
 			return [
 				'icon_url' => $base . 'templates/admin/img/icons/' . $key . '.png',
 				'icon_file' => $key . '.png',
@@ -1024,6 +1036,8 @@ class Admin
 			'trendyol' => ['label' => 'Trendyol', 'color' => '#F27A1A'],
 			'hepsiburada' => ['label' => 'Hepsiburada', 'color' => '#FF6000'],
 			'n11' => ['label' => 'N11', 'color' => '#7C3AED'],
+			'prestashop' => ['label' => 'PrestaShop', 'color' => '#DF0067'],
+			'frisay' => ['label' => 'FriSay', 'color' => '#5B2CDE'],
 			'store' => ['label' => $siteName, 'color' => '#475569'],
 			'pos' => ['label' => 'POS', 'color' => '#0F766E'],
 		];
@@ -1392,8 +1406,10 @@ class Admin
 			return self::fail(adminT('Passwords do not match'));
 		}
 
-		if (strlen($newPassword) < 8) {
-			return self::fail(adminT('Password must be at least 8 characters'));
+		$passwordError = Security::validatePassword($newPassword);
+
+		if ($passwordError) {
+			return self::fail($passwordError);
 		}
 
 		$row = DB::getRowSafe('admins', 'id_admin = ? AND active = 1', [$idAdmin]);
@@ -1434,8 +1450,10 @@ class Admin
 			return self::fail(adminT('Passwords do not match'));
 		}
 
-		if (strlen($password) < 8) {
-			return self::fail(adminT('Password must be at least 8 characters'));
+		$passwordError = Security::validatePassword($password);
+
+		if ($passwordError) {
+			return self::fail($passwordError);
 		}
 
 		$exists = (int) DB::getValue('SELECT id_admin FROM admins WHERE email = ?', [$email]);

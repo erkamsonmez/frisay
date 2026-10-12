@@ -69,4 +69,46 @@ class Routes
 		header('Location: ' . $url, true, 301);
 		exit;
 	}
+
+	/**
+	 * Prapazar / PrestaShop vitrin URL’leri (index.php?controller=product&id_product=).
+	 * Mağazanın kendi SEO URL’sine 301; native /kategori/slug-id değişmez.
+	 */
+	public static function redirectPrestashopFrontIfNeeded(): void
+	{
+		$container = trim((string) Tools::getValue('container'));
+		if ($container !== '' && $container !== 'home' && $container !== 'index') {
+			return;
+		}
+
+		$controller = strtolower(trim((string) Tools::getValue('controller')));
+		$idProduct = (int) Tools::getValue('id_product');
+		$idCategory = (int) Tools::getValue('id_category');
+		$idManufacturer = (int) Tools::getValue('id_manufacturer');
+
+		$target = '';
+		if ($idProduct > 0 && ($controller === 'product' || $controller === '')) {
+			$product = Product::getById($idProduct);
+			if ($product) {
+				$target = Product::getLink($product);
+			}
+		} elseif ($controller === 'category' && $idCategory > 0) {
+			$category = Category::getById($idCategory);
+			if ($category) {
+				$target = Category::getUrl($category);
+			}
+		} elseif ($controller === 'manufacturer' && $idManufacturer > 0) {
+			$brand = DB::getRowSafe('brands', 'id_brand = ? AND active = 1', [$idManufacturer]);
+			if (is_array($brand) && $brand) {
+				$target = Brand::getUrl($brand);
+			}
+		}
+
+		if ($target === '') {
+			return;
+		}
+
+		header('Location: ' . $target, true, 301);
+		exit;
+	}
 }

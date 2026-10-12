@@ -96,6 +96,7 @@ class GoogleShoppingModule extends ModuleBase
 
         $feedToken = Settings::get('GSF_FEED_TOKEN');
         $feedUrl   = rtrim($domain, '/') . '/api/module.php?m=google-shopping&action=feed&token=' . $feedToken;
+        $cacheInfo = self::cacheInfo();
 
         $smarty->assign([
             'flash'              => $flash,
@@ -108,8 +109,12 @@ class GoogleShoppingModule extends ModuleBase
             'gsfIncludeOutstock' => Settings::get('GSF_INCLUDE_OUTSTOCK'),
             'gsfCustomLabel0'    => Settings::get('GSF_CUSTOM_LABEL_0'),
             'feedUrl'            => $feedUrl,
-            'lastRegen'          => Settings::get('GSF_LAST_REGEN') ?: '—',
-            'cacheExists'        => file_exists(self::cachePath()),
+            'lastRegen'          => $cacheInfo['last_regen'] !== '' ? $cacheInfo['last_regen'] : '—',
+            'cacheExists'        => $cacheInfo['exists'],
+            'cacheExpired'       => $cacheInfo['expired'],
+            'cacheAgeMin'        => (int) floor($cacheInfo['age'] / 60),
+            'cacheRemainingMin'  => (int) ceil($cacheInfo['remaining'] / 60),
+            'cronFeedsUrl'       => rtrim((string) $domain, '/') . '/api/cron.php?action=feeds&token=SHOP_TOKEN',
         ]);
     }
 
@@ -118,19 +123,91 @@ class GoogleShoppingModule extends ModuleBase
     /**
      * XML feed döndürür. Cache varsa ve süresi geçmemişse cache'den okur.
      */
+    public static function ttlSeconds(): int
+    {
+        return max(60, (int)(Settings::get('GSF_CACHE_TTL') ?: 360) * 60);
+    }
+
+    public static function isEnabled(): bool
+    {
+        return Settings::get('GSF_ENABLED') === '1';
+    }
+
+    /** @return array{exists:bool,ttl:int,age:int,mtime:int,expired:bool,remaining:int,last_regen:string} */
+    public static function cacheInfo(): array
+    {
+        $path = self::cachePath();
+        $ttl = self::ttlSeconds();
+        $exists = is_file($path);
+        $mtime = $exists ? (int) filemtime($path) : 0;
+        $age = ($exists && $mtime > 0) ? max(0, time() - $mtime) : 0;
+        $expired = !$exists || $age >= $ttl;
+
+        return [
+            'exists' => $exists,
+            'ttl' => $ttl,
+            'age' => $age,
+            'mtime' => $mtime,
+            'expired' => $expired,
+            'remaining' => $expired ? 0 : ($ttl - $age),
+            'last_regen' => (string) (Settings::get('GSF_LAST_REGEN') ?: ''),
+        ];
+    }
+
     public static function buildFeed(): string
     {
         $cachePath = self::cachePath();
-        $ttl       = (int)(Settings::get('GSF_CACHE_TTL') ?: 360) * 60;
+        $info = self::cacheInfo();
 
-        if (file_exists($cachePath) && (time() - filemtime($cachePath)) < $ttl) {
+        if ($info['exists'] && !$info['expired']) {
             return (string) file_get_contents($cachePath);
         }
 
         $xml = self::generateXml();
+        $dir = dirname($cachePath);
+
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
         file_put_contents($cachePath, $xml);
         Settings::set('GSF_LAST_REGEN', date('d.m.Y H:i'));
         return $xml;
+    }
+
+    public static function regenerate(): array
+    {
+        @unlink(self::cachePath());
+        $xml = self::buildFeed();
+        $dom = new DOMDocument();
+        $dom->loadXML($xml);
+        $count = $dom->getElementsByTagName('item')->length;
+
+        return [
+            'success' => true,
+            'refreshed' => true,
+            'message' => 'Feed yenilendi. ' . $count . ' ürün işlendi.',
+            'product_count' => $count,
+            'generated_at' => Settings::get('GSF_LAST_REGEN') ?: date('d.m.Y H:i'),
+        ];
+    }
+
+    public static function refreshIfExpired(): array
+    {
+        $info = self::cacheInfo();
+
+        if ($info['exists'] && !$info['expired']) {
+            return [
+                'success' => true,
+                'refreshed' => false,
+                'message' => 'Önbellek hâlâ geçerli',
+                'age' => $info['age'],
+                'ttl' => $info['ttl'],
+                'generated_at' => $info['last_regen'],
+            ];
+        }
+
+        return self::regenerate();
     }
 
     /**

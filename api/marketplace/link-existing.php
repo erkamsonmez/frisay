@@ -27,6 +27,12 @@ if ($platform === 'hepsiburada') {
 } elseif ($platform === 'n11') {
 	$result = N11\ProductSyncService::linkExistingProduct($idProduct, $barcode);
 	$mapping = $result['mapping'] ?? N11\ProductSyncService::findMapping($idProduct);
+} elseif ($platform === 'prestashop') {
+	$result = Prestashop\ProductSyncService::linkExistingProduct($idProduct, $barcode);
+	$mapping = $result['mapping'] ?? Prestashop\ProductSyncService::findMapping($idProduct);
+} elseif ($platform === 'frisay') {
+	$result = Frisay\ProductSyncService::linkExistingProduct($idProduct, $barcode);
+	$mapping = $result['mapping'] ?? Frisay\ProductSyncService::findMapping($idProduct);
 } else {
 	$result = Trendyol\ProductSyncService::linkExistingProduct($idProduct, $barcode);
 	$mapping = $result['mapping'] ?? Trendyol\ProductSyncService::findMapping($idProduct);

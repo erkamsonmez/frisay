@@ -18,14 +18,17 @@ class RecentViewedModule extends ModuleBase
 	public array $displayHooks = [
 		'home_bottom' => 'Ana sayfa — son bakılan ürünler bloğu',
 		'product_detail' => 'Ürün detay — görüntüleme kaydı (görünmez)',
+		'cart' => 'Sepet — son bakılanlar ve sana özel',
 	];
 
 	public array $defaultDisplayHooks = [
 		'home_bottom',
 		'product_detail',
+		'cart',
 	];
 
 	public array $frontStylesheets = ['front.css'];
+	public array $frontScripts = ['front.js'];
 	public array $adminStylesheets = ['admin.css'];
 
 	public function install(): bool
@@ -56,6 +59,11 @@ class RecentViewedModule extends ModuleBase
 		return true;
 	}
 
+	public function boot(): void
+	{
+		RecentViewedService::ensureCartHook();
+	}
+
 	public function renderDisplayHook(string $hook, array $context = []): ?string
 	{
 		if ($hook === 'product_detail') {
@@ -63,6 +71,33 @@ class RecentViewedModule extends ModuleBase
 			RecentViewedService::track($idProduct);
 
 			return null;
+		}
+
+		if ($hook === 'cart') {
+			$exclude = [];
+			$cart = $context['cart'] ?? [];
+
+			if (is_array($cart) && !empty($cart['items']) && is_array($cart['items'])) {
+				foreach ($cart['items'] as $item) {
+					$exclude[] = (int) ($item['id_product'] ?? 0);
+				}
+			}
+
+			$recent = RecentViewedService::isEnabled()
+				? RecentViewedService::getProductsForCart($exclude)
+				: [];
+			$forYou = RecentViewedService::getForYouProducts($exclude);
+
+			if ($recent === [] && $forYou === []) {
+				return null;
+			}
+
+			$html = $this->renderFrontTemplate('cart', [
+				'recentProducts' => $recent,
+				'forYouProducts' => $forYou,
+			]);
+
+			return $html !== '' ? $html : null;
 		}
 
 		if ($hook !== 'home_bottom' || !RecentViewedService::isEnabled()) {

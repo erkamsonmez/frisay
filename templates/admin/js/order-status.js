@@ -20,6 +20,10 @@ document.addEventListener('DOMContentLoaded', function () {
 	}
 
 	document.querySelectorAll('.ps-order-status-select').forEach(function (select) {
+		select.addEventListener('click', function (e) {
+			e.stopPropagation();
+		});
+
 		select.addEventListener('change', function () {
 			var idOrder = parseInt(select.getAttribute('data-order-id') || '0', 10);
 			var previousStatus = parseInt(select.getAttribute('data-current') || '0', 10);
@@ -65,6 +69,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
 					select.setAttribute('data-current', String(newStatus));
 					applySelectClass(select, data.status_class || 'default');
+					if (window.AdminToast) {
+						AdminToast.show(data.status_label || data.message || 'Durum güncellendi', 'success');
+					}
 				})
 				.catch(function (err) {
 					select.value = String(previousStatus);

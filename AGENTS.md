@@ -72,6 +72,7 @@ fshop/
 | Endpoint | Amaç |
 |----------|------|
 | `GET/POST /api/v1/...` | Web API (sipariş, ürün, kategori, marka, mesaj, bildirim) — bkz. [docs/WEBAPI.md](docs/WEBAPI.md) |
+| `GET /api/orders?ws_key=` | PrestaShop uyumlu WebService (geçiş; `/api/v1` değişmez) — [docs/PRESTASHOP_WEBSERVICE.md](docs/PRESTASHOP_WEBSERVICE.md) |
 | `POST /api/module.php?m={modul}&action={islem}` | Modül API |
 | `GET /api/cron.php?action=currency&token=SHOP_TOKEN` | Döviz fiyat güncelleme |
 
@@ -110,6 +111,7 @@ Tema dosyalarında tanımlı hook noktaları:
 | `home_slider` | `templates/default/header.tpl` |
 | `main_menu` | Tema üst menü (`_mini/header*.tpl`) — kategori menüsü yerine |
 | `home_promo_slider` | `templates/default/home.tpl` |
+| `home_bottom` | `templates/theme4/home.tpl` (Tema Edit hook widget + yedek şablon) |
 | `product`, `product_inf`, `product_detail` | `templates/default/product.tpl` |
 | `product_tab`, `product_tab_content` | `templates/default/product.tpl` |
 | `order_payment` | `templates/default/checkout.tpl` |

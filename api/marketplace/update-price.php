@@ -38,6 +38,12 @@ if ($platform === 'hepsiburada') {
 } elseif ($platform === 'n11') {
 	$result = N11\ProductSyncService::updatePriceStock($idProduct, $saleOverride, $listOverride);
 	$mapping = $result['mapping'] ?? N11\ProductSyncService::findMapping($idProduct);
+} elseif ($platform === 'prestashop') {
+	$result = Prestashop\ProductSyncService::updatePriceStock($idProduct, $saleOverride, $listOverride);
+	$mapping = $result['mapping'] ?? Prestashop\ProductSyncService::findMapping($idProduct);
+} elseif ($platform === 'frisay') {
+	$result = Frisay\ProductSyncService::updatePriceStock($idProduct, $saleOverride, $listOverride);
+	$mapping = $result['mapping'] ?? Frisay\ProductSyncService::findMapping($idProduct);
 } else {
 	$result = Trendyol\ProductSyncService::updatePriceStock($idProduct, $saleOverride, $listOverride);
 	$mapping = $result['mapping'] ?? Trendyol\ProductSyncService::findMapping($idProduct);

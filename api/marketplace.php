@@ -24,7 +24,10 @@ $actions = [
 	'import-product' => 'import-product.php',
 	'link-existing' => 'link-existing.php',
 	'update-stock' => 'update-stock.php',
+	'sale-pause' => 'sale-pause.php',
 	'order-action' => 'order-action.php',
+	'ps-test' => 'ps-test.php',
+	'ps-pull' => 'ps-pull.php',
 ];
 
 // State-changing actions must be POST (CSRF enforced by admin_bootstrap).
@@ -36,7 +39,10 @@ $mutatingActions = [
 	'import-product',
 	'link-existing',
 	'update-stock',
+	'sale-pause',
 	'order-action',
+	'ps-test',
+	'ps-pull',
 	'export-orders',
 	'fetch-orders',
 	'fetch-questions',

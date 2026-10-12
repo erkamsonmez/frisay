@@ -33,11 +33,15 @@ if (Settings::get('GSF_ENABLED') !== '1') {
 
 try {
     $xml = GoogleShoppingModule::buildFeed();
+    $info = GoogleShoppingModule::cacheInfo();
 
     header('Content-Type: application/xml; charset=UTF-8');
     header('Content-Disposition: inline; filename="google-shopping-feed.xml"');
     header('X-Feed-Generator: FShop Google Shopping Module');
-    header('Cache-Control: public, max-age=' . ((int)(Settings::get('GSF_CACHE_TTL') ?: 360) * 60));
+    header('Cache-Control: public, max-age=' . (int) $info['remaining'] . ', must-revalidate');
+    if ($info['mtime'] > 0) {
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $info['mtime']) . ' GMT');
+    }
 
     echo $xml;
 } catch (Exception $e) {

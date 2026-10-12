@@ -46,7 +46,7 @@ class CashondeliveryModule extends ModuleBase
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}

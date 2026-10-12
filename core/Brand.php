@@ -69,7 +69,7 @@ class Brand
 		return $domain . 'marka/' . $brand['brand_link'];
 	}
 
-	public static function getAdminList(int $activeFilter = -1, int $limit = 50, int $offset = 0): array
+	public static function getAdminList(int $activeFilter = -1, int $limit = 50, int $offset = 0, string $orderBy = 'brand_name ASC'): array
 	{
 		$sql = 'SELECT * FROM brands WHERE 1=1';
 		$params = [];
@@ -79,7 +79,8 @@ class Brand
 			$params[] = $activeFilter;
 		}
 
-		$sql .= ' ORDER BY brand_name ASC LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
+		$orderBy = trim($orderBy) !== '' ? $orderBy : 'brand_name ASC';
+		$sql .= ' ORDER BY ' . $orderBy . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
 
 		return DB::execute($sql, $params) ?: [];
 	}

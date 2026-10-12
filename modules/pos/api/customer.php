@@ -44,7 +44,12 @@ if ($op === 'create') {
 	echo json_encode($pos->createCustomer(
 		(string) Tools::getValue('name'),
 		(string) Tools::getValue('phone'),
-		(string) Tools::getValue('email')
+		(string) Tools::getValue('email'),
+		[
+			'city' => (string) Tools::getValue('city'),
+			'district' => (string) Tools::getValue('district'),
+			'address_text' => (string) Tools::getValue('address_text'),
+		]
 	));
 	exit;
 }

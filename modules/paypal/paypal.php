@@ -102,7 +102,7 @@ class PaypalModule extends ModuleBase
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}
@@ -405,7 +405,7 @@ class PaypalModule extends ModuleBase
 		$idOrder = (int) ($result['id_order'] ?? 0);
 
 		if ($idOrder > 0) {
-			Order::updateStatus($idOrder, Order::STATUS_PROCESSING);
+			Order::markPaidByGateway($idOrder);
 		}
 
 		self::deletePending($paypalOrderId);

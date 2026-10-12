@@ -32,24 +32,24 @@ class SaleUnit
 
 	public static function getMin(array $product): float
 	{
-		$min = (float) ($product['sale_qty_min'] ?? 0);
-
-		if ($min <= 0) {
-			$min = self::isM2($product) ? 0.01 : 1.0;
+		if (!self::isM2($product)) {
+			return 1.0;
 		}
 
-		return $min;
+		$min = (float) ($product['sale_qty_min'] ?? 0);
+
+		return $min > 0 ? $min : 0.01;
 	}
 
 	public static function getStep(array $product): float
 	{
-		$step = (float) ($product['sale_qty_step'] ?? 0);
-
-		if ($step <= 0) {
-			$step = self::isM2($product) ? 0.01 : 1.0;
+		if (!self::isM2($product)) {
+			return 1.0;
 		}
 
-		return $step;
+		$step = (float) ($product['sale_qty_step'] ?? 0);
+
+		return $step > 0 ? $step : 0.01;
 	}
 
 	public static function unitLabel(string $unit): string

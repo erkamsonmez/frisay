@@ -1,43 +1,57 @@
+<div class="d-flex flex-wrap gap-2 mb-3">
+	<a href="{$adminUrl}notifications" class="admin-notif-filter{if $notifyType == ''} is-active{/if}">
+		<span class="admin-notif-filter__dot" style="background:#111827"></span>
+		{'All'|adminT}
+		<span class="admin-notif-filter__count">{$unreadCount}</span>
+	</a>
+	{foreach $notifyTypeButtons as $btn}
+	<a href="{$adminUrl}notifications?type={$btn.type|escape}" class="admin-notif-filter{if $notifyType == $btn.type} is-active{/if}">
+		<span class="admin-notif-filter__dot" style="background:{$btn.color|escape}"></span>
+		{$btn.label|adminT}
+		<span class="admin-notif-filter__count">{$btn.count}</span>
+	</a>
+	{/foreach}
+</div>
+
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
 	<p class="text-muted small mb-0">{if $unreadCount > 0}{$unreadCount}{' unread notifications'|adminT}{else}{'All notifications read'|adminT}{/if}</p>
 	{if $unreadCount > 0}
 	<form method="post" class="mb-0">
 		<input type="hidden" name="token" value="{$adminToken}">
+		{if $notifyType}<input type="hidden" name="type" value="{$notifyType|escape}">{/if}
 		<button type="submit" name="markAllRead" value="1" class="btn btn-sm btn-outline-secondary">{'Mark all as read'|adminT}</button>
 	</form>
 	{/if}
 </div>
 
-<div class="ps-panel">
-	<div class="ps-panel__body p-0">
-		{if $notifications|@count}
-		<div class="list-group list-group-flush">
-			{foreach $notifications as $n}
-			<div class="list-group-item{if !$n.is_read} list-group-item-warning{/if}">
-				<div class="d-flex flex-wrap justify-content-between gap-2">
-					<div class="flex-grow-1">
-						<strong>{$n.title|escape}</strong>
-						{if $n.message}<p class="small text-muted mb-1 mt-1">{$n.message|escape|nl2br}</p>{/if}
-						<span class="small text-muted">{$n.date_formatted}</span>
-					</div>
-					<div class="d-flex flex-column gap-1 align-items-end">
-						{if $n.link}
-						<a href="{$n.link|escape}" class="btn btn-sm btn-outline-dark">{'View'|adminT}</a>
-						{/if}
-						{if !$n.is_read}
-						<form method="post" class="mb-0">
-							<input type="hidden" name="token" value="{$adminToken}">
-							<input type="hidden" name="id" value="{$n.id_notification}">
-							<button type="submit" name="markRead" value="1" class="btn btn-sm btn-link">{'Mark as read'|adminT}</button>
-						</form>
-						{/if}
-					</div>
-				</div>
-			</div>
-			{/foreach}
-		</div>
-		{else}
-		<p class="text-muted p-4 mb-0">{'No notifications.'|adminT}</p>
-		{/if}
+{if $notifications|@count}
+<div class="admin-notif-list">
+	{foreach $notifications as $n}
+	<div class="admin-notif-card{if !$n.is_read} is-unread{/if}">
+		<span class="admin-notif-card__icon" style="background:{$n.color|escape}">
+			<i data-lucide="{$n.icon|escape}"></i>
+		</span>
+		<span class="admin-notif-card__body">
+			<strong class="admin-notif-card__title">{$n.type_label|escape}</strong>
+			<span class="admin-notif-card__msg">{$n.message|escape}</span>
+		</span>
+		<span class="admin-notif-card__meta">
+			<span class="admin-notif-card__time">{$n.time_ago|escape}</span>
+			{if $n.link}
+			<a href="{$n.link|escape}" class="admin-notif-card__link">{'View'|adminT}</a>
+			{/if}
+			{if !$n.is_read}
+			<form method="post" class="mb-0">
+				<input type="hidden" name="token" value="{$adminToken}">
+				{if $notifyType}<input type="hidden" name="type" value="{$notifyType|escape}">{/if}
+				<input type="hidden" name="id" value="{$n.id_notification}">
+				<button type="submit" name="markRead" value="1" class="admin-notif-card__read">{'Mark as read'|adminT}</button>
+			</form>
+			{/if}
+		</span>
 	</div>
+	{/foreach}
 </div>
+{else}
+<p class="text-muted p-4 mb-0">{'No notifications.'|adminT}</p>
+{/if}

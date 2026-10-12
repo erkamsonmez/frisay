@@ -1,7 +1,32 @@
-<div class="admin-toolbar d-flex flex-wrap gap-2 mb-3">
-	<a href="{$adminUrl}messages" class="btn btn-sm {if $readFilter === null}btn-dark{else}btn-outline-dark{/if}">{'All'|adminT}</a>
-	<a href="{$adminUrl}messages?read=0" class="btn btn-sm {if $readFilter === 0}btn-dark{else}btn-outline-dark{/if}">{'Unread'|adminT}</a>
-	<a href="{$adminUrl}messages?read=1" class="btn btn-sm {if $readFilter === 1}btn-dark{else}btn-outline-dark{/if}">{'Read'|adminT}</a>
+<div class="admin-panel p-3 mb-3">
+	<div class="mp-filter-card mb-0">
+		<div class="mp-filter-header">
+			<div>
+				<div class="mp-filter-title">
+					{include file='admin/partials/filter-funnel-icon.tpl'}
+					{'Filters'|adminT}
+				</div>
+			</div>
+		</div>
+		<form method="get" action="{$adminUrl}messages" id="admMessagesFilterForm">
+			<div class="row">
+				<div class="col-md-4 mb-3">
+					<label for="msg_read">{'Status'|adminT}</label>
+					<select id="msg_read" name="read" class="form-select form-select-sm">
+						<option value=""{if $readFilter === null} selected{/if}>{'All'|adminT}</option>
+						<option value="0"{if $readFilter === 0} selected{/if}>{'Unread'|adminT}</option>
+						<option value="1"{if $readFilter === 1} selected{/if}>{'Read'|adminT}</option>
+					</select>
+				</div>
+			</div>
+		</form>
+		<div class="mp-filter-actions">
+			<div class="mp-filter-actions__btns">
+				<button type="submit" form="admMessagesFilterForm" class="btn btn-warning">{'Filter'|adminT}</button>
+				<a href="{$adminUrl}messages" class="btn btn-outline-secondary">{'Clear'|adminT}</a>
+			</div>
+		</div>
+	</div>
 </div>
 
 <div class="admin-panel p-0">

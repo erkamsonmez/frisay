@@ -96,14 +96,12 @@ class Customer
 			return self::fail($passwordError);
 		}
 
-		$exists = DB::getValue('SELECT id_user FROM users WHERE phone = ? LIMIT 1', [$phone]);
-		if ($exists) {
-			return self::fail('Bu telefon numarası zaten kayıtlı');
+		if (self::phoneIsRegistered($phone)) {
+			return self::fail(translate('This phone is already registered'));
 		}
 
-		$emailExists = DB::getValue('SELECT id_user FROM users WHERE email = ? LIMIT 1', [$email]);
-		if ($emailExists) {
-			return self::fail('Bu e-posta adresi zaten kayıtlı');
+		if (self::emailIsRegistered($email)) {
+			return self::fail(translate('This email is already registered'));
 		}
 
 		$isActive = self::shouldActivateNewMember() ? 1 : 0;
@@ -128,14 +126,49 @@ class Customer
 			Notification::welcome((int) $id, $fullName);
 			Mail::sendWelcome($email, $fullName);
 
-			return self::ok(translate('Registration successful'));
+			return [
+				'success' => true,
+				'message' => translate('Registration successful'),
+				'id_user' => (int) $id,
+			];
+		}
+
+		if (class_exists('Order', false)) {
+			try {
+				Order::attachGuestOrdersToUser((int) $id);
+			} catch (Throwable $e) {
+				error_log('attachGuestOrdersToUser: ' . $e->getMessage());
+			}
 		}
 
 		return [
 			'success' => true,
 			'message' => translate('Your registration was received. You can sign in after admin approval.'),
 			'user' => null,
+			'id_user' => (int) $id,
 		];
+	}
+
+	public static function emailIsRegistered(string $email): bool
+	{
+		$email = strtolower(trim($email));
+
+		if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+			return false;
+		}
+
+		return (int) DB::getValue('SELECT id_user FROM users WHERE email = ? LIMIT 1', [$email]) > 0;
+	}
+
+	public static function phoneIsRegistered(string $phone): bool
+	{
+		$phone = self::normalizePhone($phone);
+
+		if ($phone === '' || !self::isValidPhone($phone)) {
+			return false;
+		}
+
+		return (int) DB::getValue('SELECT id_user FROM users WHERE phone = ? LIMIT 1', [$phone]) > 0;
 	}
 
 	public static function login(string $login, string $password, bool $remember = true): array
@@ -143,8 +176,11 @@ class Customer
 		$login = trim($login);
 		$rateKey = RateLimit::loginIdentifier($login !== '' ? $login : 'empty');
 
-		if (RateLimit::isLimited(RateLimit::SCOPE_CUSTOMER_LOGIN, $rateKey, 8, 900)) {
-			return self::fail('Çok fazla başarısız giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.');
+		$maxAttempts = SecuritySettings::getCustomerLoginMaxAttempts();
+		$windowSeconds = SecuritySettings::getCustomerLoginWindowSeconds();
+
+		if (RateLimit::isLimited(RateLimit::SCOPE_CUSTOMER_LOGIN, $rateKey, $maxAttempts, $windowSeconds)) {
+			return self::fail(SecuritySettings::loginLockMessage((int) ($windowSeconds / 60)));
 		}
 
 		$user = null;
@@ -191,6 +227,7 @@ class Customer
 	{
 		session_regenerate_id(true);
 		$_SESSION['id_user'] = $idUser;
+		$_SESSION['customer_last_active'] = time();
 
 		if (class_exists('GroupPricing', false)) {
 			GroupPricing::resetCache();
@@ -198,6 +235,14 @@ class Customer
 
 		if ($remember) {
 			Cookie::issueRememberToken($idUser);
+		}
+
+		if (class_exists('Order', false)) {
+			try {
+				Order::attachGuestOrdersToUser($idUser);
+			} catch (Throwable $e) {
+				error_log('attachGuestOrdersToUser: ' . $e->getMessage());
+			}
 		}
 	}
 
@@ -211,7 +256,7 @@ class Customer
 		}
 
 		Cookie::clearRememberCookie();
-		unset($_SESSION['id_user']);
+		unset($_SESSION['id_user'], $_SESSION['customer_last_active']);
 
 		if (class_exists('GroupPricing', false)) {
 			GroupPricing::resetCache();
@@ -552,6 +597,13 @@ class Customer
 	public static function requestPasswordReset(string $email): array
 	{
 		$email = trim(strtolower($email));
+		$identifier = RateLimit::loginIdentifier($email !== '' ? $email : 'empty');
+
+		if (RateLimit::isLimited(RateLimit::SCOPE_CUSTOMER_PASSWORD_RESET, $identifier, 5, 3600)) {
+			return self::fail('Çok fazla şifre sıfırlama isteği. Lütfen daha sonra tekrar deneyin.');
+		}
+
+		RateLimit::record(RateLimit::SCOPE_CUSTOMER_PASSWORD_RESET, $identifier);
 
 		if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 			return self::fail('Geçerli bir e-posta adresi girin');

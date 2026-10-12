@@ -548,6 +548,333 @@ class ProductVariation
 		return true;
 	}
 
+	/**
+	 * @param list<int> $productIds
+	 * @return array<int, list<array<string, mixed>>>
+	 */
+	public static function getMapByProductIds(array $productIds): array
+	{
+		self::ensureSchema();
+
+		$productIds = array_values(array_unique(array_filter(array_map('intval', $productIds))));
+
+		if ($productIds === []) {
+			return [];
+		}
+
+		$placeholders = implode(',', array_fill(0, count($productIds), '?'));
+		$rows = DB::execute(
+			'SELECT * FROM product_variations WHERE id_product IN (' . $placeholders . ') ORDER BY id_product ASC, id_variation ASC',
+			$productIds
+		) ?: [];
+		$map = [];
+
+		foreach ($rows as $row) {
+			$normalized = self::normalizeRow($row);
+			$map[(int) $normalized['id_product']][] = $normalized;
+		}
+
+		return $map;
+	}
+
+	public static function getByProductSku(int $idProduct, string $sku): ?array
+	{
+		self::ensureSchema();
+
+		$sku = trim($sku);
+
+		if ($idProduct <= 0 || $sku === '') {
+			return null;
+		}
+
+		$row = DB::getRowSafe('product_variations', 'id_product = ? AND sku = ?', [$idProduct, $sku]);
+
+		return $row ? self::normalizeRow($row) : null;
+	}
+
+	public static function findUniqueBySku(string $sku): ?array
+	{
+		self::ensureSchema();
+
+		$sku = trim($sku);
+
+		if ($sku === '') {
+			return null;
+		}
+
+		$rows = DB::execute('SELECT * FROM product_variations WHERE sku = ? LIMIT 2', [$sku]) ?: [];
+
+		if (count($rows) !== 1) {
+			return null;
+		}
+
+		return self::normalizeRow($rows[0]);
+	}
+
+	public static function findUniqueByBarcode(string $barcode): ?array
+	{
+		self::ensureSchema();
+
+		$barcode = trim($barcode);
+
+		if ($barcode === '') {
+			return null;
+		}
+
+		$rows = DB::execute('SELECT * FROM product_variations WHERE barcode = ? LIMIT 2', [$barcode]) ?: [];
+
+		if (count($rows) !== 1) {
+			return null;
+		}
+
+		return self::normalizeRow($rows[0]);
+	}
+
+	/**
+	 * Barkod veya stok kodu ile tekil varyasyon bulur (pazaryeri sipariş eşlemesi).
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public static function findByCode(string $code): ?array
+	{
+		$code = trim($code);
+
+		if ($code === '') {
+			return null;
+		}
+
+		$byBarcode = self::findUniqueByBarcode($code);
+
+		if ($byBarcode) {
+			return $byBarcode;
+		}
+
+		return self::findUniqueBySku($code);
+	}
+
+	/** İlk seçenek adı (Beden, Renk…) */
+	public static function getAxis(int $idProduct): string
+	{
+		$rows = self::getByProduct($idProduct, true);
+
+		if ($rows === []) {
+			return '';
+		}
+
+		$keys = array_keys($rows[0]['options'] ?? []);
+
+		return trim((string) ($keys[0] ?? ''));
+	}
+
+	/** "Renk: Kırmızı, Beden: M" → ['Renk' => 'Kırmızı', 'Beden' => 'M'] */
+	public static function parseOptionsLabel(string $label): array
+	{
+		$label = trim($label);
+
+		if ($label === '') {
+			return [];
+		}
+
+		$parts = preg_split('/\s*(?:,|\/)\s*/u', $label) ?: [];
+		$options = [];
+
+		foreach ($parts as $part) {
+			$part = trim((string) $part);
+
+			if ($part === '') {
+				continue;
+			}
+
+			$colon = mb_strpos($part, ':');
+
+			if ($colon === false) {
+				continue;
+			}
+
+			$name = trim(mb_substr($part, 0, $colon));
+			$value = trim(mb_substr($part, $colon + 1));
+
+			if ($name === '' || $value === '') {
+				continue;
+			}
+
+			$options[$name] = $value;
+		}
+
+		return self::normalizeOptions($options);
+	}
+
+	public static function syncProductStock(int $idProduct): void
+	{
+		if ($idProduct <= 0) {
+			return;
+		}
+
+		$totalStock = self::getTotalStock($idProduct);
+		DB::update('products', ['stock' => $totalStock], 'id_product = :where_id', ['where_id' => $idProduct]);
+	}
+
+	/**
+	 * Insert or update a single variation without deleting the others.
+	 *
+	 * @param array<string, mixed> $item
+	 * @return array{success:bool,message?:string,created?:bool,id?:int}
+	 */
+	public static function upsertOne(int $idProduct, array $item): array
+	{
+		self::ensureSchema();
+
+		if ($idProduct <= 0) {
+			return ['success' => false, 'message' => 'Geçersiz ürün'];
+		}
+
+		$sku = trim((string) ($item['sku'] ?? $item['stock_code'] ?? ''));
+		$barcode = trim((string) ($item['barcode'] ?? ''));
+		$options = self::normalizeOptions($item['options'] ?? []);
+		$idVariation = (int) ($item['id'] ?? $item['id_variation'] ?? 0);
+		$existing = null;
+
+		if ($idVariation > 0) {
+			$existing = self::getById($idVariation);
+
+			if (!$existing || (int) $existing['id_product'] !== $idProduct) {
+				return ['success' => false, 'message' => 'Varyasyon bulunamadı: ' . $idVariation];
+			}
+		}
+
+		if (!$existing && $sku !== '') {
+			$existing = self::getByProductSku($idProduct, $sku);
+		}
+
+		if (!$existing && $options !== []) {
+			foreach (self::getByProduct($idProduct) as $row) {
+				if (self::optionsEqual($row['options'] ?? [], $options)) {
+					$existing = $row;
+					break;
+				}
+			}
+		}
+
+		if ($options === [] && $existing) {
+			$options = is_array($existing['options'] ?? null) ? $existing['options'] : [];
+		}
+
+		if ($options === []) {
+			return ['success' => false, 'message' => 'Varyasyon için seçenek girin (ör. Renk: Kırmızı, Beden: M)'];
+		}
+
+		if ($sku === '') {
+			$sku = $existing
+				? (string) ($existing['sku'] ?? '')
+				: ('VAR-' . $idProduct . '-' . (count(self::getByProduct($idProduct)) + 1));
+		}
+
+		$price = $existing['price'] ?? null;
+
+		if (array_key_exists('price', $item) && $item['price'] !== '' && $item['price'] !== null) {
+			$price = max(0.0, (float) str_replace(',', '.', (string) $item['price']));
+		}
+
+		$stock = $existing ? (float) ($existing['stock'] ?? 0) : 0.0;
+
+		if (array_key_exists('stock', $item) && $item['stock'] !== '' && $item['stock'] !== null) {
+			$stock = max(0, round((float) str_replace(',', '.', (string) $item['stock']), 3));
+		}
+
+		$active = $existing ? ((int) ($existing['active'] ?? 1) === 1) : true;
+
+		if (array_key_exists('active', $item) && $item['active'] !== '' && $item['active'] !== null) {
+			$active = filter_var($item['active'], FILTER_VALIDATE_BOOLEAN)
+				|| in_array(strtolower(trim((string) $item['active'])), ['1', 'aktif', 'yes', 'evet'], true);
+		}
+
+		if ($barcode === '' && $existing) {
+			$barcode = (string) ($existing['barcode'] ?? '');
+		}
+
+		$row = [
+			'id_product' => $idProduct,
+			'sku' => mb_substr($sku, 0, 64),
+			'barcode' => mb_substr($barcode, 0, 64),
+			'options_json' => json_encode($options, JSON_UNESCAPED_UNICODE),
+			'price' => $price,
+			'stock' => $stock,
+			'active' => $active ? 1 : 0,
+		];
+
+		if ($existing) {
+			$idVariation = (int) $existing['id_variation'];
+			DB::update('product_variations', $row, 'id_variation = :where_id', ['where_id' => $idVariation]);
+			self::syncProductStock($idProduct);
+
+			return ['success' => true, 'created' => false, 'id' => $idVariation];
+		}
+
+		$newId = DB::insert('product_variations', $row);
+
+		if (!$newId) {
+			return ['success' => false, 'message' => 'Varyasyon kaydedilemedi'];
+		}
+
+		self::syncProductStock($idProduct);
+
+		return ['success' => true, 'created' => true, 'id' => (int) $newId];
+	}
+
+	/**
+	 * @param array<string, mixed> $data
+	 * @return array{success:bool,message?:string,id?:int,unchanged?:bool}
+	 */
+	public static function patchPriceStock(int $idVariation, array $data): array
+	{
+		$existing = self::getById($idVariation);
+
+		if (!$existing) {
+			return ['success' => false, 'message' => 'Varyasyon bulunamadı'];
+		}
+
+		$row = [];
+
+		if (array_key_exists('price', $data) && $data['price'] !== '' && $data['price'] !== null) {
+			$row['price'] = max(0.0, (float) str_replace(',', '.', (string) $data['price']));
+		}
+
+		if (array_key_exists('stock', $data) && $data['stock'] !== '' && $data['stock'] !== null) {
+			$row['stock'] = max(0, round((float) str_replace(',', '.', (string) $data['stock']), 3));
+		}
+
+		if ($row === []) {
+			return ['success' => true, 'unchanged' => true, 'id' => $idVariation];
+		}
+
+		DB::update('product_variations', $row, 'id_variation = :where_id', ['where_id' => $idVariation]);
+
+		if (isset($row['stock'])) {
+			self::syncProductStock((int) $existing['id_product']);
+		}
+
+		return ['success' => true, 'id' => $idVariation];
+	}
+
+	/** @param array<string, string> $a */
+	private static function optionsEqual(array $a, array $b): bool
+	{
+		$normalize = static function (array $opts): array {
+			$out = [];
+
+			foreach ($opts as $name => $value) {
+				$key = mb_strtolower(trim((string) $name), 'UTF-8');
+				$out[$key] = mb_strtolower(trim((string) $value), 'UTF-8');
+			}
+
+			ksort($out);
+
+			return $out;
+		};
+
+		return $normalize($a) === $normalize($b);
+	}
+
 	public static function increaseStock(int $idVariation, float $qty, int $idProduct = 0): void
 	{
 		self::ensureSchema();

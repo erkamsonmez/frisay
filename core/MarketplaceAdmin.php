@@ -39,6 +39,8 @@ class MarketplaceAdmin
 				'panel_html' => Marketplace::renderProductPanelHtml($idProduct, 'trendyol'),
 				'panel_html_hb' => Marketplace::renderProductPanelHtml($idProduct, 'hepsiburada'),
 				'panel_html_n11' => Marketplace::renderProductPanelHtml($idProduct, 'n11'),
+				'panel_html_ps' => Marketplace::renderProductPanelHtml($idProduct, 'prestashop'),
+				'panel_html_frisay' => Marketplace::renderProductPanelHtml($idProduct, 'frisay'),
 			];
 		}
 
@@ -56,6 +58,8 @@ class MarketplaceAdmin
 			'tyConfigured' => Marketplace::isTrendyolConfigured(),
 			'hbConfigured' => Marketplace::isPlatformConfigured('hepsiburada'),
 			'n11Configured' => Marketplace::isPlatformConfigured('n11'),
+			'psConfigured' => Marketplace::isPlatformConfigured('prestashop'),
+			'frisayConfigured' => Marketplace::isPlatformConfigured('frisay'),
 			'categoryOptions' => Category::getProductSelectOptions(),
 			'brandOptions' => Brand::getOptions(),
 			'fiyattrendToken' => (string) Settings::get('TRENDYOL_FIYATTREND_TOKEN'),
@@ -77,7 +81,7 @@ class MarketplaceAdmin
 		$productQuery = trim((string) Tools::getValue('product_query', ''));
 		$orderStatus = trim((string) Tools::getValue('order_status', 'all'));
 
-		if (!in_array($platform, ['all', 'trendyol', 'hepsiburada', 'n11'], true)) {
+		if (!Marketplace::isValidOrderPlatformFilter($platform)) {
 			$platform = 'all';
 		}
 		if (!in_array($orderStatus, ['all', 'pending', 'navy', 'success', 'done', 'danger', 'muted'], true)) {
@@ -123,6 +127,8 @@ class MarketplaceAdmin
 			'tyConfigured' => Marketplace::isTrendyolConfigured(),
 			'hbConfigured' => Marketplace::isPlatformConfigured('hepsiburada'),
 			'n11Configured' => Marketplace::isPlatformConfigured('n11'),
+			'psConfigured' => Marketplace::isPlatformConfigured('prestashop'),
+			'frisayConfigured' => Marketplace::isPlatformConfigured('frisay'),
 			'marketplaceOrders' => $orders,
 			'pagination' => $pagination,
 			'marketplaceOrderPlatform' => $platform,
@@ -199,31 +205,27 @@ class MarketplaceAdmin
 		global $smarty;
 
 		$flash = Marketplace::handleAdminPosts($GLOBALS['adminToken'] ?? '');
-		$tab = (string) Tools::getValue('tab', 'settings');
 		$platform = trim((string) Tools::getValue('platform', $defaultPlatform));
 
 		if (!isset(Marketplace::PLATFORMS[$platform])) {
 			$platform = 'trendyol';
 		}
 
-		if (!in_array($tab, ['settings', 'fiyattrend'], true)) {
-			$tab = 'settings';
-		}
-
 		$assign = array_merge(Marketplace::urls(), [
 			'flash' => $flash,
-			'tab' => $tab,
+			'tab' => 'settings',
 			'marketplacePlatforms' => Marketplace::platformList(),
 			'marketplacePlatform' => $platform,
 			'marketplacePage' => 'settings',
 			'settingsUrl' => Marketplace::settingsUrl($platform),
 			'marketplaceAdminAssets' => ['css' => [], 'js' => []],
+			'tyFiyattrendToken' => (string) Settings::get('TRENDYOL_FIYATTREND_TOKEN'),
+			'ftConfigured' => Marketplace::isPlatformConfigured('fiyattrend'),
 		]);
 
 		if ($platform === 'trendyol' && Marketplace::isPlatformActive('trendyol')) {
 			$assign = array_merge($assign, Trendyol\TrendyolAdminPages::settingsVars(), [
 				'tyConfigured' => Marketplace::isTrendyolConfigured(),
-				'tab' => $tab,
 				'settingsUrl' => Marketplace::settingsUrl('trendyol'),
 			]);
 		} elseif ($platform === 'hepsiburada' && Marketplace::isPlatformActive('hepsiburada')) {
@@ -234,6 +236,16 @@ class MarketplaceAdmin
 			$assign = array_merge($assign, N11\N11AdminPages::settingsVars(), [
 				'settingsUrl' => Marketplace::settingsUrl('n11'),
 			]);
+		} elseif ($platform === 'prestashop' && Marketplace::isPlatformActive('prestashop')) {
+			$assign = array_merge($assign, Prestashop\PrestashopAdminPages::settingsVars(), [
+				'settingsUrl' => Marketplace::settingsUrl('prestashop'),
+			]);
+		} elseif ($platform === 'frisay' && Marketplace::isPlatformActive('frisay')) {
+			$assign = array_merge($assign, Frisay\FrisayAdminPages::settingsVars(), [
+				'settingsUrl' => Marketplace::settingsUrl('frisay'),
+			]);
+		} elseif ($platform === 'fiyattrend') {
+			$assign['settingsUrl'] = Marketplace::settingsUrl('fiyattrend');
 		}
 
 		$smarty->assign($assign);
@@ -266,7 +278,7 @@ class MarketplaceAdmin
 		$startDate = trim((string) Tools::getValue('start_date', ''));
 		$endDate = trim((string) Tools::getValue('end_date', ''));
 
-		if (!in_array($platform, ['all', 'trendyol', 'hepsiburada', 'n11'], true)) {
+		if (!Marketplace::isValidOrderPlatformFilter($platform)) {
 			$platform = 'all';
 		}
 
@@ -342,6 +354,10 @@ class MarketplaceAdmin
 
 		foreach ($orders as $ord) {
 			$lines = is_array($ord['lines'] ?? null) ? $ord['lines'] : [];
+			if ($lines === [] && !empty($ord['lines_json'])) {
+				$decodedLines = json_decode((string) $ord['lines_json'], true);
+				$lines = is_array($decodedLines) ? $decodedLines : [];
+			}
 			$items = [];
 			$totalQty = 0;
 
@@ -365,10 +381,14 @@ class MarketplaceAdmin
 					?? $line['imageUrl']
 					?? $line['productImageUrl']
 					?? $line['image']
+					?? $line['image_url']
 					?? ''
 				);
 				if ($image === '') {
 					$image = self::resolveLocalProductImage($platformKey, $sku, $line);
+				}
+				if ($image === '' && class_exists('Product')) {
+					$image = (string) \Product::getImageUrl(null);
 				}
 				$items[] = [
 					'name' => (string) (
@@ -428,6 +448,42 @@ class MarketplaceAdmin
 				$rowKey = $platformKey . '-' . substr(md5($orderNumber . '|' . $packageId), 0, 12);
 			}
 
+			$rawDecoded = $ord['raw_json'] ?? null;
+			if (is_string($rawDecoded) && $rawDecoded !== '') {
+				$decodedRaw = json_decode($rawDecoded, true);
+				$rawDecoded = is_array($decodedRaw) ? $decodedRaw : [];
+			} elseif (!is_array($rawDecoded)) {
+				$rawDecoded = [];
+			}
+			$addr = self::extractLabelAddress($rawDecoded);
+			$location = trim(
+				(string) ($addr['city'] ?? '')
+				. ((($addr['city'] ?? '') !== '' && ($addr['district'] ?? '') !== '') ? '/' : '')
+				. (string) ($addr['district'] ?? '')
+			);
+			$thumbs = [];
+			foreach ($items as $it) {
+				$url = trim((string) ($it['image'] ?? ''));
+				if ($url !== '' && !in_array($url, $thumbs, true)) {
+					$thumbs[] = $url;
+				}
+				if (count($thumbs) >= 3) {
+					break;
+				}
+			}
+			$thumbUrl = $thumbs[0] ?? (class_exists('Product') ? (string) \Product::getImageUrl(null) : '');
+			$cargoName = ($cargoProvider !== '' && $cargoProvider !== '—') ? $cargoProvider : '';
+			$cargoLogo = '';
+			if ($cargoName !== '' && class_exists('Cargo')) {
+				$cargoRow = \Cargo::getByName($cargoName);
+				$cargoLogo = (string) (\Cargo::resolveLogoUrl($cargoName, $cargoRow ? (int) $cargoRow['id_cargo'] : null) ?? '');
+			}
+			$dateFull = $orderDate;
+			if ($dateFull !== '' && strtotime($dateFull)) {
+				$dateFull = date('Y-m-d H:i:s', strtotime($dateFull));
+			}
+			$cardStatus = self::statusToneToPill($statusTone);
+
 			$rowData = [
 				'platform' => $platformKey,
 				'platform_label' => $platformLabel,
@@ -443,7 +499,22 @@ class MarketplaceAdmin
 				'status_raw' => $status !== '' ? $status : '—',
 				'status_class' => self::orderStatusClass($status),
 				'status_tone' => $statusTone,
-				'status_pill' => self::statusToneToPill($statusTone),
+				'status_pill' => $cardStatus,
+				'status_label' => $statusLabel,
+				'card_status' => $cardStatus,
+				'location' => $location,
+				'thumb_url' => $thumbUrl,
+				'thumb_urls' => $thumbs,
+				'total_formatted' => Tools::displayPrice($totalPriceValue),
+				'cargo_name' => $cargoName,
+				'cargo_logo_url' => $cargoLogo,
+				'tracking_url' => self::resolveCargoTrackingLink($ord),
+				'date_full' => $dateFull !== '' ? $dateFull : $dateList,
+				'print_url' => \Admin::url(
+					'marketplace-order-print?auto=1&platform=' . rawurlencode($platformKey)
+					. '&order_number=' . rawurlencode($orderNumber)
+					. '&package_id=' . rawurlencode($packageId)
+				),
 				'status_step' => $statusStep,
 				'total_price' => Tools::displayPrice($totalPriceValue),
 				'total_price_value' => $totalPriceValue,
@@ -597,31 +668,15 @@ class MarketplaceAdmin
 		$fetch = max($limit, 25);
 		$orders = [];
 
-		try {
-			$orders = array_merge($orders, self::normalizeMarketplaceOrders(
-				Trendyol\OrderService::getRecent($fetch),
-				'trendyol',
-				'Trendyol'
-			));
-		} catch (\Throwable $e) {
-		}
-
-		try {
-			$orders = array_merge($orders, self::normalizeMarketplaceOrders(
-				Hepsiburada\OrderService::getRecent($fetch),
-				'hepsiburada',
-				'Hepsiburada'
-			));
-		} catch (\Throwable $e) {
-		}
-
-		try {
-			$orders = array_merge($orders, self::normalizeMarketplaceOrders(
-				N11\OrderService::getRecent($fetch),
-				'n11',
-				'N11'
-			));
-		} catch (\Throwable $e) {
+		foreach (Marketplace::orderPlatformKeys() as $key) {
+			try {
+				$orders = array_merge($orders, self::normalizeMarketplaceOrders(
+					Marketplace::getRecentOrders($key, $fetch),
+					$key,
+					(string) (Marketplace::PLATFORMS[$key]['label'] ?? $key)
+				));
+			} catch (\Throwable $e) {
+			}
 		}
 
 		usort($orders, static function (array $a, array $b): int {
@@ -645,7 +700,7 @@ class MarketplaceAdmin
 		$productQuery = trim((string) ($filters['product_query'] ?? ''));
 		$orderStatus = trim((string) ($filters['order_status'] ?? 'all'));
 
-		if (!in_array($platform, ['all', 'trendyol', 'hepsiburada', 'n11'], true)) {
+		if (!Marketplace::isValidOrderPlatformFilter($platform)) {
 			$platform = 'all';
 		}
 
@@ -655,27 +710,15 @@ class MarketplaceAdmin
 
 		$orders = [];
 
-		if ($platform === 'all' || $platform === 'trendyol') {
-			$orders = array_merge($orders, self::normalizeMarketplaceOrders(
-				Trendyol\OrderService::getRecent(500),
-				'trendyol',
-				'Trendyol'
-			));
-		}
+		foreach (Marketplace::orderPlatformKeys() as $key) {
+			if ($platform !== 'all' && $platform !== $key) {
+				continue;
+			}
 
-		if ($platform === 'all' || $platform === 'hepsiburada') {
 			$orders = array_merge($orders, self::normalizeMarketplaceOrders(
-				Hepsiburada\OrderService::getRecent(500),
-				'hepsiburada',
-				'Hepsiburada'
-			));
-		}
-
-		if ($platform === 'all' || $platform === 'n11') {
-			$orders = array_merge($orders, self::normalizeMarketplaceOrders(
-				N11\OrderService::getRecent(500),
-				'n11',
-				'N11'
+				Marketplace::getRecentOrders($key, 500),
+				$key,
+				(string) (Marketplace::PLATFORMS[$key]['label'] ?? $key)
 			));
 		}
 
@@ -755,7 +798,7 @@ class MarketplaceAdmin
 		$orderNumber = trim($orderNumber);
 		$packageId = trim($packageId);
 
-		if (!in_array($platformKey, ['trendyol', 'hepsiburada', 'n11'], true)) {
+		if (!Marketplace::isOrderPlatform($platformKey)) {
 			return null;
 		}
 
@@ -1190,6 +1233,28 @@ class MarketplaceAdmin
 			if ($map && (int) ($map['id_product'] ?? 0) > 0) {
 				return (int) $map['id_product'];
 			}
+		} elseif ($platform === 'prestashop') {
+			if (preg_match('/^\d+$/', $code)) {
+				$map = \DB::getRowSafe('prestashop_products', 'ps_product_id = ?', [(int) $code]);
+				if ($map && (int) ($map['id_product'] ?? 0) > 0) {
+					return (int) $map['id_product'];
+				}
+			}
+			$map = \DB::getRowSafe('prestashop_products', 'reference = ? OR barcode = ?', [$code, $code]);
+			if ($map && (int) ($map['id_product'] ?? 0) > 0) {
+				return (int) $map['id_product'];
+			}
+		} elseif ($platform === 'frisay') {
+			if (preg_match('/^\d+$/', $code)) {
+				$map = \DB::getRowSafe('frisay_products', 'remote_id = ?', [(int) $code]);
+				if ($map && (int) ($map['id_product'] ?? 0) > 0) {
+					return (int) $map['id_product'];
+				}
+			}
+			$map = \DB::getRowSafe('frisay_products', 'stock_code = ? OR barcode = ?', [$code, $code]);
+			if ($map && (int) ($map['id_product'] ?? 0) > 0) {
+				return (int) $map['id_product'];
+			}
 		}
 
 		$id = (int) (\DB::getValue(
@@ -1398,6 +1463,10 @@ class MarketplaceAdmin
 			'waiting' => ['Hazırlanıyor', 'pending', 1],
 			'waitingbypayment' => ['Hazırlanıyor', 'pending', 1],
 			'paymentawaiting' => ['Hazırlanıyor', 'pending', 1],
+			'awaitingpayment' => ['Ödeme Bekliyor', 'pending', 1],
+			'ödemebekliyor' => ['Ödeme Bekliyor', 'pending', 1],
+			'hazırlanıyor' => ['Hazırlanıyor', 'pending', 1],
+			'hazirlaniyor' => ['Hazırlanıyor', 'pending', 1],
 			'invoiced' => ['Hazırlanıyor', 'pending', 1],
 			'unpacked' => ['Hazırlanıyor', 'pending', 1],
 			'picking' => ['Paketleniyor', 'navy', 2],
@@ -1405,15 +1474,18 @@ class MarketplaceAdmin
 			'packaged' => ['Paketleniyor', 'navy', 2],
 			'readytoship' => ['Paketleniyor', 'navy', 2],
 			'shipped' => ['Kargoda', 'success', 3],
+			'kargoda' => ['Kargoda', 'success', 3],
 			'intransit' => ['Kargoda', 'success', 3],
 			'received' => ['Kargoda', 'success', 3],
 			'shipping' => ['Kargoda', 'success', 3],
 			'atcollectionpoint' => ['Kargoda', 'success', 3],
 			'delivered' => ['Teslim Edildi', 'done', 4],
+			'teslimedildi' => ['Teslim Edildi', 'done', 4],
 			'completed' => ['Teslim Edildi', 'done', 4],
 			'complete' => ['Teslim Edildi', 'done', 4],
 			'cancelled' => ['İptal', 'danger', 0],
 			'canceled' => ['İptal', 'danger', 0],
+			'iptaledildi' => ['İptal', 'danger', 0],
 			'cancelledbymerchant' => ['İptal', 'danger', 0],
 			'cancelbycustomer' => ['İptal', 'danger', 0],
 			'unsupplied' => ['İptal', 'danger', 0],

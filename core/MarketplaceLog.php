@@ -59,6 +59,8 @@ class MarketplaceLog
 			'trendyol' => 'Trendyol',
 			'hepsiburada' => 'Hepsiburada',
 			'n11' => 'N11',
+			'prestashop' => 'PrestaShop',
+			'frisay' => 'FriSay',
 		];
 
 		return $labels[$platform] ?? 'Mağaza';
@@ -417,6 +419,9 @@ class MarketplaceLog
 			'trendyol' => 'Trendyol',
 			'hepsiburada' => 'Hepsiburada',
 			'n11' => 'N11',
+			'prestashop' => 'PrestaShop',
+			'frisay' => 'FriSay',
+			'fiyattrend' => 'FiyatTrend',
 		];
 
 		return $map[$platform] ?? ($platform !== '' ? $platform : '—');

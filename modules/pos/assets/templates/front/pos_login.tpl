@@ -27,10 +27,11 @@
 		</div>
 		{/if}
 
-		<form method="post" class="pos-login__form">
+		<form method="post" class="pos-login__form" autocomplete="off">
 			<input type="hidden" name="token" value="{$posToken|escape}">
+			<input type="text" name="username" value="" autocomplete="username" tabindex="-1" aria-hidden="true" class="pos-autofill-decoy">
 			<label for="pos_pin">PIN</label>
-			<input type="password" id="pos_pin" name="pos_pin" class="pos-field" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="off" required>
+			<input type="text" id="pos_pin" name="pos_pin" class="pos-field pos-pin-masked" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code" required data-lpignore="true" data-1p-ignore="true" data-form-type="other">
 			<button type="submit" name="posLogin" value="1" class="pos-btn pos-btn--pay pos-btn--block">Giriş yap</button>
 		</form>
 

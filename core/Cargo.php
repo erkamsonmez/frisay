@@ -113,6 +113,28 @@ class Cargo
 		return $list[0] ?? null;
 	}
 
+	public static function setDefaultId(int $id): bool
+	{
+		self::ensureSchema();
+
+		if ($id <= 0) {
+			DB::execute('UPDATE cargo_companies SET is_default = 0');
+
+			return true;
+		}
+
+		$cargo = self::getById($id);
+
+		if (!$cargo || empty($cargo['active'])) {
+			return false;
+		}
+
+		DB::execute('UPDATE cargo_companies SET is_default = 0');
+		DB::update('cargo_companies', ['is_default' => 1], 'id_cargo = :id_cargo', ['id_cargo' => $id]);
+
+		return true;
+	}
+
 	/** @return array<int, array<string, mixed>> */
 	public static function getRates(int $idCargo): array
 	{
@@ -175,6 +197,18 @@ class Cargo
 
 			if ($cargo && !empty($cargo['active'])) {
 				return $id;
+			}
+		}
+
+		$configuredId = (int) Settings::get('DEFAULT_CARGO_ID');
+
+		if ($configuredId > 0) {
+			$configured = self::getById($configuredId);
+
+			if ($configured && !empty($configured['active'])) {
+				self::setSelectedId($configuredId);
+
+				return $configuredId;
 			}
 		}
 
@@ -353,7 +387,7 @@ class Cargo
 			return null;
 		}
 
-		$dir = dirname(__DIR__) . '/img/cargos';
+		$dir = self::logoDir();
 		$extensions = ['png', 'jpg', 'jpeg', 'webp', 'svg'];
 		$domain = rtrim((string) ($GLOBALS['domain'] ?? ''), '/');
 
@@ -372,6 +406,114 @@ class Cargo
 		}
 
 		return null;
+	}
+
+	public static function logoDir(): string
+	{
+		$dir = dirname(__DIR__) . '/img/cargos';
+
+		if (!is_dir($dir)) {
+			@mkdir($dir, 0755, true);
+		}
+
+		$index = $dir . '/index.php';
+
+		if (!is_file($index)) {
+			@file_put_contents($index, "<?php\nhttp_response_code(403);\n");
+		}
+
+		return $dir;
+	}
+
+	/**
+	 * @param array<string, mixed> $file $_FILES entry
+	 * @return array{ok:bool,message:string,url?:string}
+	 */
+	public static function uploadLogo(int $idCargo, array $file): array
+	{
+		if ($idCargo <= 0 || !self::getById($idCargo)) {
+			return ['ok' => false, 'message' => 'Kargo kaydı bulunamadı'];
+		}
+
+		if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+			return ['ok' => false, 'message' => 'Dosya seçilmedi'];
+		}
+
+		if (!empty($file['error'])) {
+			return ['ok' => false, 'message' => 'Dosya yüklenemedi'];
+		}
+
+		if (($file['size'] ?? 0) > 2 * 1024 * 1024) {
+			return ['ok' => false, 'message' => 'Logo en fazla 2 MB olabilir'];
+		}
+
+		$finfo = finfo_open(FILEINFO_MIME_TYPE);
+		$mime = $finfo ? (string) finfo_file($finfo, $file['tmp_name']) : '';
+
+		if ($finfo) {
+			finfo_close($finfo);
+		}
+
+		$allowed = ['image/jpeg', 'image/png', 'image/webp'];
+
+		if (!in_array($mime, $allowed, true)) {
+			return ['ok' => false, 'message' => 'Sadece JPG, PNG veya WEBP yükleyebilirsiniz'];
+		}
+
+		$dir = self::logoDir();
+		self::deleteLogoFiles($idCargo);
+		$targetPath = $dir . '/' . $idCargo . '.png';
+
+		if ($mime === 'image/png') {
+			if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+				return ['ok' => false, 'message' => 'Logo kaydedilemedi'];
+			}
+		} else {
+			if (!function_exists('imagecreatefromstring') || !function_exists('imagepng')) {
+				return ['ok' => false, 'message' => 'PNG dönüşümü için GD gerekli; lütfen PNG yükleyin'];
+			}
+
+			$raw = @file_get_contents($file['tmp_name']);
+			$img = is_string($raw) ? @imagecreatefromstring($raw) : false;
+
+			if ($img === false) {
+				return ['ok' => false, 'message' => 'Görsel okunamadı'];
+			}
+
+			imagesavealpha($img, true);
+			$ok = @imagepng($img, $targetPath, 6);
+			imagedestroy($img);
+
+			if (!$ok) {
+				return ['ok' => false, 'message' => 'Logo kaydedilemedi'];
+			}
+		}
+
+		$url = self::resolveLogoUrl('', $idCargo);
+
+		return [
+			'ok' => true,
+			'message' => 'Kargo logosu güncellendi',
+			'url' => $url ?: '',
+		];
+	}
+
+	public static function deleteLogoFiles(int $idCargo): void
+	{
+		if ($idCargo <= 0) {
+			return;
+		}
+
+		$dir = self::logoDir();
+		$slug = (string) $idCargo;
+
+		foreach (['png', 'jpg', 'jpeg', 'webp', 'svg'] as $ext) {
+			$file = $dir . '/' . $slug . '.' . $ext;
+
+			if (is_file($file)) {
+				@unlink($file);
+			}
+		}
 	}
 
 	public static function buildTrackingUrl(string $trackingNumber, $cargo = null): string
@@ -473,6 +615,7 @@ class Cargo
 
 		DB::execute('DELETE FROM cargo_rates WHERE id_cargo = ?', [$id]);
 		DB::execute('DELETE FROM cargo_companies WHERE id_cargo = ?', [$id]);
+		self::deleteLogoFiles($id);
 
 		return ['ok' => true, 'message' => 'Kargo silindi'];
 	}
@@ -544,6 +687,7 @@ class Cargo
 		$row['is_default'] = (int) ($row['is_default'] ?? 0);
 		$row['position'] = (int) ($row['position'] ?? 0);
 		$row['rates'] = self::getRates($row['id_cargo']);
+		$row['logo_url'] = self::resolveLogoUrl((string) ($row['name'] ?? ''), $row['id_cargo']) ?? '';
 
 		return $row;
 	}

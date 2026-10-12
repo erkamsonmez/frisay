@@ -14,6 +14,8 @@ class CanonicalHost
 		$domain = trim((string) Settings::get('DOMAIN'));
 
 		if ($domain === '') {
+			self::redirectHttpToHttpsIfForced();
+
 			return;
 		}
 
@@ -25,6 +27,10 @@ class CanonicalHost
 
 		$wantScheme = strtolower((string) ($parsed['scheme'] ?? 'https'));
 		$wantHost = strtolower((string) $parsed['host']);
+
+		if (class_exists('SecuritySettings', false) && SecuritySettings::forceHttps()) {
+			$wantScheme = 'https';
+		}
 
 		if (isset($parsed['port']) && !in_array((int) $parsed['port'], [80, 443], true)) {
 			$wantHost .= ':' . (int) $parsed['port'];
@@ -47,8 +53,32 @@ class CanonicalHost
 		}
 
 		$uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+		if (preg_match('#/api(/|$)#i', $uri)) {
+			return;
+		}
 
 		header('Location: ' . $wantScheme . '://' . $wantHost . $uri, true, 301);
+		exit;
+	}
+
+	private static function redirectHttpToHttpsIfForced(): void
+	{
+		if (!class_exists('SecuritySettings', false) || !SecuritySettings::forceHttps()) {
+			return;
+		}
+
+		if (self::requestScheme() !== 'http') {
+			return;
+		}
+
+		$host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+		$uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+
+		if ($host === '' || preg_match('#/api(/|$)#i', $uri)) {
+			return;
+		}
+
+		header('Location: https://' . $host . $uri, true, 301);
 		exit;
 	}
 

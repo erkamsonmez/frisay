@@ -6,7 +6,7 @@
 	<h2 class="h5 mb-3">Point of Sale (Kasa)</h2>
 	<p class="text-muted">Mağaza içi satış ekranı. Admin oturumu ile veya PIN ile giriş yapılabilir. Ürüne tıklayarak veya barkod okuyucu ile sepete ekleme yapılır.</p>
 	<p class="small text-muted mb-0">Barkod eşleşmesi: ürün <code>barcode</code> / <code>stock_code</code>, varyasyon <code>barcode</code> / <code>sku</code> alanlarından yapılır.</p>
-	<p class="small text-muted">Kredi kartı: <strong>Sanal POS</strong> modülü kurulu ve aktifse kasada doğrudan kart formu açılır. PIN tanımlıysa <em>Kilitle</em> ile ekran kilitlenebilir.</p>
+	<p class="small text-muted">Kart ödemesi kasada fiziksel POS cihazı ile alınır (Nakit / POS Kart / Havale).</p>
 
 	<div class="row g-3 mb-4">
 		<div class="col-md-6">
@@ -131,14 +131,30 @@
 			</div>
 
 			<div class="col-md-6">
-				<label class="form-label" for="pos_pin">Yeni PIN</label>
+				<label class="form-label" for="pos_pin">Kasiyer PIN (yeni)</label>
 				<input type="password" class="form-control" id="pos_pin" name="pos_pin" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="new-password">
-				<div class="form-text">4–8 haneli rakam. Boş bırakırsanız mevcut PIN korunur.</div>
+				<div class="form-text">4–8 haneli. Kasa kilidi / bağımsız giriş için. Boş = mevcut korunur.</div>
 			</div>
 
 			<div class="col-md-6">
-				<label class="form-label" for="pos_pin_confirm">PIN tekrar</label>
+				<label class="form-label" for="pos_pin_confirm">Kasiyer PIN tekrar</label>
 				<input type="password" class="form-control" id="pos_pin_confirm" name="pos_pin_confirm" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="new-password">
+			</div>
+
+			<div class="col-md-6">
+				<label class="form-label" for="pos_manager_pin">Yönetici şifresi — gün sonu (yeni)</label>
+				<input type="password" class="form-control" id="pos_manager_pin" name="pos_manager_pin" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password">
+				<div class="form-text">Tam 6 haneli rakam. Gün sonu raporu ve kasa kapatma için zorunlu. Boş = mevcut korunur.</div>
+				{if $posHasManagerPin}
+				<span class="badge bg-success mt-1">Yönetici şifresi tanımlı</span>
+				{else}
+				<span class="badge bg-warning text-dark mt-1">Henüz tanımlı değil</span>
+				{/if}
+			</div>
+
+			<div class="col-md-6">
+				<label class="form-label" for="pos_manager_pin_confirm">Yönetici şifresi tekrar</label>
+				<input type="password" class="form-control" id="pos_manager_pin_confirm" name="pos_manager_pin_confirm" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="new-password">
 			</div>
 		</div>
 

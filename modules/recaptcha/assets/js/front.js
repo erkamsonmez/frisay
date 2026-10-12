@@ -338,12 +338,15 @@
 			}
 			resetV2ForForm(form);
 			if ($alert.length) {
-				$alert.removeClass('d-none alert-success').addClass('alert-danger').text(res.message || 'Error');
+				$alert.removeClass('d-none alert-success').addClass('alert alert-danger').text(res.message || 'Error');
 			}
-		}).fail(function () {
+		}).fail(function (xhr) {
 			resetV2ForForm(form);
 			if ($alert.length) {
-				$alert.removeClass('d-none alert-success').addClass('alert-danger').text('Request failed');
+				var message = (xhr && xhr.responseJSON && xhr.responseJSON.message)
+					? xhr.responseJSON.message
+					: ($alert.attr('data-request-failed') || 'Sunucuya bağlanılamadı');
+				$alert.removeClass('d-none alert-success').addClass('alert alert-danger').text(message);
 			}
 		});
 	}

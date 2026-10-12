@@ -12,7 +12,7 @@
  */
 
 $baseUrl = rtrim((string) (getenv('FSHOP_API_URL') ?: 'http://localhost/fshop/api/v1'), '/');
-$apiKey = trim((string) (getenv('FSHOP_API_KEY') ?: 'f25851a5e2cd17667780e12369317457b5ef1b503ed24aa3ca178e6b738d6d32'));
+$apiKey = trim((string) (getenv('FSHOP_API_KEY') ?: ''));
 
 // Görsel yükleme (opsiyonel) — dosya yolu veya URL; boş bırakılırsa atlanır
 $imageFilePath = ''; // örn: __DIR__ . '/sample-product.jpg'

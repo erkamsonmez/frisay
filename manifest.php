@@ -11,25 +11,14 @@ if (!headers_sent()) {
 	http_response_code(200);
 }
 
+require_once __DIR__ . '/config/pwa_helpers.php';
+
 /**
  * @return string
  */
 function fshop_pwa_scope()
 {
-	$script = str_replace('\\', '/', (string) (isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : ''));
-
-	if (preg_match('#^(/.+?)/manifest\.php#', $script, $m)) {
-		return rtrim($m[1], '/') . '/';
-	}
-
-	$uri = str_replace('\\', '/', (string) (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''));
-	$path = (string) parse_url($uri, PHP_URL_PATH);
-
-	if (preg_match('#^(/[^/]+)/#', $path, $m)) {
-		return rtrim($m[1], '/') . '/';
-	}
-
-	return '/fshop/';
+	return fshop_pwa_resolve_scope(isset($_SERVER['SCRIPT_NAME']) ? (string) $_SERVER['SCRIPT_NAME'] : '');
 }
 
 /**
@@ -151,8 +140,6 @@ function fshop_pwa_load_db_settings()
 
 	return $settings;
 }
-
-require_once __DIR__ . '/config/pwa_helpers.php';
 
 $scope = fshop_pwa_scope();
 $s = fshop_pwa_load_db_settings();

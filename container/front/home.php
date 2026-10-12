@@ -13,20 +13,18 @@
 	$topRatedProducts = Product::getTopRatedList(8);
 	$categoryBlocks = [];
 	$homeCategories = [];
-	$categoryIcons = ['📱', '💄', '💊', '🏷️', '👕', '⌚', '🎧', '🏠', '⚽', '📦', '✨', '🛒'];
 	$homeCategoryRows = Category::getHomeList();
 
-	foreach ($homeCategoryRows as $index => $cat) {
+	foreach ($homeCategoryRows as $cat) {
 		$homeCategories[] = [
 			'category' => $cat,
 			'url' => Category::getUrl($cat),
-			'icon' => $categoryIcons[$index % count($categoryIcons)],
 			'initial' => mb_strtoupper(mb_substr((string) $cat['category_name'], 0, 1)),
 		];
 	}
 
 	foreach ($homeCategoryRows as $cat) {
-		$products = Product::getActiveList((int) $cat['id_category'], 5);
+		$products = Product::getActiveList((int) $cat['id_category'], 10);
 
 		if (!$products) {
 			continue;
@@ -43,6 +41,14 @@
 	$newProducts = Product::getActiveList(null, 8, 0, 'newest');
 	$homeBrands = Brand::getPublicList(12);
 	$cmsBlogLinks = array_slice(Cms::getFooterLinks(), 0, 3);
+	$homeBlogPosts = [];
+	if (Module::isEnabled('blog')) {
+		require_once dirname(__DIR__, 2) . '/modules/blog/lib/BlogService.php';
+		if (class_exists('BlogService', false)) {
+			BlogService::ensureSchema();
+			$homeBlogPosts = BlogService::getList(true, 3);
+		}
+	}
 
 	$smarty->assign([
 		'featuredProducts' => $featuredProducts,
@@ -51,6 +57,7 @@
 		'newProducts' => $newProducts,
 		'homeBrands' => $homeBrands,
 		'cmsBlogLinks' => $cmsBlogLinks,
+		'homeBlogPosts' => $homeBlogPosts,
 		'homeCategories' => $homeCategories,
 		'categoryBlocks' => $categoryBlocks,
 		'activeOrders' => Order::getActiveOrdersForViewer(3),

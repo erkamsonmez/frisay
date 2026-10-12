@@ -31,11 +31,136 @@ class Category
 				 ADD COLUMN `home_position` int(11) NOT NULL DEFAULT 0 AFTER `show_on_home`"
 			);
 		}
+
+		$dir = self::imageDir();
+
+		if (!is_dir($dir)) {
+			@mkdir($dir, 0755, true);
+		}
+	}
+
+	public static function imageDir(): string
+	{
+		return dirname(__DIR__) . '/img/category';
+	}
+
+	/** @var string[] */
+	private const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+
+	public static function getImageFile(int $idCategory): ?string
+	{
+		if ($idCategory <= 0) {
+			return null;
+		}
+
+		$dir = self::imageDir();
+
+		foreach (self::IMAGE_EXTS as $ext) {
+			$file = $idCategory . '.' . $ext;
+
+			if (is_file($dir . '/' . $file)) {
+				return $file;
+			}
+		}
+
+		return null;
+	}
+
+	public static function getImageUrl(int $idCategory): string
+	{
+		global $domain;
+
+		$file = self::getImageFile($idCategory);
+
+		if ($file === null) {
+			return '';
+		}
+
+		$path = self::imageDir() . '/' . $file;
+		$url = rtrim((string) $domain, '/') . '/img/category/' . $file;
+
+		return class_exists('Performance', false)
+			? Performance::versionedUrl($url, $path)
+			: $url;
+	}
+
+	/**
+	 * @param array<string, mixed> $file $_FILES entry
+	 * @return array{success: bool, message: string}
+	 */
+	public static function saveImage(int $idCategory, array $file): array
+	{
+		if ($idCategory <= 0) {
+			return ['success' => false, 'message' => 'Kategori bulunamadı'];
+		}
+
+		if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+			return ['success' => false, 'message' => 'Dosya seçilmedi'];
+		}
+
+		if (!empty($file['error'])) {
+			return ['success' => false, 'message' => 'Dosya yüklenemedi'];
+		}
+
+		if (($file['size'] ?? 0) > 2 * 1024 * 1024) {
+			return ['success' => false, 'message' => 'Görsel en fazla 2 MB olabilir'];
+		}
+
+		$finfo = finfo_open(FILEINFO_MIME_TYPE);
+		$mime = $finfo ? (string) finfo_file($finfo, $file['tmp_name']) : '';
+
+		if ($finfo) {
+			finfo_close($finfo);
+		}
+
+		$map = [
+			'image/jpeg' => 'jpg',
+			'image/png' => 'png',
+			'image/webp' => 'webp',
+			'image/gif' => 'gif',
+		];
+
+		if (!isset($map[$mime])) {
+			return ['success' => false, 'message' => 'Sadece JPG, PNG, WEBP veya GIF yükleyebilirsiniz'];
+		}
+
+		$dir = self::imageDir();
+
+		if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
+			return ['success' => false, 'message' => 'img/category klasörü oluşturulamadı'];
+		}
+
+		self::deleteImage($idCategory);
+
+		$target = $dir . '/' . $idCategory . '.' . $map[$mime];
+
+		if (!move_uploaded_file($file['tmp_name'], $target)) {
+			return ['success' => false, 'message' => 'Görsel kaydedilemedi'];
+		}
+
+		return ['success' => true, 'message' => 'Kategori görseli kaydedildi'];
+	}
+
+	public static function deleteImage(int $idCategory): void
+	{
+		if ($idCategory <= 0) {
+			return;
+		}
+
+		$dir = self::imageDir();
+
+		foreach (self::IMAGE_EXTS as $ext) {
+			$path = $dir . '/' . $idCategory . '.' . $ext;
+
+			if (is_file($path)) {
+				@unlink($path);
+			}
+		}
 	}
 
 	/**
 	 * Ana sayfada gösterilecek kategoriler (show_on_home=1).
-	 * Hiçbiri seçili değilse menü kategorilerine düşer (geriye uyumluluk).
+	 * Hiçbiri işaretli değilse boş döner; menüye düşmez.
 	 *
 	 * @return array<int, array<string, mixed>>
 	 */
@@ -49,11 +174,12 @@ class Category
 			 ORDER BY home_position ASC, category_name ASC'
 		) ?: [];
 
-		if ($rows === []) {
-			return self::getMenuList();
-		}
+		return array_map(static function (array $row): array {
+			$row = Lang::applyCategory($row);
+			$row['image_url'] = self::getImageUrl((int) ($row['id_category'] ?? 0));
 
-		return array_map(static fn(array $row): array => Lang::applyCategory($row), $rows);
+			return $row;
+		}, $rows);
 	}
 
 	public static function getByLink(string $link): ?array
@@ -95,10 +221,38 @@ class Category
 		return $row ? Lang::applyCategory($row) : null;
 	}
 
+	/**
+	 * Kök kategori (id_parent = 0). PrestaShop aktarımında genelde 2 (Ana Sayfa).
+	 */
+	public static function getRootId(): int
+	{
+		static $rootId = null;
+
+		if ($rootId !== null) {
+			return $rootId;
+		}
+
+		$id = DB::getValue(
+			'SELECT id_category FROM categories WHERE id_parent = 0 ORDER BY id_category ASC LIMIT 1'
+		);
+
+		$rootId = (int) ($id ?: 0);
+
+		return $rootId;
+	}
+
+	/** Üst seviye menü kategorileri (kökün doğrudan altları). */
 	public static function getMenuList(): array
 	{
+		$rootId = self::getRootId();
+
+		if ($rootId <= 0) {
+			return [];
+		}
+
 		$rows = DB::execute(
-			'SELECT * FROM categories WHERE active = 1 AND id_parent > 0 ORDER BY category_name ASC'
+			'SELECT * FROM categories WHERE active = 1 AND id_parent = ? ORDER BY category_name ASC',
+			[$rootId]
 		) ?: [];
 
 		return array_map(static fn(array $row): array => Lang::applyCategory($row), $rows);
@@ -285,18 +439,18 @@ class Category
 			return [];
 		}
 
-		$placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-
-		$rows = DB::execute(
-			'SELECT b.*, COUNT(p.id_product) AS product_count
+		$sql = 'SELECT b.*, COUNT(p.id_product) AS product_count
 			 FROM brands b
 			 INNER JOIN products p ON p.id_brand = b.id_brand AND p.active = 1
-			 WHERE b.active = 1 AND p.id_category IN (' . $placeholders . ')
+			 WHERE b.active = 1';
+		$params = [];
+		Product::appendInCategoriesSql($sql, $params, $categoryIds);
+		$sql .= '
 			 GROUP BY b.id_brand
 			 HAVING product_count > 0
-			 ORDER BY b.brand_name ASC',
-			$categoryIds
-		) ?: [];
+			 ORDER BY b.brand_name ASC';
+
+		$rows = DB::execute($sql, $params) ?: [];
 
 		return array_map(static fn(array $row): array => Lang::applyBrand($row), $rows);
 	}
@@ -308,7 +462,7 @@ class Category
 		return $domain . $category['category_link'];
 	}
 
-	public static function getAdminList(int $activeFilter = -1, int $limit = 50, int $offset = 0): array
+	public static function getAdminList(int $activeFilter = -1, int $limit = 50, int $offset = 0, string $orderBy = ''): array
 	{
 		self::ensureSchema();
 
@@ -323,7 +477,11 @@ class Category
 			$params[] = $activeFilter;
 		}
 
-		$sql .= ' ORDER BY c.show_on_home DESC, c.home_position ASC, c.id_category ASC LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
+		$orderBy = trim($orderBy);
+		if ($orderBy === '') {
+			$orderBy = 'c.show_on_home DESC, c.home_position ASC, c.id_category ASC';
+		}
+		$sql .= ' ORDER BY ' . $orderBy . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
 
 		return DB::execute($sql, $params) ?: [];
 	}
@@ -358,7 +516,13 @@ class Category
 	{
 		$row = DB::getRowSafe('categories', 'id_category = ?', [$id]);
 
-		return $row ?: null;
+		if (!$row) {
+			return null;
+		}
+
+		$row['image_url'] = self::getImageUrl($id);
+
+		return $row;
 	}
 
 	public static function getParentOptions(int $excludeId = 0): array

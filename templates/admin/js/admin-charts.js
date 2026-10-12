@@ -35,33 +35,43 @@
 		});
 
 		new Chart(el, {
-			type: 'bar',
+			type: 'line',
 			data: {
 				labels: chartData.labels,
 				datasets: [
 					{
 						label: chartData.store_label || 'Store sales',
 						data: storeValues,
-						backgroundColor: '#0D9488',
-						borderRadius: 6,
-						borderSkipped: false,
-						barPercentage: 0.85,
-						categoryPercentage: 0.7
+						borderColor: '#2457C5',
+						backgroundColor: 'rgba(36, 87, 197, 0.08)',
+						borderWidth: 3,
+						tension: 0.4,
+						fill: false,
+						pointRadius: 0,
+						pointHoverRadius: 5,
+						pointHoverBackgroundColor: '#2457C5'
 					},
 					{
 						label: chartData.marketplace_label || 'Marketplace sales',
 						data: mpValues,
-						backgroundColor: chartData.marketplace_color || '#F97316',
-						borderRadius: 6,
-						borderSkipped: false,
-						barPercentage: 0.85,
-						categoryPercentage: 0.7
+						borderColor: chartData.marketplace_color || '#F5A623',
+						backgroundColor: 'rgba(245, 166, 35, 0.08)',
+						borderWidth: 3,
+						tension: 0.4,
+						fill: false,
+						pointRadius: 0,
+						pointHoverRadius: 5,
+						pointHoverBackgroundColor: '#F5A623'
 					}
 				]
 			},
 			options: {
 				responsive: true,
 				maintainAspectRatio: false,
+				interaction: {
+					mode: 'index',
+					intersect: false
+				},
 				plugins: {
 					legend: {
 						display: true,

@@ -27,6 +27,7 @@
 	var uploadBtn = modalEl.querySelector('[data-ml-upload-btn]');
 	var mkdirBtn = modalEl.querySelector('[data-ml-mkdir]');
 	var refreshBtn = modalEl.querySelector('[data-ml-refresh]');
+	var upBtn = modalEl.querySelector('[data-ml-up]');
 	var confirmBtn = modalEl.querySelector('[data-ml-confirm]');
 	var statusModalEl = modalEl.querySelector('[data-ml-status]');
 	var confirmLabelDefault = confirmBtn ? (confirmBtn.textContent || 'Seç') : 'Seç';
@@ -53,6 +54,22 @@
 			.replace(/</g, '&lt;')
 			.replace(/>/g, '&gt;')
 			.replace(/"/g, '&quot;');
+	}
+
+	function parentPath(path) {
+		path = String(path || '').replace(/^\/+|\/+$/g, '');
+		if (!path) {
+			return null;
+		}
+		var idx = path.lastIndexOf('/');
+		return idx === -1 ? '' : path.slice(0, idx);
+	}
+
+	function syncUpButton() {
+		if (!upBtn) {
+			return;
+		}
+		upBtn.disabled = busy || parentPath(currentPath) === null;
 	}
 
 	function selectedPaths() {
@@ -82,6 +99,7 @@
 		if (mkdirBtn) {
 			mkdirBtn.disabled = !canMkdir || busy;
 		}
+		syncUpButton();
 	}
 
 	function renderCrumbs(crumbs) {
@@ -108,19 +126,34 @@
 		});
 	}
 
+	function renderUpCard() {
+		var parent = parentPath(currentPath);
+		if (parent === null) {
+			return '';
+		}
+		return ''
+			+ '<div class="ml-item is-dir is-up" data-type="dir" data-path="' + escapeHtml(parent) + '" title="Üst dizin">'
+			+ '<div class="ml-thumb" aria-hidden="true">'
+			+ '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>'
+			+ '</div>'
+			+ '<span class="ml-name">..</span>'
+			+ '</div>';
+	}
+
 	function renderGrid() {
 		if (!gridEl) {
 			return;
 		}
 
 		var items = filteredItems();
+		var upCard = renderUpCard();
 		if (!items.length) {
-			gridEl.innerHTML = '<div class="ml-empty">Bu klasörde görsel yok.</div>';
+			gridEl.innerHTML = upCard + '<div class="ml-empty">Bu klasörde görsel yok.</div>';
 			updateMeta();
 			return;
 		}
 
-		var html = '';
+		var html = upCard;
 		items.forEach(function (item) {
 			if (item.type === 'dir') {
 				html += ''
@@ -335,6 +368,16 @@
 	if (refreshBtn) {
 		refreshBtn.addEventListener('click', function () {
 			loadPath(currentPath);
+		});
+	}
+
+	if (upBtn) {
+		upBtn.addEventListener('click', function () {
+			var parent = parentPath(currentPath);
+			if (parent === null || busy) {
+				return;
+			}
+			loadPath(parent);
 		});
 	}
 

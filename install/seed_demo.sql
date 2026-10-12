@@ -47,7 +47,10 @@ INSERT INTO `modules` (`id_module`, `name`, `version`, `active`, `installed`, `d
 (9, 'export-excel', '1.0.0', 1, 1, '2026-07-19 16:54:38'),
 (10, 'xml-import', '1.0.0', 1, 1, '2026-07-19 22:42:43'),
 (11, 'mobil-app', '1.0.0', 1, 1, '2026-07-20 11:18:31'),
-(12, 'slider', '1.0.0', 1, 1, '2026-07-24 23:13:39');
+(12, 'slider', '1.0.0', 1, 1, '2026-07-24 23:13:39'),
+(13, 'theme4', '2.6.0', 1, 1, '2026-09-14 10:00:00');
+(14, 'alert-price', '1.0.0', 1, 1, '2026-09-14 10:00:00');
+(15, 'recent-viewed', '1.0.0', 1, 1, '2026-09-14 10:00:00');
 
 INSERT INTO `module_display_hooks` (`id_hook`, `module_name`, `hook_name`, `position`) VALUES
 (3, 'same-category-products', 'product', 0),
@@ -64,7 +67,12 @@ INSERT INTO `module_display_hooks` (`id_hook`, `module_name`, `hook_name`, `posi
 (14, 'mobil-app', 'head.top', 0),
 (15, 'mobil-app', 'mobile_menu', 1),
 (16, 'slider', 'home_slider', 0),
-(17, 'slider', 'home_promo_slider', 1);
+(17, 'slider', 'home_promo_slider', 1),
+(18, 'theme4', 'home', 0);
+(19, 'main-menu', 'footer_menu', 0);
+(20, 'alert-price', 'product_inf', 0);
+(21, 'recent-viewed', 'home_bottom', 0);
+(22, 'recent-viewed', 'product_detail', 0);
 
 INSERT INTO `orders` (`id_order`, `id_user`, `reference`, `status`, `cargo_company`, `tracking_number`, `payment_method`, `customer_name`, `customer_phone`, `customer_email`, `company_name`, `tax_office`, `tax_number`, `address_city`, `address_district`, `address_text`, `note`, `coupon_code`, `coupon_discount`, `promotion_name`, `promotion_discount`, `payment_discount`, `payment_discount_label`, `subtotal`, `shipping`, `total`, `date_add`, `date_delivered`) VALUES
 (1, 1, 'FS000001', 2, '', '', 'bank_transfer', 'Ramazan Benek', '0123456789', '', '', '', '', 'Antalya', 'Muratpaşa', 'Deneme mahallesi', '', '', 0.00, '', 0.00, 0.00, '', 4248.69, 0.00, 4248.69, '2026-06-17 16:32:15', NULL);
@@ -93,4 +101,4 @@ CREATE TABLE IF NOT EXISTS `slider_slides` (
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `slider_slides` (`id_slide`, `slide_group`, `title`, `subtitle`, `promo_lines`, `button_text`, `link_url`, `image_file`, `position`, `active`, `date_add`) VALUES
-(1, 'hero', '', '', '', 'View', '', 'slide_4.jpg', 0, 1, '2026-07-24 23:13:49');
+(1, 'hero', '', '', '', 'Keşfet', '', 'slide_4.jpg', 0, 1, '2026-07-24 23:13:49');

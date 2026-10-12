@@ -62,6 +62,28 @@ class ArchiveService
             return false;
         }
 
+        $wanted = [];
+        foreach ($selectedFiles as $selected) {
+            $wanted[str_replace('\\', '/', (string) $selected)] = true;
+        }
+
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = str_replace('\\', '/', (string) $zip->getNameIndex($i));
+
+            if ($wanted !== [] && !isset($wanted[$name])) {
+                continue;
+            }
+
+            if ($name === '' || substr($name, -1) === '/') {
+                continue;
+            }
+
+            if (\Security::isUnsafeZipPath($name) || \Security::isZipEntrySymlink($zip, $i)) {
+                $zip->close();
+                return false;
+            }
+        }
+
         if (empty($selectedFiles)) {
             $res = $zip->extractTo($extractDir);
         } else {

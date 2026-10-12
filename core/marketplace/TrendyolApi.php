@@ -8,10 +8,16 @@ namespace Trendyol;
  */
 class TrendyolApi
 {
+	/** Türkiye vitrini — V2 kategori/ürün isteklerinde zorunlu header. */
+	public const STOREFRONT_CODE = 'TR';
+
 	private string $supplierId;
 	private string $apiKey;
 	private string $apiSecret;
 	private string $baseUri;
+
+	/** @var array<int, array<string, mixed>> */
+	private array $attributeListCache = [];
 
 	public function __construct(string $supplierId, string $apiKey, string $apiSecret)
 	{
@@ -19,6 +25,16 @@ class TrendyolApi
 		$this->apiKey = trim($apiKey);
 		$this->apiSecret = trim($apiSecret);
 		$this->baseUri = 'https://apigw.trendyol.com/integration/';
+	}
+
+	private function ordersEndpoint(): string
+	{
+		return "order/sellers/{$this->supplierId}/v2/orders";
+	}
+
+	private function productsV2Endpoint(): string
+	{
+		return "product/sellers/{$this->supplierId}/v2/products";
 	}
 
 	public function isConfigured(): bool
@@ -34,14 +50,14 @@ class TrendyolApi
 	public function getOrders()
 	{
 		$status = 'Created,Picking,Invoiced,Shipped,Cancelled,Delivered,UnDelivered,Returned,AtCollectionPoint,UnPacked,UnSupplied';
-		$endpoint = "order/sellers/{$this->supplierId}/orders?status={$status}&orderByField=PackageLastModifiedDate&orderByDirection=DESC&size=200";
+		$endpoint = $this->ordersEndpoint() . "?status={$status}&orderByField=PackageLastModifiedDate&orderByDirection=DESC&size=200";
 
 		return $this->request('GET', $endpoint);
 	}
 
 	public function getOrderDetail($idOrder)
 	{
-		$endpoint = "order/sellers/{$this->supplierId}/orders?orderNumber=" . rawurlencode((string) $idOrder);
+		$endpoint = $this->ordersEndpoint() . '?orderNumber=' . rawurlencode((string) $idOrder);
 
 		return $this->request('GET', $endpoint);
 	}
@@ -123,9 +139,9 @@ class TrendyolApi
 		$end = (int) round(strtotime($endDate . ' 23:59:59') * 1000);
 
 		if ($idOrder) {
-			$endpoint = "order/sellers/{$this->supplierId}/orders?orderNumber=" . (int) $idOrder;
+			$endpoint = $this->ordersEndpoint() . '?orderNumber=' . (int) $idOrder;
 		} else {
-			$endpoint = "order/sellers/{$this->supplierId}/orders?startDate={$start}&endDate={$end}&orderByField=PackageLastModifiedDate&orderByDirection=DESC&size=200";
+			$endpoint = $this->ordersEndpoint() . "?startDate={$start}&endDate={$end}&orderByField=PackageLastModifiedDate&orderByDirection=DESC&size=200";
 		}
 
 		return $this->request('GET', $endpoint);
@@ -154,21 +170,21 @@ class TrendyolApi
 
 	public function getProducts($limit, $page = 0)
 	{
-		$endpoint = "product/sellers/{$this->supplierId}/products?approved=true&size=" . (int) $limit . '&page=' . (int) $page;
+		$endpoint = $this->productsV2Endpoint() . '?approved=true&size=' . (int) $limit . '&page=' . (int) $page;
 
 		return $this->request('GET', $endpoint);
 	}
 
 	public function createProduct($data)
 	{
-		$endpoint = "product/sellers/{$this->supplierId}/products";
+		$endpoint = $this->productsV2Endpoint();
 
 		return $this->request('POST', $endpoint, $data);
 	}
 
 	public function updateProduct($data)
 	{
-		$endpoint = "product/sellers/{$this->supplierId}/products";
+		$endpoint = $this->productsV2Endpoint();
 
 		return $this->request('PUT', $endpoint, $data);
 	}
@@ -195,9 +211,9 @@ class TrendyolApi
 
 		$encoded = rawurlencode($barcode);
 		$candidates = [
-			"product/sellers/{$this->supplierId}/products?barcode={$encoded}&page=0&size=50",
+			$this->productsV2Endpoint() . "?barcode={$encoded}&page=0&size=50",
 			"product/sellers/{$this->supplierId}/products/approved?barcode={$encoded}&page=0&size=50",
-			"product/sellers/{$this->supplierId}/products?stockCode={$encoded}&page=0&size=50",
+			$this->productsV2Endpoint() . "?stockCode={$encoded}&page=0&size=50",
 		];
 
 		$lastOk = null;
@@ -280,9 +296,262 @@ class TrendyolApi
 
 	public function getAttirupes($id)
 	{
-		$endpoint = "product/product-categories/{$id}/attributes";
+		$id = (int) $id;
+		$result = $this->getCategoryAttributeList($id);
 
-		return $this->request('GET', $endpoint);
+		if (!is_array($result) || (array_key_exists('success', $result) && $result['success'] === false)) {
+			return $result;
+		}
+
+		$rows = $result['categoryAttributes'] ?? ($result['categoryAttributeList'] ?? []);
+
+		if (!is_array($rows)) {
+			$rows = [];
+		}
+
+		$filtered = [];
+
+		foreach ($rows as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+
+			$allowCustom = !empty($row['allowCustom']);
+			$existingValues = $row['attributeValues'] ?? [];
+
+			if (!$allowCustom && (!is_array($existingValues) || $existingValues === [])) {
+				$attributeId = (int) ($row['attribute']['id'] ?? 0);
+
+				if ($attributeId > 0) {
+					$row['attributeValues'] = $this->getAttributeValues($id, $attributeId);
+				}
+			}
+
+			$filtered[] = $row;
+		}
+
+		usort($filtered, static function (array $a, array $b): int {
+			$ra = !empty($a['required']) || !empty($a['mandatory']) || !empty($a['isMandatory']) ? 0 : 1;
+			$rb = !empty($b['required']) || !empty($b['mandatory']) || !empty($b['isMandatory']) ? 0 : 1;
+
+			if ($ra !== $rb) {
+				return $ra - $rb;
+			}
+
+			$na = (string) (($a['attribute']['name'] ?? '') ?: '');
+			$nb = (string) (($b['attribute']['name'] ?? '') ?: '');
+
+			return strcasecmp($na, $nb);
+		});
+
+		$result['categoryAttributes'] = $filtered;
+
+		return $result;
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	public function getCategoryAttributeList(int $categoryId): array
+	{
+		if ($categoryId <= 0) {
+			return ['categoryAttributes' => []];
+		}
+
+		if (isset($this->attributeListCache[$categoryId])) {
+			return $this->attributeListCache[$categoryId];
+		}
+
+		$result = $this->request('GET', "product/categories/{$categoryId}/attributes");
+		$this->attributeListCache[$categoryId] = is_array($result) ? $result : ['categoryAttributes' => []];
+
+		return $this->attributeListCache[$categoryId];
+	}
+
+	/**
+	 * @return array<int, int>
+	 */
+	public function originAttributeIds(int $categoryId): array
+	{
+		$result = $this->getCategoryAttributeList($categoryId);
+		$rows = $result['categoryAttributes'] ?? ($result['categoryAttributeList'] ?? []);
+		$ids = [];
+
+		if (!is_array($rows)) {
+			return [];
+		}
+
+		foreach ($rows as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+
+			$name = (string) (($row['attribute']['name'] ?? '') ?: '');
+
+			if (!self::isOriginAttributeName($name)) {
+				continue;
+			}
+
+			$id = (int) ($row['attribute']['id'] ?? 0);
+
+			if ($id > 0) {
+				$ids[] = $id;
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * @return array<int, array{id: int, name: string, attributeValueId: int, attributeValue: string}>
+	 */
+	public function getAttributeValues(int $categoryId, int $attributeId): array
+	{
+		if ($categoryId <= 0 || $attributeId <= 0) {
+			return [];
+		}
+
+		$out = [];
+		$page = 0;
+		$size = 1000;
+
+		while ($page < 5) {
+			$endpoint = "product/categories/{$categoryId}/attributes/{$attributeId}/values?page={$page}&size={$size}";
+			$result = $this->request('GET', $endpoint);
+
+			if (!is_array($result) || (array_key_exists('success', $result) && $result['success'] === false)) {
+				break;
+			}
+
+			$content = $result['content'] ?? [];
+
+			if (!is_array($content) || $content === []) {
+				break;
+			}
+
+			foreach ($content as $item) {
+				if (!is_array($item)) {
+					continue;
+				}
+
+				$valueId = (int) ($item['attributeValueId'] ?? $item['id'] ?? 0);
+				$name = (string) ($item['attributeValue'] ?? $item['name'] ?? '');
+
+				if ($valueId <= 0 && $name === '') {
+					continue;
+				}
+
+				$out[] = [
+					'id' => $valueId,
+					'name' => $name,
+					'attributeValueId' => $valueId,
+					'attributeValue' => $name,
+				];
+			}
+
+			$totalPages = (int) ($result['totalPages'] ?? 1);
+
+			if ($page + 1 >= $totalPages || count($content) < $size) {
+				break;
+			}
+
+			$page++;
+		}
+
+		return $out;
+	}
+
+	public static function isOriginAttributeName(string $name): bool
+	{
+		$name = trim(mb_strtolower($name));
+
+		if ($name === '') {
+			return false;
+		}
+
+		return (bool) preg_match('/men[sş]ei|mensei|\borigin\b|menşe/u', $name);
+	}
+
+	/**
+	 * Trendyol origin alanı 2 haneli ISO ülke kodu ister (Türkiye → TR).
+	 */
+	public static function resolveOriginCode(?string $raw): string
+	{
+		$raw = trim((string) $raw);
+		$key = mb_strtolower($raw);
+		$map = [
+			'tr' => 'TR',
+			'türkiye' => 'TR',
+			'turkiye' => 'TR',
+			'turkey' => 'TR',
+			'cn' => 'CN',
+			'çin' => 'CN',
+			'cin' => 'CN',
+			'china' => 'CN',
+			'de' => 'DE',
+			'almanya' => 'DE',
+			'germany' => 'DE',
+			'it' => 'IT',
+			'italya' => 'IT',
+			'italy' => 'IT',
+			'bd' => 'BD',
+			'bangladeş' => 'BD',
+			'banglades' => 'BD',
+			'bangladesh' => 'BD',
+			'in' => 'IN',
+			'hindistan' => 'IN',
+			'india' => 'IN',
+			'vn' => 'VN',
+			'vietnam' => 'VN',
+			'pk' => 'PK',
+			'pakistan' => 'PK',
+			'us' => 'US',
+			'abd' => 'US',
+			'usa' => 'US',
+		];
+
+		if ($key !== '' && isset($map[$key])) {
+			return $map[$key];
+		}
+
+		if (preg_match('/^[A-Za-z]{2}$/', $raw)) {
+			return strtoupper($raw);
+		}
+
+		return 'TR';
+	}
+
+	/**
+	 * Menşei katalog değerlerinden Türkiye'yi (yoksa ilk değeri) seçer.
+	 *
+	 * @param array<int, array<string, mixed>> $values
+	 */
+	public static function pickDefaultOriginValueId(array $values): int
+	{
+		$fallback = 0;
+
+		foreach ($values as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+
+			$id = (int) ($item['id'] ?? $item['attributeValueId'] ?? 0);
+			$name = mb_strtolower(trim((string) ($item['name'] ?? $item['attributeValue'] ?? '')));
+
+			if ($id <= 0) {
+				continue;
+			}
+
+			if ($fallback === 0) {
+				$fallback = $id;
+			}
+
+			if (preg_match('/t[uü]rkiye|turkey|^tr$/', $name)) {
+				return $id;
+			}
+		}
+
+		return $fallback;
 	}
 
 	public function getQuestion($page = 0, $size = 25, $status = null)
@@ -324,10 +593,40 @@ class TrendyolApi
 			$item['stockCode'] = (string) $sku;
 		}
 
-		$updateData = ['items' => [$item]];
+		return $this->updateStockPriceItems([$item]);
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $items
+	 * @return array<string, mixed>|null
+	 */
+	public function updateStockPriceItems(array $items)
+	{
 		$endpoint = "inventory/sellers/{$this->supplierId}/products/price-and-inventory";
 
-		return $this->request('POST', $endpoint, $updateData);
+		$clean = [];
+
+		foreach ($items as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+
+			unset($item['id_variation']);
+			$clean[] = $item;
+		}
+
+		return $this->request('POST', $endpoint, ['items' => array_values($clean)]);
+	}
+
+	/**
+	 * @param array<string, mixed> $data items: [{barcode, archived}]
+	 * @return array<string, mixed>|null
+	 */
+	public function archiveProducts($data)
+	{
+		$endpoint = "product/sellers/{$this->supplierId}/products/archive-state";
+
+		return $this->request('PUT', $endpoint, $data);
 	}
 
 	/**
@@ -375,6 +674,7 @@ class TrendyolApi
 				'Content-Type: application/json',
 				'User-Agent: ' . $userAgent,
 				'Accept: application/json',
+				'storeFrontCode: ' . self::STOREFRONT_CODE,
 			],
 			CURLOPT_TIMEOUT => 60,
 		]);

@@ -2,15 +2,31 @@
 <div class="alert alert-{$flashType|default:'info'}">{$flash|escape}</div>
 {/if}
 
-<form method="get" action="{$adminUrl}stock-analysis" class="admin-toolbar row g-2 mb-3">
-	<div class="col-md-3">
-		<label class="form-label small mb-1">{'Sales period (days)'|adminT}</label>
-		<input type="number" min="1" max="90" name="days" class="form-control form-control-sm" value="{$days}">
+<div class="admin-panel p-3 mb-3">
+	<div class="mp-filter-card mb-0">
+		<div class="mp-filter-header">
+			<div>
+				<div class="mp-filter-title">
+					{include file='admin/partials/filter-funnel-icon.tpl'}
+					{'Filters'|adminT}
+				</div>
+			</div>
+		</div>
+		<form method="get" action="{$adminUrl}stock-analysis" id="admStockFilterForm">
+			<div class="row">
+				<div class="col-md-4 mb-3">
+					<label for="sa_days">{'Sales period (days)'|adminT}</label>
+					<input type="number" min="1" max="90" id="sa_days" name="days" class="form-control form-control-sm" value="{$days}">
+				</div>
+			</div>
+		</form>
+		<div class="mp-filter-actions">
+			<div class="mp-filter-actions__btns">
+				<button type="submit" form="admStockFilterForm" class="btn btn-warning">{'Filter'|adminT}</button>
+			</div>
+		</div>
 	</div>
-	<div class="col-md-2 d-flex align-items-end">
-		<button type="submit" class="btn btn-sm btn-dark">{'Filter'|adminT}</button>
-	</div>
-</form>
+</div>
 
 <div class="ps-panel mb-4">
 	<div class="ps-panel__head">

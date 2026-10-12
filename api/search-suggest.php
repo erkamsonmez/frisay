@@ -5,6 +5,16 @@ require_once dirname(__DIR__) . '/config/settings.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+$ip = RateLimit::clientIp();
+
+if (RateLimit::isLimited(RateLimit::SCOPE_SEARCH_SUGGEST, $ip, 60, 60)) {
+	http_response_code(429);
+	echo json_encode(['success' => false, 'message' => 'Too many requests', 'items' => []], JSON_UNESCAPED_UNICODE);
+	exit;
+}
+
+RateLimit::record(RateLimit::SCOPE_SEARCH_SUGGEST, $ip);
+
 $query = trim((string) Tools::getValue('q', Tools::getValue('query', '')));
 
 if (mb_strlen($query) < 2) {

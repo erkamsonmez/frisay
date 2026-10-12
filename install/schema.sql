@@ -88,6 +88,13 @@ CREATE TABLE `products` (
   KEY `stock_code` (`stock_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE `product_category` (
+  `id_product` int(11) NOT NULL,
+  `id_category` int(11) NOT NULL,
+  PRIMARY KEY (`id_product`, `id_category`),
+  KEY `id_category` (`id_category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE `images` (
   `id_image` int(11) NOT NULL AUTO_INCREMENT,
   `id_product` int(11) NOT NULL,
@@ -374,14 +381,11 @@ CREATE TABLE `product_logs` (
   KEY `date_add` (`date_add`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT INTO `admins` (`id_admin`, `full_name`, `email`, `password`, `active`) VALUES
-(1, 'Site Yöneticisi', 'admin@example.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 1);
-
 INSERT INTO `settings` (`title`, `value`) VALUES
 ('DOMAIN', 'http://localhost/fshop/'),
 ('FOLDER', '/fshop/'),
 ('SITE_NAME', 'FShop'),
-('THEME', 'dress'),
+('THEME', 'default'),
 ('DEFAULT_LANG', 'tr'),
 ('SHOP_LANGUAGES', 'tr,en'),
 ('ADMIN_DEFAULT_LANG', 'tr'),
@@ -393,5 +397,5 @@ INSERT INTO `settings` (`title`, `value`) VALUES
 ('MAIL_DRIVER', 'php'),
 ('GIFT_WRAP_ENABLED', '0'),
 ('GIFT_WRAP_FEE', '0'),
-('FS_VERSION', '2.5.6');
+('FS_VERSION', '3.0.0');
 

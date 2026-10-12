@@ -1,212 +1,342 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>{'Order #'|adminT}{$order.reference|escape} — {'Print'|adminT}</title>
+	<title>{if $printOrders|@count > 1}{'Shipping labels'|adminT} ({$printOrders|@count}){else}{'Shipping label'|adminT} #{$printOrders[0].reference|escape}{/if}</title>
+{literal}
 	<style>
-		* { box-sizing: border-box; }
-		body {
-			font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-			font-size: 13px;
-			color: #222;
+		*{ box-sizing:border-box; margin:0; padding:0; }
+		@page{
+			size: A6 portrait;
 			margin: 0;
-			padding: 24px;
-			background: #f5f5f5;
 		}
-		.print-sheet {
-			max-width: 800px;
-			margin: 0 auto;
-			background: #fff;
-			border: 1px solid #ddd;
-			padding: 28px 32px;
+		html,body{
+			background:#d1d5db;
+			color:#000;
+			font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+			-webkit-print-color-adjust:exact;
+			print-color-adjust:exact;
 		}
-		.print-toolbar {
-			max-width: 800px;
-			margin: 0 auto 16px;
-			display: flex;
-			gap: 8px;
+		body{ padding:16px 12px 24px; }
+		.toolbar{
+			width:105mm;
+			max-width:100%;
+			margin:0 auto 14px;
+			display:flex;
+			gap:8px;
 		}
-		.print-toolbar button {
-			padding: 8px 16px;
-			border: 1px solid #363a41;
-			background: #363a41;
-			color: #fff;
-			border-radius: 4px;
-			cursor: pointer;
-			font-size: 13px;
+		.toolbar button{
+			border:0;
+			background:#111;
+			color:#fff;
+			border-radius:8px;
+			padding:9px 16px;
+			font:600 13px/1 Arial,sans-serif;
+			cursor:pointer;
 		}
-		.print-toolbar button.secondary {
-			background: #fff;
-			color: #363a41;
+		.toolbar button.secondary{
+			background:#fff;
+			color:#111;
+			border:1px solid #cbd5e1;
 		}
-		.print-head {
-			display: flex;
-			justify-content: space-between;
-			align-items: flex-start;
-			gap: 16px;
-			margin-bottom: 24px;
-			padding-bottom: 16px;
-			border-bottom: 2px solid #222;
+		/* A6 sheet */
+		.label{
+			width:105mm;
+			height:148mm;
+			max-width:100%;
+			margin:0 auto 16px;
+			background:#fff;
+			padding:4.5mm 5mm 4mm;
+			display:flex;
+			flex-direction:column;
+			box-shadow:0 8px 28px rgba(15,23,42,.18);
+			overflow:hidden;
+			page-break-after:always;
+			break-after:page;
+			page-break-inside:avoid;
+			break-inside:avoid;
 		}
-		.print-head h1 {
-			font-size: 20px;
-			margin: 0 0 4px;
+		.label:last-of-type{
+			margin-bottom:0;
+			page-break-after:auto;
+			break-after:auto;
 		}
-		.print-head .meta {
-			font-size: 12px;
-			color: #666;
+		/* —— Header —— */
+		.head{
+			display:flex;
+			justify-content:space-between;
+			align-items:stretch;
+			gap:4mm;
+			padding-bottom:3.2mm;
+			border-bottom:2.2px solid #000;
 		}
-		.print-grid {
-			display: grid;
-			grid-template-columns: 1fr 1fr;
-			gap: 16px;
-			margin-bottom: 20px;
+		.brand{
+			flex:0 1 42%;
+			display:flex;
+			flex-direction:column;
+			justify-content:flex-start;
+			gap:3.2mm;
+			min-width:0;
+			padding-top:0.5mm;
 		}
-		.print-block h2 {
-			font-size: 11px;
-			text-transform: uppercase;
-			letter-spacing: 0.05em;
-			color: #888;
-			margin: 0 0 8px;
+		.brand-logo{
+			display:block;
+			max-width:100%;
+			width:auto;
+			height:9.5mm;
+			max-height:9.5mm;
+			object-fit:contain;
+			object-position:left center;
 		}
-		.print-block p { margin: 0 0 4px; line-height: 1.45; }
-		table.print-items {
-			width: 100%;
-			border-collapse: collapse;
-			margin-bottom: 20px;
+		.brand-name{
+			font-size:5.2mm;
+			font-weight:800;
+			letter-spacing:-0.02em;
+			line-height:1.05;
+			color:#000;
 		}
-		table.print-items th,
-		table.print-items td {
-			border: 1px solid #ddd;
-			padding: 8px 10px;
-			text-align: left;
+		.brand-cargo-logo{
+			display:block;
+			max-width:100%;
+			width:auto;
+			height:8mm;
+			max-height:8mm;
+			object-fit:contain;
+			object-position:left center;
 		}
-		table.print-items th {
-			background: #f8f9fa;
-			font-size: 11px;
-			text-transform: uppercase;
+		.brand-cargo-name{
+			font-size:4.2mm;
+			font-weight:800;
+			color:#0033a0;
+			line-height:1.1;
+			letter-spacing:-0.01em;
 		}
-		.print-totals {
-			margin-left: auto;
-			width: 280px;
+		.barcode-col{
+			flex:1 1 55%;
+			display:flex;
+			flex-direction:column;
+			align-items:flex-end;
+			justify-content:flex-start;
+			min-width:0;
+			text-align:right;
 		}
-		.print-totals .row {
-			display: flex;
-			justify-content: space-between;
-			padding: 4px 0;
+		.barcode-svg{
+			width:100%;
+			display:flex;
+			justify-content:flex-end;
 		}
-		.print-totals .row.total {
-			font-weight: 700;
-			font-size: 15px;
-			border-top: 2px solid #222;
-			margin-top: 8px;
-			padding-top: 8px;
+		.barcode-svg svg{
+			display:block;
+			width:100%;
+			max-width:54mm;
+			height:14mm;
 		}
-		.print-foot {
-			margin-top: 28px;
-			padding-top: 12px;
-			border-top: 1px solid #eee;
-			font-size: 11px;
-			color: #888;
-			text-align: center;
+		.barcode-code{
+			margin-top:1.2mm;
+			font-size:2.7mm;
+			font-weight:700;
+			letter-spacing:0.04em;
+			font-variant-numeric:tabular-nums;
+			line-height:1.2;
+			word-break:break-all;
 		}
-		@media print {
-			body { background: #fff; padding: 0; }
-			.print-toolbar { display: none !important; }
-			.print-sheet { border: 0; padding: 0; max-width: none; }
+		.shop-tag{
+			margin-top:auto;
+			padding-top:2mm;
+			font-size:3mm;
+			font-weight:600;
+			color:#111;
+			line-height:1;
+		}
+		/* —— Sections —— */
+		.block{
+			padding:2.8mm 0 2.6mm;
+			border-bottom:2.2px solid #000;
+		}
+		.block-title{
+			font-size:3.4mm;
+			font-weight:800;
+			margin-bottom:2mm;
+			letter-spacing:0;
+		}
+		.field{
+			display:grid;
+			grid-template-columns:18mm 1fr;
+			column-gap:1.5mm;
+			align-items:start;
+			margin-bottom:1.6mm;
+			font-size:2.9mm;
+			line-height:1.35;
+		}
+		.field:last-child{ margin-bottom:0; }
+		.field-k{
+			font-weight:400;
+			color:#111;
+			white-space:nowrap;
+		}
+		.field-v{
+			font-weight:400;
+			color:#111;
+			word-break:break-word;
+		}
+		.field-v.is-name{
+			font-weight:800;
+			font-size:3.1mm;
+		}
+		.meta{
+			display:flex;
+			justify-content:space-between;
+			align-items:baseline;
+			gap:3mm;
+			font-size:2.9mm;
+			line-height:1.35;
+			font-weight:400;
+		}
+		.meta strong{ font-weight:700; }
+		/* —— Items —— */
+		.items{
+			flex:1 1 auto;
+			min-height:0;
+			padding-top:2.5mm;
+			overflow:hidden;
+		}
+		.item{
+			display:grid;
+			grid-template-columns:11mm 9mm 1fr;
+			column-gap:2.2mm;
+			align-items:center;
+			padding:2mm 0 2.4mm;
+			border-bottom:1px dashed #666;
+		}
+		.item:last-child{ border-bottom:1px dashed #666; }
+		.item-img,
+		.item-img-empty{
+			width:11mm;
+			height:11mm;
+			object-fit:contain;
+			background:#fff;
+		}
+		.item-img-empty{
+			border:1px solid #e5e7eb;
+			background:#f8fafc;
+		}
+		.item-qty{
+			font-size:4.2mm;
+			font-weight:800;
+			line-height:1;
+			letter-spacing:-0.02em;
+			white-space:nowrap;
+		}
+		.item-meta{ min-width:0; }
+		.item-sku{
+			font-size:2.7mm;
+			font-weight:700;
+			line-height:1.2;
+			color:#111;
+		}
+		.item-name{
+			margin-top:0.6mm;
+			font-size:2.8mm;
+			font-weight:500;
+			line-height:1.25;
+			color:#111;
+		}
+		@media print{
+			html,body{ background:#fff; }
+			body{ padding:0; }
+			.toolbar{ display:none !important; }
+			.label{
+				width:105mm;
+				height:148mm;
+				margin:0;
+				box-shadow:none;
+				page-break-after:always;
+				break-after:page;
+				page-break-inside:avoid;
+				break-inside:avoid;
+			}
+			.label:last-of-type{
+				page-break-after:auto;
+				break-after:auto;
+			}
 		}
 	</style>
+{/literal}
 </head>
 <body>
-	<div class="print-toolbar">
+	<div class="toolbar">
 		<button type="button" onclick="window.print()">{'Print'|adminT}</button>
 		<button type="button" class="secondary" onclick="window.close()">{'Close'|adminT}</button>
 	</div>
 
-	<div class="print-sheet">
-		<div class="print-head">
-			<div>
-				<h1>{$printSiteName|escape}</h1>
-				<div class="meta">{'Order slip'|adminT}</div>
+	{foreach $printOrders as $order}
+	<section class="label" aria-label="{'Shipping label'|adminT} #{$order.reference|escape}">
+		<header class="head">
+			<div class="brand">
+				{if $printStoreLogo}
+				<img class="brand-logo" src="{$printStoreLogo|escape}" alt="{$printSiteName|escape}">
+				{else}
+				<div class="brand-name">{$printSiteName|escape}</div>
+				{/if}
+				{if $order.cargo_logo_url}
+				<img class="brand-cargo-logo" src="{$order.cargo_logo_url|escape}" alt="{$order.cargo_name|escape}">
+				{elseif $order.cargo_name}
+				<div class="brand-cargo-name">{$order.cargo_name|escape}</div>
+				{/if}
 			</div>
-			<div class="meta text-end">
-				<strong>#{$order.reference|escape}</strong><br>
-				{$order.date_formatted|escape}<br>
-				{'Status:'|adminT} {$order.status_label|escape}
+			<div class="barcode-col">
+				<div class="barcode-svg">{$order.barcode_svg nofilter}</div>
+				<div class="barcode-code">{$order.barcode_value|escape}</div>
+				<div class="shop-tag">{$printSiteName|escape}</div>
 			</div>
-		</div>
+		</header>
 
-		<div class="print-grid">
-			<div class="print-block">
-				<h2>{'Customer'|adminT}</h2>
-				<p><strong>{$order.customer_name|escape}</strong></p>
-				<p>{$order.customer_phone|escape}</p>
-				{if $order.customer_email}<p>{$order.customer_email|escape}</p>{/if}
+		<section class="block">
+			<div class="block-title">Alıcı Bilgileri</div>
+			<div class="field">
+				<div class="field-k">Ad/Soyad :</div>
+				<div class="field-v is-name">{$order.customer_name|escape}</div>
 			</div>
-			<div class="print-block">
-				<h2>{'Delivery address'|adminT}</h2>
-				<p>{$order.address_city|escape} / {$order.address_district|escape}</p>
-				<p>{$order.address_text|escape}</p>
-				{if $order.company_name}<p>{'Company:'|adminT} {$order.company_name|escape}</p>{/if}
-				{if $order.tax_number}<p>{'Tax/ID no:'|adminT} {$order.tax_number|escape}</p>{/if}
+			<div class="field">
+				<div class="field-k">Adres :</div>
+				<div class="field-v">{$order.label_address|escape}</div>
 			</div>
-		</div>
-
-		{if $order.note}
-		<div class="print-block" style="margin-bottom:16px;">
-			<h2>{'Order note'|adminT}</h2>
-			<p>{$order.note|escape}</p>
-		</div>
-		{/if}
-
-		<table class="print-items">
-			<thead>
-				<tr>
-					<th>{'Product'|adminT}</th>
-					<th style="width:60px;">{'Qty'|adminT}</th>
-					<th style="width:100px;">{'Unit'|adminT}</th>
-					<th style="width:100px;">{'Total'|adminT}</th>
-				</tr>
-			</thead>
-			<tbody>
-				{foreach $order.items as $item}
-				<tr>
-					<td>{$item.product_name|escape}</td>
-					<td>{if $item.qty_label|default:''}{$item.qty_label|escape}{else}{$item.qty}{/if}{if $item.measure_label|default:''}<div style="font-size:11px;color:#666;">{$item.measure_label|escape}</div>{/if}</td>
-					<td>{$item.price_formatted}</td>
-					<td>{$item.total_formatted}</td>
-				</tr>
-				{/foreach}
-			</tbody>
-		</table>
-
-		<div class="print-totals">
-			<div class="row"><span>{'Subtotal'|adminT}</span><span>{$order.subtotal_formatted}</span></div>
-			<div class="row"><span>{'Shipping'|adminT}</span><span>{$order.shipping_formatted}</span></div>
-			<div class="row total"><span>{'Total'|adminT}</span><span>{$order.total_formatted}</span></div>
-			<div class="row" style="margin-top:8px;font-size:12px;color:#666;">
-				<span>{'Payment'|adminT}</span><span>{$order.payment_label|escape}</span>
+			<div class="field">
+				<div class="field-k">Telefon :</div>
+				<div class="field-v">{if $order.customer_phone}{$order.customer_phone|escape}{else}&nbsp;{/if}</div>
 			</div>
-		</div>
+		</section>
 
-		{if $order.cargo_company || $order.tracking_number}
-		<div class="print-block" style="margin-top:20px;">
-			<h2>{'Shipping'|adminT}</h2>
-			{if $order.cargo_company}<p>{'Company:'|adminT} {$order.cargo_company|escape}</p>{/if}
-			{if $order.tracking_number}<p>{'Tracking no:'|adminT} {$order.tracking_number|escape}</p>{/if}
-		</div>
-		{/if}
+		<section class="block">
+			<div class="block-title">Sipariş Bilgileri</div>
+			<div class="meta">
+				<span>Sipariş No : <strong>{$order.reference|escape}</strong></span>
+				<span>Sipariş Tarihi : <strong>{$order.label_date|escape}</strong></span>
+			</div>
+		</section>
 
-		<div class="print-foot">
-			{$printSiteName|escape}
-			{if $printContactPhone} · {$printContactPhone|escape}{/if}
-			{if $printContactEmail} · {$printContactEmail|escape}{/if}
-		</div>
-	</div>
+		<section class="items">
+			{foreach $order.items as $item}
+			<article class="item">
+				{if $item.image_url}
+				<img class="item-img" src="{$item.image_url|escape}" alt="">
+				{else}
+				<div class="item-img-empty" aria-hidden="true"></div>
+				{/if}
+				<div class="item-qty">{$item.qty_display|escape} x</div>
+				<div class="item-meta">
+					{if $item.sku}<div class="item-sku">{$item.sku|escape}</div>{/if}
+					<div class="item-name">{$item.product_name|escape}</div>
+				</div>
+			</article>
+			{/foreach}
+		</section>
+	</section>
+	{/foreach}
 
 	{if $printAuto}
-	<script>window.addEventListener('load', function () { window.print(); });</script>
+	<script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 280); });</script>
 	{/if}
 </body>
 </html>

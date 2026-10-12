@@ -3,10 +3,13 @@
 class RateLimit
 {
 	const SCOPE_CUSTOMER_LOGIN = 'customer_login';
+	const SCOPE_CUSTOMER_PASSWORD_RESET = 'customer_pw_reset';
 	const SCOPE_ADMIN_LOGIN = 'admin_login';
 	const SCOPE_ADMIN_PASSWORD_RESET = 'admin_password_reset';
 	const SCOPE_POS_LOGIN = 'pos_login';
 	const SCOPE_WEBAPI = 'webapi';
+	const SCOPE_PSWS = 'psws';
+	const SCOPE_SEARCH_SUGGEST = 'search_suggest';
 
 	private static bool $schemaReady = false;
 

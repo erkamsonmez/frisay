@@ -1,0 +1,44 @@
+/**
+ * Theme4 theme settings — auto-generated. Do not edit by hand.
+ */
+:root {
+	--container: 1320px;
+	--font: 'Inter', system-ui, -apple-system, sans-serif;
+	--theme-container-max: 1320px;
+	--theme-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+	--primary: #0080c0;
+	--primary-hover: #07355F;
+	--primary-light: #EEF4FB;
+	--secondary: #ff8040;
+	--text: #0F172A;
+	--text-muted: #64748B;
+	--border: #E2E8F0;
+	--background: #F5F7FA;
+	--surface: #FFFFFF;
+	--white: #FFFFFF;
+	--danger: #DC2626;
+	--sm-primary: var(--primary);
+	--sm-primary-dark: var(--primary-hover);
+	--sm-primary-soft: var(--primary-light);
+	--sn-blue: var(--primary);
+	--sn-blue-dark: var(--primary-hover);
+}
+
+body,
+body.sm-body,
+body.sn-body,
+.prime-body {
+	font-family: var(--font);
+}
+
+.sn-wrap,
+.sm-container,
+.custom-container,
+.page > .container,
+.page .container.custom-container,
+.t4-builder-row.container {
+	max-width: var(--container);
+	width: 100%;
+	margin-left: auto;
+	margin-right: auto;
+}

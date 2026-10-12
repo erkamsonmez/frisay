@@ -39,7 +39,12 @@ $filters = Order::normalizeAdminFilters([
 	'tracking_number' => Tools::getValue('tracking_number'),
 	'cargo_company' => Tools::getValue('cargo_company'),
 	'channel' => Tools::getValue('channel'),
+	'id_min' => Tools::getValue('id_min'),
+	'id_max' => Tools::getValue('id_max'),
+	'total_min' => Tools::getValue('total_min'),
+	'total_max' => Tools::getValue('total_max'),
 	'sort' => Tools::getValue('sort'),
+	'dir' => Tools::getValue('dir'),
 ]);
 
 ExportExcelService::exportOrders($status, $filters);

@@ -106,7 +106,7 @@ class ParamposModule extends ModuleBase
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}
@@ -612,7 +612,7 @@ class ParamposModule extends ModuleBase
 			return;
 		}
 
-		Order::updateStatus((int) $order['id_order'], Order::STATUS_PROCESSING);
+		Order::markPaidByGateway((int) $order['id_order']);
 	}
 
 	private static function redirectAfterPayment(bool $success, string $message = '', string $reference = ''): void
@@ -641,17 +641,28 @@ class ParamposModule extends ModuleBase
 
 	private static function shouldVerifySsl(): bool
 	{
-		if (Settings::get('PARAMPOS_TEST_MODE') !== '0') {
-			return false;
+		return Settings::get('PARAMPOS_TEST_MODE') === '0';
+	}
+
+	private static function caBundlePath(): string
+	{
+		if (!class_exists('UpdateChecker', false)) {
+			require_once dirname(__DIR__, 2) . '/core/UpdateChecker.php';
 		}
 
-		$ca = (string) ini_get('curl.cainfo');
+		$ca = UpdateChecker::caBundlePath();
 
-		if ($ca === '') {
-			$ca = (string) ini_get('openssl.cafile');
+		if ($ca !== '' && is_file($ca)) {
+			return $ca;
 		}
 
-		return $ca !== '' && is_file($ca);
+		foreach ([(string) ini_get('curl.cainfo'), (string) ini_get('openssl.cafile')] as $iniCa) {
+			if ($iniCa !== '' && is_file($iniCa)) {
+				return $iniCa;
+			}
+		}
+
+		return '';
 	}
 
 	/** @param array<string, mixed> $bodyParams */
@@ -705,6 +716,14 @@ class ParamposModule extends ModuleBase
 		curl_setopt($ch, CURLOPT_TIMEOUT, 45);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, $verifySsl);
 		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, $verifySsl ? 2 : 0);
+
+		if ($verifySsl) {
+			$ca = self::caBundlePath();
+
+			if ($ca !== '') {
+				curl_setopt($ch, CURLOPT_CAINFO, $ca);
+			}
+		}
 
 		$result = curl_exec($ch);
 		$errno = curl_errno($ch);

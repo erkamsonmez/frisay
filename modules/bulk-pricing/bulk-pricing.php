@@ -11,8 +11,8 @@ class BulkPricingModule extends ModuleBase
 {
 	public string $name = 'bulk-pricing';
 	public string $title = 'Toplu Fiyat Güncelleme';
-	public string $version = '1.0.0';
-	public string $description = 'Kategori ve markaya göre alış / satış / eski fiyatlara toplu zam veya indirim uygular';
+	public string $version = '1.3.0';
+	public string $description = 'Kategori/marka/fiyat aralığı filtresi, kar dilimli formül veya Excel ile alış / satış fiyatlarını toplu güncelleme';
 	public string $author = 'FShop';
 
 	public array $frontStylesheets = ['.no-global-assets'];
@@ -47,9 +47,40 @@ class BulkPricingModule extends ModuleBase
 			$adjustment['fields'] === []
 			&& !Tools::isSubmit('bulkPricingPreview')
 			&& !Tools::isSubmit('bulkPricingApply')
+			&& !Tools::isSubmit('bulkPricingExcelExport')
+			&& !Tools::isSubmit('bulkPricingExcelImport')
 		) {
 			$adjustment['fields'] = [BulkPricingService::FIELD_PRICE];
 			$adjustment['value'] = 10.0;
+			$adjustment['margin_base'] = 'cost';
+			$adjustment['margins'] = [
+				['min' => 0.0, 'max' => 100.0, 'percent' => 12.0],
+				['min' => 100.0, 'max' => 500.0, 'percent' => 10.0],
+			];
+		}
+
+		if (Tools::isSubmit('bulkPricingExcelExport')) {
+			$postToken = (string) Tools::getValue('token');
+
+			if (!hash_equals($adminToken, $postToken)) {
+				$flash = 'Geçersiz istek';
+				$flashType = 'danger';
+			} else {
+				BulkPricingService::exportPricingExcel($filters);
+			}
+		}
+
+		if (Tools::isSubmit('bulkPricingExcelImport')) {
+			$postToken = (string) Tools::getValue('token');
+
+			if (!hash_equals($adminToken, $postToken)) {
+				$flash = 'Geçersiz istek';
+				$flashType = 'danger';
+			} else {
+				$result = BulkPricingService::importPricingFromUpload($_FILES['bulk_pricing_excel'] ?? []);
+				$flash = (string) ($result['message'] ?? '');
+				$flashType = !empty($result['success']) ? 'success' : 'danger';
+			}
 		}
 
 		if (Tools::isSubmit('bulkPricingPreview') || Tools::isSubmit('bulkPricingApply')) {
@@ -98,6 +129,7 @@ class BulkPricingModule extends ModuleBase
 			'adjustmentLabel' => $adjustmentLabel,
 			'matchCount' => $matchCount,
 			'previewRows' => $previewRows,
+			'showMarginK' => BulkPricingService::formulaUsesVar((string) ($adjustment['formula'] ?? ''), 'k'),
 			'categoryOptions' => BulkPricingService::getCategoryOptions(),
 			'brandOptions' => Brand::getOptions(),
 			'shopCurrency' => Currency::getShopCurrency(),

@@ -22,3 +22,13 @@ require_once __DIR__ . '/N11OrderService.php';
 require_once __DIR__ . '/N11QuestionService.php';
 require_once __DIR__ . '/N11AdminPages.php';
 require_once __DIR__ . '/Code128Barcode.php';
+
+require_once __DIR__ . '/PrestashopApi.php';
+require_once __DIR__ . '/PrestashopProductSyncService.php';
+require_once __DIR__ . '/PrestashopOrderService.php';
+require_once __DIR__ . '/PrestashopAdminPages.php';
+
+require_once __DIR__ . '/FrisayApi.php';
+require_once __DIR__ . '/FrisayProductSyncService.php';
+require_once __DIR__ . '/FrisayOrderService.php';
+require_once __DIR__ . '/FrisayAdminPages.php';

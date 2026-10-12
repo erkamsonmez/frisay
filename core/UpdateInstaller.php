@@ -232,15 +232,6 @@ class UpdateInstaller
 			$ok = curl_exec($ch);
 			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 			$err = curl_error($ch);
-
-			if (($ok === false || $code === 0) && $err !== '' && stripos($err, 'SSL') !== false) {
-				curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-				curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-				$ok = curl_exec($ch);
-				$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-				$err = curl_error($ch);
-			}
-
 			curl_close($ch);
 			fclose($fp);
 
@@ -304,7 +295,7 @@ class UpdateInstaller
 				continue;
 			}
 
-			if (strpos($name, '../') !== false || strpos($name, '..\\') !== false || $name[0] === '/' || preg_match('#^[A-Za-z]:#', $name)) {
+			if (Security::isUnsafeZipPath($name) || Security::isZipEntrySymlink($zip, $i)) {
 				$zip->close();
 				throw new RuntimeException('ZIP path traversal engellendi: ' . $name);
 			}

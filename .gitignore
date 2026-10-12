@@ -5,6 +5,7 @@ config/installed.lock
 
 # Loglar
 logs/*.log
+logs/*.jsonl
 logs/php-error.log
 admin/error_log
 
@@ -26,6 +27,11 @@ cache/*.xml
 # Yüklenen ürün görselleri
 img/products/*
 !img/products/index.php
+
+# Kategori görselleri
+img/category/*
+!img/category/index.php
+!img/category/.htaccess
 
 # İade talebi görselleri
 img/returns/*

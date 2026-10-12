@@ -106,7 +106,14 @@ class SameCategoryProductsModule extends ModuleBase
 			return null;
 		}
 
+		$theme = Settings::get('THEME') ?: 'default';
+		$themeSafe = preg_replace('/[^a-z0-9_-]/', '', strtolower((string) $theme)) ?: 'default';
+		$railTpl = dirname(__DIR__, 2) . '/templates/' . $themeSafe . '/partials/sn-product-rail.tpl';
+		$hasRail = is_file($railTpl);
 		$limit = max(1, (int) Settings::get('SAME_CATEGORY_LIMIT'));
+		if ($hasRail) {
+			$limit = max($limit, 12);
+		}
 		$sort = (string) Settings::get('SAME_CATEGORY_SORT');
 		$allowedSorts = ['newest', 'price_asc', 'price_desc', 'name_asc', 'discount'];
 
@@ -134,7 +141,24 @@ class SameCategoryProductsModule extends ModuleBase
 			return null;
 		}
 
-		$theme = Settings::get('THEME') ?: 'default';
+		if ($hasRail) {
+			global $smarty, $domain;
+
+			$tpl = $smarty->createTemplate(
+				'file:' . $railTpl,
+				[
+					'title' => Settings::get('SAME_CATEGORY_TITLE') ?: 'Aynı kategorideki ürünler',
+					'url' => $domain . ($product['category_link'] ?? ''),
+					'products' => $products,
+				],
+				'module_front_' . $this->name,
+				$smarty
+			);
+
+			$html = $tpl->fetch();
+
+			return $html !== '' ? $html : null;
+		}
 
 		if ($theme === 'shopmore') {
 			global $smarty, $domain;

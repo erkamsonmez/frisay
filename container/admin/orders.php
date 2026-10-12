@@ -79,10 +79,37 @@
 		'tracking_number' => Tools::getValue('tracking_number'),
 		'cargo_company' => Tools::getValue('cargo_company'),
 		'channel' => Tools::getValue('channel'),
+		'id_min' => Tools::getValue('id_min'),
+		'id_max' => Tools::getValue('id_max'),
+		'total_min' => Tools::getValue('total_min'),
+		'total_max' => Tools::getValue('total_max'),
 		'sort' => Tools::getValue('sort'),
+		'dir' => Tools::getValue('dir'),
 	]);
 	$perPage = 30;
 	$filterQuery = Order::buildAdminFilterQuery($status, $filters);
+	unset($filterQuery['sort'], $filterQuery['dir']);
+
+	$sortState = Pagination::adminColumnSort(
+		[
+			'id' => 'id_order',
+			'reference' => 'reference',
+			'date' => 'date_add',
+			'total' => 'total',
+		],
+		'date',
+		'desc',
+		Admin::url('orders'),
+		$filterQuery,
+		$filters['sort'],
+		$filters['dir']
+	);
+
+	$filters['sort'] = $sortState['sort'];
+	$filters['dir'] = $sortState['dir'];
+	$filters['order_by'] = $sortState['order_by'] . ($sortState['sort'] === 'id' ? '' : ', id_order ' . strtoupper($sortState['dir']));
+	$filterQuery = Order::buildAdminFilterQuery($status, $filters);
+
 	$total = Order::countAdmin($status, $filters['date_from'], $filters['date_to'], $filters);
 	$pagination = Pagination::build($total, $currentPage, $perPage, Admin::url('orders'), $filterQuery);
 	$orders = Order::enrichAdminRows(
@@ -102,12 +129,18 @@
 		}
 	}
 
+	$orderFiltersTpl = $filters;
+	$orderFiltersTpl['sort'] = $filters['sort'] . '_' . $filters['dir'];
+
 	$smarty->assign([
 		'orders' => $orders,
 		'ordersTotal' => $total,
 		'pagination' => $pagination,
 		'statusFilter' => $status,
-		'orderFilters' => $filters,
+		'orderFilters' => $orderFiltersTpl,
+		'sortLinks' => $sortState['links'],
+		'listSort' => $sortState['sort'],
+		'listDir' => $sortState['dir'],
 		'statusOptions' => Order::getStatusOptions(),
 		'paymentFilterOptions' => Order::getAdminPaymentFilterOptions(),
 		'cargoFilterOptions' => $cargoOptions,

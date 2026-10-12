@@ -57,7 +57,7 @@
 		'data' => [],
 		'marketplace_data' => [],
 		'colors' => [],
-		'marketplace_color' => '#F97316',
+		'marketplace_color' => '#F5A623',
 		'store_label' => 'Store sales',
 		'marketplace_label' => 'Marketplace sales',
 	];

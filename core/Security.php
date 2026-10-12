@@ -16,12 +16,27 @@ class Security
 	public static function validatePassword(string $password, bool $requireComplexity = true): ?string
 	{
 		$password = (string) $password;
+		$minLength = class_exists('SecuritySettings', false)
+			? SecuritySettings::getPasswordMinLength()
+			: 8;
 
-		if (strlen($password) < 8) {
-			return 'Şifre en az 8 karakter olmalı';
+		if (strlen($password) < $minLength) {
+			$msg = 'Şifre en az %d karakter olmalı';
+			if (function_exists('translate')) {
+				$msg = translate('Password must be at least %d characters');
+			}
+
+			return sprintf($msg, $minLength);
 		}
 
-		if ($requireComplexity && (!preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password))) {
+		$needComplexity = $requireComplexity
+			&& (!class_exists('SecuritySettings', false) || SecuritySettings::requirePasswordComplexity());
+
+		if ($needComplexity && (!preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password))) {
+			if (function_exists('translate')) {
+				return translate('Password must include at least one letter and one number');
+			}
+
 			return 'Şifre en az bir harf ve bir rakam içermeli';
 		}
 
@@ -159,9 +174,18 @@ class Security
 	private const HTML_ALLOW_ATTRS = [
 		'a' => ['href' => true, 'title' => true, 'target' => true, 'rel' => true, 'class' => true],
 		'img' => ['src' => true, 'alt' => true, 'width' => true, 'height' => true, 'title' => true, 'class' => true],
-		'td' => ['colspan' => true, 'rowspan' => true, 'class' => true],
-		'th' => ['colspan' => true, 'rowspan' => true, 'class' => true],
+		'td' => ['colspan' => true, 'rowspan' => true, 'class' => true, 'align' => true],
+		'th' => ['colspan' => true, 'rowspan' => true, 'class' => true, 'align' => true],
 		'blockquote' => ['cite' => true, 'class' => true],
+		'p' => ['class' => true, 'align' => true],
+		'div' => ['class' => true, 'align' => true],
+		'h1' => ['class' => true, 'align' => true],
+		'h2' => ['class' => true, 'align' => true],
+		'h3' => ['class' => true, 'align' => true],
+		'h4' => ['class' => true, 'align' => true],
+		'h5' => ['class' => true, 'align' => true],
+		'h6' => ['class' => true, 'align' => true],
+		'span' => ['class' => true],
 	];
 
 	/**
@@ -170,7 +194,7 @@ class Security
 	 */
 	public static function sanitizeHtml(string $html): string
 	{
-		$html = trim($html);
+		$html = trim(self::decodeOoxmlEscapes($html));
 
 		if ($html === '') {
 			return '';
@@ -184,7 +208,7 @@ class Security
 
 		$previous = libxml_use_internal_errors(true);
 		$dom = new DOMDocument();
-		$wrapped = '<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>'
+		$wrapped = '<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"></head><body>'
 			. '<div id="fshop-html-root">' . $html . '</div></body></html>';
 		$flags = 0;
 
@@ -192,7 +216,7 @@ class Security
 			$flags |= LIBXML_NONET;
 		}
 
-		$loaded = $dom->loadHTML($wrapped, $flags);
+		$loaded = @$dom->loadHTML('<?xml encoding="UTF-8">' . $wrapped, $flags);
 		libxml_clear_errors();
 		libxml_use_internal_errors($previous);
 
@@ -213,6 +237,7 @@ class Security
 		}
 
 		self::sanitizeDomChildren($root);
+		self::removeEmptyHtmlBlocks($root);
 
 		$out = '';
 
@@ -220,7 +245,125 @@ class Security
 			$out .= $dom->saveHTML($child);
 		}
 
-		return $out;
+		$out = self::htmlEntitiesToUtf8($out);
+		$out = preg_replace('/(?:\s*<p>(?:\s|&nbsp;|\x{00A0})*<\/p>)+\s*$/u', '', $out) ?? $out;
+
+		return trim($out);
+	}
+
+	/**
+	 * Excel / OOXML shared-string escapes: _x000D_ (CR), _x000A_ (LF), …
+	 */
+	public static function decodeOoxmlEscapes(string $value): string
+	{
+		if ($value === '' || strpos($value, '_x') === false) {
+			return $value;
+		}
+
+		$decoded = preg_replace_callback(
+			'/_x([0-9A-Fa-f]{2,4})_/',
+			static function (array $m): string {
+				$code = hexdec($m[1]);
+
+				if ($code <= 0) {
+					return '';
+				}
+
+				if ($code === 0x0D || $code === 0x0A) {
+					return "\n";
+				}
+
+				if ($code === 0x09) {
+					return "\t";
+				}
+
+				if (function_exists('mb_chr')) {
+					$ch = mb_chr($code, 'UTF-8');
+
+					return is_string($ch) ? $ch : '';
+				}
+
+				$ch = @html_entity_decode('&#' . $code . ';', ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+				return is_string($ch) ? $ch : '';
+			},
+			$value
+		);
+
+		$value = is_string($decoded) ? $decoded : $value;
+		$value = str_replace(["\r\n", "\r"], "\n", $value);
+		$value = preg_replace("/\n{3,}/", "\n\n", $value) ?? $value;
+
+		return $value;
+	}
+
+	/**
+	 * DOMDocument::saveHTML often emits &uuml; etc.; keep UTF-8 letters without opening markup entities.
+	 */
+	public static function htmlEntitiesToUtf8(string $html): string
+	{
+		if ($html === '' || strpos($html, '&') === false) {
+			return $html;
+		}
+
+		$converted = preg_replace_callback(
+			'/&(#(?:x[0-9a-fA-F]+|\d+)|[a-zA-Z][a-zA-Z0-9]+);/',
+			static function (array $m): string {
+				$entity = '&' . $m[1] . ';';
+				$decoded = html_entity_decode($entity, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+				if ($decoded === '' || $decoded === $entity) {
+					return $m[0];
+				}
+
+				if (strpbrk($decoded, "<>&\"'") !== false) {
+					return $m[0];
+				}
+
+				return $decoded;
+			},
+			$html
+		);
+
+		return is_string($converted) ? $converted : $html;
+	}
+
+	private static function removeEmptyHtmlBlocks(DOMElement $root): void
+	{
+		$xpath = new DOMXPath($root->ownerDocument);
+		$nodes = $xpath->query('.//p|.//div|.//span|.//h1|.//h2|.//h3|.//h4|.//h5|.//h6', $root);
+
+		if (!($nodes instanceof DOMNodeList)) {
+			return;
+		}
+
+		$remove = [];
+
+		foreach ($nodes as $node) {
+			if (!($node instanceof DOMElement) || $node->parentNode === null) {
+				continue;
+			}
+
+			$text = trim(preg_replace('/\x{00A0}|\x{200B}/u', ' ', $node->textContent ?? '') ?? '');
+
+			if ($text !== '') {
+				continue;
+			}
+
+			if ($node->getElementsByTagName('img')->length > 0
+				|| $node->getElementsByTagName('br')->length > 0
+				|| $node->getElementsByTagName('hr')->length > 0) {
+				continue;
+			}
+
+			$remove[] = $node;
+		}
+
+		foreach ($remove as $node) {
+			if ($node->parentNode) {
+				$node->parentNode->removeChild($node);
+			}
+		}
 	}
 
 	private static function sanitizeDomChildren(DOMNode $parent): void
@@ -298,6 +441,16 @@ class Security
 
 				if ($name === 'target' && $attr->value !== '_blank' && $attr->value !== '_self') {
 					$remove[] = $attr->name;
+					continue;
+				}
+
+				if ($name === 'align') {
+					$align = strtolower(trim($attr->value));
+
+					if (!in_array($align, ['left', 'right', 'center', 'justify'], true)) {
+						$remove[] = $attr->name;
+					}
+
 					continue;
 				}
 
@@ -538,7 +691,7 @@ class Security
 			return true;
 		}
 
-		if (preg_match('#/api/webapi\.php$#', $script)) {
+		if (preg_match('#/api/webapi\.php$#', $script) || preg_match('#/api/psws\.php$#', $script)) {
 			return true;
 		}
 
@@ -659,5 +812,61 @@ class Security
 		}
 
 		self::requireCsrf($scope);
+	}
+
+	public static function isUnsafeZipPath(string $entry): bool
+	{
+		$entry = str_replace('\\', '/', $entry);
+
+		if ($entry === '' || strpos($entry, "\0") !== false || strpos($entry, ':') !== false) {
+			return true;
+		}
+
+		if ($entry[0] === '/' || strpos($entry, '//') === 0 || preg_match('#^[a-zA-Z]:#', $entry)) {
+			return true;
+		}
+
+		if (strpos($entry, '../') !== false || $entry === '..' || substr($entry, -3) === '/..') {
+			return true;
+		}
+
+		$parts = explode('/', $entry);
+		$last = count($parts) - 1;
+
+		foreach ($parts as $i => $part) {
+			if ($part === '.' || $part === '..') {
+				return true;
+			}
+
+			if ($part === '' && $i !== $last) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	public static function isZipEntrySymlink($zip, int $index): bool
+	{
+		if (!class_exists('ZipArchive') || !($zip instanceof ZipArchive) || !method_exists($zip, 'getExternalAttributesIndex')) {
+			return false;
+		}
+
+		$opsys = 0;
+		$attr = 0;
+
+		if (!$zip->getExternalAttributesIndex($index, $opsys, $attr)) {
+			return false;
+		}
+
+		$unix = defined('ZipArchive::OPSYS_UNIX') ? ZipArchive::OPSYS_UNIX : 3;
+
+		if ((int) $opsys !== (int) $unix) {
+			return false;
+		}
+
+		$mode = ($attr >> 16) & 0xFFFF;
+
+		return ($mode & 0170000) === 0120000;
 	}
 }

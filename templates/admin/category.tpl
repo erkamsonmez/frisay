@@ -19,7 +19,7 @@
 </div>
 
 <div class="admin-panel">
-	<form method="post">
+	<form method="post" enctype="multipart/form-data">
 		<input type="hidden" name="saveCategory" value="1">
 		<input type="hidden" name="token" value="{$adminToken}">
 
@@ -80,6 +80,20 @@
 				<label class="form-label" for="catHomePos">{'Homepage order'|adminT}</label>
 				<input type="number" class="form-control" name="home_position" id="catHomePos" min="0" step="1" value="{$category.home_position|default:0|escape}">
 				<div class="form-text">{'Lower numbers appear first on the homepage category blocks.'|adminT}</div>
+			</div>
+			<div class="col-md-6">
+				<label class="form-label" for="catImage">{'Category image'|adminT}</label>
+				{if $category.image_url|default:''}
+				<div class="d-flex align-items-center gap-3 mb-2">
+					<img src="{$category.image_url|escape}" alt="" width="64" height="64" class="rounded border" style="object-fit:cover;">
+					<div class="form-check mb-0">
+						<input class="form-check-input" type="checkbox" name="delete_category_image" value="1" id="catImageDelete">
+						<label class="form-check-label" for="catImageDelete">{'Remove image'|adminT}</label>
+					</div>
+				</div>
+				{/if}
+				<input type="file" class="form-control" name="category_image" id="catImage" accept="image/png,image/jpeg,image/webp,image/gif">
+				<div class="form-text">{'PNG, JPG, WEBP or GIF. Shown on the homepage category circles. Max 2 MB.'|adminT}</div>
 			</div>
 		</div>
 

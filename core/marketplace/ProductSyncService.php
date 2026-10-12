@@ -59,6 +59,28 @@ class ProductSyncService
 			}
 		}
 
+		$items = \DB::execute("SHOW TABLES LIKE 'trendyol_product_items'");
+
+		if (empty($items)) {
+			\DB::execute(
+				"CREATE TABLE `trendyol_product_items` (
+					`id` int(11) NOT NULL AUTO_INCREMENT,
+					`id_product` int(11) NOT NULL,
+					`id_variation` int(11) NOT NULL DEFAULT 0,
+					`barcode` varchar(64) NOT NULL DEFAULT '',
+					`stock_code` varchar(100) NOT NULL DEFAULT '',
+					`sale_price` decimal(20,2) NOT NULL DEFAULT 0.00,
+					`list_price` decimal(20,2) NOT NULL DEFAULT 0.00,
+					`quantity` int(11) NOT NULL DEFAULT 0,
+					`date_upd` datetime NOT NULL,
+					PRIMARY KEY (`id`),
+					UNIQUE KEY `product_variation` (`id_product`, `id_variation`),
+					KEY `barcode` (`barcode`),
+					KEY `id_product` (`id_product`)
+				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+			);
+		}
+
 		\MarketplaceTables::ensureSchema();
 	}
 
@@ -110,16 +132,17 @@ class ProductSyncService
 
 		$existing = self::findMapping($idProduct) ?: [];
 		$meta = self::mergeMeta($product, $existing, $meta);
-		$build = self::buildPayload($product, $meta);
+		$build = self::buildCreateItems($product, $meta);
 
 		if (!$build['ok']) {
 			return ['ok' => false, 'message' => $build['message']];
 		}
 
-		$payload = ['items' => [$build['payload']]];
+		$payload = ['items' => $build['items']];
 		$api = self::api();
 		$isUpdate = trim((string) ($existing['content_id'] ?? '')) !== ''
 			|| trim((string) ($existing['last_status'] ?? '')) === 'synced';
+		$firstItem = $build['items'][0];
 
 		if ($isUpdate) {
 			$result = $api->updateProduct($payload);
@@ -131,13 +154,13 @@ class ProductSyncService
 
 		if (self::isApiError($result)) {
 			self::saveMapping($idProduct, [
-				'barcode' => (string) ($build['payload']['barcode'] ?? ''),
+				'barcode' => (string) ($firstItem['barcode'] ?? ''),
 				'brand_id' => (int) ($meta['brand_id'] ?? 0),
 				'category_id' => (int) ($meta['category_id'] ?? 0),
 				'attributes_json' => json_encode($meta['attributes'] ?? [], JSON_UNESCAPED_UNICODE),
-				'sale_price' => (float) ($build['payload']['salePrice'] ?? 0),
-				'list_price' => (float) ($build['payload']['listPrice'] ?? 0),
-				'quantity' => (int) ($build['payload']['quantity'] ?? 0),
+				'sale_price' => (float) ($firstItem['salePrice'] ?? 0),
+				'list_price' => (float) ($firstItem['listPrice'] ?? 0),
+				'quantity' => (int) ($firstItem['quantity'] ?? 0),
 				'last_status' => 'failed',
 				'last_error' => (string) ($result['message'] ?? 'Trendyol API hatası'),
 				'last_sync_at' => $now,
@@ -152,13 +175,15 @@ class ProductSyncService
 
 		$batchId = (string) ($result['batchRequestId'] ?? '');
 		$mappingFields = [
-			'barcode' => (string) ($build['payload']['barcode'] ?? ''),
+			'barcode' => (string) ($firstItem['barcode'] ?? ''),
 			'brand_id' => (int) ($meta['brand_id'] ?? 0),
 			'category_id' => (int) ($meta['category_id'] ?? 0),
 			'attributes_json' => json_encode($meta['attributes'] ?? [], JSON_UNESCAPED_UNICODE),
-			'sale_price' => (float) ($build['payload']['salePrice'] ?? 0),
-			'list_price' => (float) ($build['payload']['listPrice'] ?? 0),
-			'quantity' => (int) ($build['payload']['quantity'] ?? 0),
+			'sale_price' => (float) ($firstItem['salePrice'] ?? 0),
+			'list_price' => (float) ($firstItem['listPrice'] ?? 0),
+			'quantity' => (int) array_sum(array_map(static function ($it) {
+				return (int) ($it['quantity'] ?? 0);
+			}, $build['items'])),
 			'batch_request_id' => $batchId,
 			'last_status' => 'synced',
 			'last_error' => '',
@@ -166,10 +191,13 @@ class ProductSyncService
 		];
 
 		self::saveMapping($idProduct, $mappingFields);
+		self::saveItemMappings($idProduct, $build['items'], $build['units'] ?? []);
 		self::refreshFromTrendyol($idProduct);
+		$variantNote = count($build['items']) > 1 ? (' · ' . count($build['items']) . ' varyasyon') : '';
+
 		return [
 			'ok' => true,
-			'message' => $isUpdate ? 'Ürün Trendyol\'da güncellendi' : 'Ürün Trendyol\'a aktarıldı',
+			'message' => ($isUpdate ? 'Ürün Trendyol\'da güncellendi' : 'Ürün Trendyol\'a aktarıldı') . $variantNote,
 			'mapping' => self::findMapping($idProduct),
 			'data' => $result,
 		];
@@ -401,6 +429,7 @@ class ProductSyncService
 			return ['ok' => false, 'message' => 'Trendyol bağlantısı bulunamadı'];
 		}
 
+		\DB::execute('DELETE FROM trendyol_product_items WHERE id_product = ?', [$idProduct]);
 		\DB::execute('DELETE FROM trendyol_products WHERE id_product = ?', [$idProduct]);
 
 		return [
@@ -464,8 +493,9 @@ class ProductSyncService
 		$sku = trim((string) ($product['stock_code'] ?? ''));
 		$oldMapQty = (float) ($mapping['quantity'] ?? 0);
 		$oldSale = (float) ($mapping['sale_price'] ?? 0);
+		$inventoryItems = self::buildInventoryItems($idProduct, $product, $salePrice, $listPrice, $barcode, $sku, $stock);
 
-		$result = self::api()->updateStockPrice($barcode, $listPrice, $salePrice, $stock, $sku !== '' ? $sku : null);
+		$result = self::api()->updateStockPriceItems($inventoryItems);
 		$now = date('Y-m-d H:i:s');
 
 		if (self::isApiError($result)) {
@@ -497,6 +527,7 @@ class ProductSyncService
 			'last_error' => '',
 			'last_sync_at' => $now,
 		]);
+		self::saveInventoryItemMappings($idProduct, $inventoryItems);
 
 		$ref = $sku !== '' ? $sku : $barcode;
 
@@ -646,7 +677,7 @@ class ProductSyncService
 	 * @param array<string, mixed> $product
 	 * @param array<string, mixed> $existing
 	 * @param array<string, mixed> $meta
-	 * @return array{brand_id: int, category_id: int, attributes: array<string, mixed>, sale_price: ?float, list_price: ?float}
+	 * @return array{brand_id: int, category_id: int, attributes: array<string, mixed>, sale_price: ?float, list_price: ?float, variants: array<int, array<string, mixed>>}
 	 */
 	private static function mergeMeta(array $product, array $existing, array $meta): array
 	{
@@ -684,12 +715,19 @@ class ProductSyncService
 			$listPrice = (float) $existing['list_price'];
 		}
 
+		$variants = $meta['variants'] ?? [];
+
+		if (!is_array($variants)) {
+			$variants = [];
+		}
+
 		return [
 			'brand_id' => $brandId,
 			'category_id' => $categoryId,
 			'attributes' => $attributes,
 			'sale_price' => $salePrice,
 			'list_price' => $listPrice,
+			'variants' => $variants,
 		];
 	}
 
@@ -762,9 +800,18 @@ class ProductSyncService
 
 		$desi = max(1, (int) ($product['desi'] ?? 1));
 		$cargoDay = (int) ($product['cargo_day'] ?? 0);
-		$deliveryDuration = $cargoDay > 0 ? min(3, max(1, $cargoDay)) : 1;
+		$deliveryDuration = $cargoDay <= 0 ? 0 : ($cargoDay === 1 ? 1 : min(3, $cargoDay));
 
-		$attributes = self::api()->convertAttributes($meta['attributes'] ?? []);
+		$api = self::api();
+		$attrMap = $meta['attributes'] ?? [];
+
+		if (!is_array($attrMap)) {
+			$attrMap = [];
+		}
+
+		$attrMap = self::ensureOriginAttribute($attrMap, (int) $meta['category_id']);
+		$origin = self::originCodeFromAttributes($attrMap, (int) $meta['category_id'], (string) ($meta['origin'] ?? ''));
+		$attributes = $api->convertAttributes($attrMap);
 
 		if ($attributes === []) {
 			return ['ok' => false, 'message' => 'Trendyol kategori özellikleri (attributes) gerekli'];
@@ -773,6 +820,7 @@ class ProductSyncService
 		$description = self::buildDescription($product);
 		$payload = [
 			'barcode' => mb_substr($barcode, 0, 40),
+			'origin' => $origin,
 			'title' => mb_substr($title, 0, 100),
 			'productMainId' => mb_substr('PM-' . $idProduct, 0, 40),
 			'brandId' => (int) $meta['brand_id'],
@@ -793,6 +841,864 @@ class ProductSyncService
 		];
 
 		return ['ok' => true, 'message' => 'OK', 'payload' => $payload];
+	}
+
+	/**
+	 * @param array<string, mixed> $product
+	 * @param array<string, mixed> $meta
+	 * @return array{ok: bool, message: string, items?: array<int, array<string, mixed>>, units?: array<int, array<string, mixed>>}
+	 */
+	public static function buildCreateItems(array $product, array $meta): array
+	{
+		$idProduct = (int) ($product['id_product'] ?? 0);
+		$title = trim((string) ($product['product_name'] ?? ''));
+
+		if ($idProduct <= 0) {
+			return ['ok' => false, 'message' => 'Geçersiz ürün'];
+		}
+
+		if ($title === '') {
+			return ['ok' => false, 'message' => 'Ürün adı boş olamaz'];
+		}
+
+		if ((int) ($meta['brand_id'] ?? 0) <= 0) {
+			return ['ok' => false, 'message' => 'Trendyol marka ID gerekli (ürün panelinden seçin)'];
+		}
+
+		if ((int) ($meta['category_id'] ?? 0) <= 0) {
+			return ['ok' => false, 'message' => 'Trendyol kategori ID gerekli (ürün panelinden seçin)'];
+		}
+
+		$images = self::buildImages($product);
+
+		if ($images === []) {
+			return ['ok' => false, 'message' => 'En az bir herkese açık ürün görseli gerekli (localhost URL kabul edilmez)'];
+		}
+
+		$baseSale = isset($meta['sale_price']) && $meta['sale_price'] !== null && (float) $meta['sale_price'] > 0
+			? (float) $meta['sale_price']
+			: 0.0;
+		$baseList = isset($meta['list_price']) && $meta['list_price'] !== null && (float) $meta['list_price'] > 0
+			? (float) $meta['list_price']
+			: 0.0;
+
+		if ($baseSale <= 0) {
+			return ['ok' => false, 'message' => 'Trendyol satış fiyatı girilmeli (mağaza fiyatı otomatik kullanılmaz)'];
+		}
+
+		$vat = (int) round((float) ($product['vat'] ?? 20));
+
+		if (!in_array($vat, [0, 1, 10, 20], true)) {
+			$vat = 20;
+		}
+
+		$desi = max(1, (int) ($product['desi'] ?? 1));
+		$cargoDay = (int) ($product['cargo_day'] ?? 0);
+		$deliveryDuration = $cargoDay <= 0 ? 0 : ($cargoDay === 1 ? 1 : min(3, $cargoDay));
+		$api = self::api();
+		$attrMap = is_array($meta['attributes'] ?? null) ? $meta['attributes'] : [];
+		$attrMap = self::ensureOriginAttribute($attrMap, (int) $meta['category_id']);
+		$origin = self::originCodeFromAttributes($attrMap, (int) $meta['category_id'], (string) ($meta['origin'] ?? ''));
+		$baseAttributes = $api->convertAttributes($attrMap);
+
+		if ($baseAttributes === []) {
+			return ['ok' => false, 'message' => 'Trendyol kategori özellikleri (attributes) gerekli'];
+		}
+
+		$attrResult = $api->getAttirupes((int) $meta['category_id']);
+		$categoryAttrs = [];
+
+		if (is_array($attrResult) && !self::isApiError($attrResult)) {
+			$categoryAttrs = $attrResult['categoryAttributes'] ?? [];
+		}
+
+		if (!is_array($categoryAttrs)) {
+			$categoryAttrs = [];
+		}
+
+		$description = self::buildDescription($product);
+		$productMainId = trim((string) ($product['stock_code'] ?? ''));
+
+		if ($productMainId === '') {
+			$productMainId = 'PM-' . $idProduct;
+		}
+
+		$ctx = [
+			'title' => $title,
+			'product_main_id' => mb_substr($productMainId, 0, 40),
+			'brand_id' => (int) $meta['brand_id'],
+			'category_id' => (int) $meta['category_id'],
+			'origin' => $origin,
+			'description' => $description,
+			'dimensional_weight' => $desi,
+			'vat' => $vat,
+			'delivery_duration' => $deliveryDuration,
+			'images' => $images,
+			'base_attributes' => $baseAttributes,
+			'category_attrs' => $categoryAttrs,
+		];
+		$variantMeta = [];
+
+		foreach ($meta['variants'] ?? [] as $row) {
+			if (!is_array($row)) {
+				continue;
+			}
+
+			$vid = (int) ($row['id_variation'] ?? $row['id'] ?? 0);
+
+			if ($vid > 0) {
+				$variantMeta[$vid] = $row;
+			}
+		}
+
+		$variations = class_exists('ProductVariation')
+			? \ProductVariation::getByProduct($idProduct, true)
+			: [];
+		$units = [];
+
+		if ($variations !== []) {
+			foreach ($variations as $variation) {
+				$vid = (int) ($variation['id_variation'] ?? 0);
+				$extra = $variantMeta[$vid] ?? [];
+				$sale = isset($extra['sale_price']) && (float) $extra['sale_price'] > 0
+					? (float) $extra['sale_price']
+					: (\ProductVariation::getEffectivePrice($variation, $baseSale) ?: $baseSale);
+				$list = isset($extra['list_price']) && (float) $extra['list_price'] > 0
+					? (float) $extra['list_price']
+					: $baseList;
+				$stock = isset($extra['stock']) && $extra['stock'] !== '' && $extra['stock'] !== null
+					? (int) $extra['stock']
+					: (int) ($variation['stock'] ?? 0);
+				$units[] = [
+					'id_variation' => $vid,
+					'barcode' => trim((string) ($variation['barcode'] ?? '')),
+					'stock_code' => trim((string) ($variation['sku'] ?? '')),
+					'stock' => max(0, $stock),
+					'sale_price' => $sale,
+					'list_price' => $list,
+					'options' => is_array($variation['options'] ?? null) ? $variation['options'] : [],
+					'label' => \ProductVariation::formatLabel($variation),
+				];
+			}
+		} else {
+			$barcode = trim((string) ($product['barcode'] ?? ''));
+
+			if ($barcode === '') {
+				$barcode = 'FS' . $idProduct;
+			}
+
+			$stockCode = trim((string) ($product['stock_code'] ?? ''));
+
+			if ($stockCode === '') {
+				$stockCode = 'SKU-' . $idProduct;
+			}
+
+			$units[] = [
+				'id_variation' => 0,
+				'barcode' => $barcode,
+				'stock_code' => $stockCode,
+				'stock' => max(0, \Product::getStock($product)),
+				'sale_price' => $baseSale,
+				'list_price' => $baseList,
+				'options' => [],
+				'label' => '',
+			];
+		}
+
+		$items = [];
+		$errors = [];
+
+		foreach ($units as $i => $unit) {
+			$built = self::buildCreateItem($unit, $ctx);
+
+			if (empty($built['ok'])) {
+				$label = $unit['label'] !== '' ? $unit['label'] : ('#' . ($i + 1));
+				$errors[] = $label . ': ' . ($built['message'] ?? 'geçersiz');
+				continue;
+			}
+
+			$items[] = $built['item'];
+			$units[$i]['barcode'] = (string) ($built['item']['barcode'] ?? $unit['barcode']);
+			$units[$i]['stock_code'] = (string) ($built['item']['stockCode'] ?? $unit['stock_code']);
+		}
+
+		if ($items === []) {
+			$msg = $errors !== []
+				? ('Gönderilecek geçerli varyasyon yok. ' . implode(' · ', $errors))
+				: 'Gönderilecek ürün/varyasyon yok.';
+
+			return ['ok' => false, 'message' => $msg];
+		}
+
+		return ['ok' => true, 'message' => 'OK', 'items' => $items, 'units' => $units];
+	}
+
+	/**
+	 * @param array<string, mixed> $unit
+	 * @param array<string, mixed> $ctx
+	 * @return array{ok: bool, message?: string, item?: array<string, mixed>}
+	 */
+	private static function buildCreateItem(array $unit, array $ctx): array
+	{
+		$idVariation = (int) ($unit['id_variation'] ?? 0);
+		$barcode = preg_replace('/\s+/', '', trim((string) ($unit['barcode'] ?? ''))) ?: '';
+
+		if ($barcode === '') {
+			$barcode = $idVariation > 0
+				? ('FSV' . $idVariation)
+				: ('FS' . (string) ($ctx['product_main_id'] ?? ''));
+		}
+
+		$stockCode = trim((string) ($unit['stock_code'] ?? ''));
+
+		if ($stockCode === '') {
+			$stockCode = $barcode;
+		}
+
+		$salePrice = (float) ($unit['sale_price'] ?? 0);
+		$listPrice = (float) ($unit['list_price'] ?? 0);
+
+		if ($salePrice <= 0) {
+			return ['ok' => false, 'message' => 'satış fiyatı girilmeli'];
+		}
+
+		if ($listPrice <= $salePrice) {
+			$listPrice = $salePrice;
+		}
+
+		$attributes = $ctx['base_attributes'];
+		$options = is_array($unit['options'] ?? null) ? $unit['options'] : [];
+
+		if ($options !== []) {
+			$attributes = self::mergeVariationAttributes(
+				$attributes,
+				is_array($ctx['category_attrs'] ?? null) ? $ctx['category_attrs'] : [],
+				$options
+			);
+		}
+
+		return [
+			'ok' => true,
+			'item' => [
+				'barcode' => mb_substr($barcode, 0, 40),
+				'origin' => (string) $ctx['origin'],
+				'title' => mb_substr((string) $ctx['title'], 0, 100),
+				'productMainId' => mb_substr((string) $ctx['product_main_id'], 0, 40),
+				'brandId' => (int) $ctx['brand_id'],
+				'categoryId' => (int) $ctx['category_id'],
+				'quantity' => max(0, (int) ($unit['stock'] ?? 0)),
+				'stockCode' => mb_substr($stockCode, 0, 100),
+				'dimensionalWeight' => (int) $ctx['dimensional_weight'],
+				'description' => (string) $ctx['description'],
+				'currencyType' => 'TRY',
+				'listPrice' => round($listPrice, 2),
+				'salePrice' => round($salePrice, 2),
+				'vatRate' => (int) $ctx['vat'],
+				'images' => $ctx['images'],
+				'attributes' => $attributes,
+				'deliveryOption' => [
+					'deliveryDuration' => (int) $ctx['delivery_duration'],
+				],
+			],
+		];
+	}
+
+	/**
+	 * Menşei (ör. attributeId 1192) zorunlu kategori özelliğidir; item.origin ISO kodu yetmez.
+	 *
+	 * @param array<int|string, mixed> $attrMap
+	 * @return array<int|string, mixed>
+	 */
+	private static function ensureOriginAttribute(array $attrMap, int $categoryId): array
+	{
+		if ($categoryId <= 0) {
+			return $attrMap;
+		}
+
+		$api = self::api();
+		$originIds = $api->originAttributeIds($categoryId);
+
+		if ($originIds === []) {
+			$originIds = [1192];
+		}
+
+		foreach ($originIds as $oid) {
+			$oid = (int) $oid;
+
+			if ($oid < 1) {
+				continue;
+			}
+
+			$raw = $attrMap[$oid] ?? ($attrMap[(string) $oid] ?? null);
+			$values = $api->getAttributeValues($categoryId, $oid);
+			$pickId = 0;
+
+			if ($raw !== null && $raw !== '' && is_numeric($raw) && (int) $raw > 0) {
+				$pickId = (int) $raw;
+			} elseif ($raw !== null && $raw !== '') {
+				$pickId = self::matchOriginValueIdByName($values, (string) $raw);
+			}
+
+			if ($pickId < 1) {
+				$pickId = TrendyolApi::pickDefaultOriginValueId($values);
+			}
+
+			if ($pickId > 0) {
+				$attrMap[$oid] = $pickId;
+			}
+		}
+
+		return $attrMap;
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $values
+	 */
+	private static function matchOriginValueIdByName(array $values, string $name): int
+	{
+		$want = mb_strtolower(trim($name));
+
+		if ($want === '') {
+			return 0;
+		}
+
+		foreach ($values as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+
+			$id = (int) ($item['id'] ?? $item['attributeValueId'] ?? 0);
+			$label = mb_strtolower(trim((string) ($item['name'] ?? $item['attributeValue'] ?? '')));
+
+			if ($id > 0 && ($label === $want || TrendyolApi::resolveOriginCode($label) === TrendyolApi::resolveOriginCode($want))) {
+				return $id;
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * @param array<int|string, mixed> $attrMap
+	 */
+	private static function originCodeFromAttributes(array $attrMap, int $categoryId, string $fallback = ''): string
+	{
+		if ($fallback !== '') {
+			$code = TrendyolApi::resolveOriginCode($fallback);
+
+			if ($code !== '') {
+				return $code;
+			}
+		}
+
+		$api = self::api();
+		$originIds = $api->originAttributeIds($categoryId);
+
+		if ($originIds === []) {
+			$originIds = [1192];
+		}
+
+		foreach ($originIds as $oid) {
+			$oid = (int) $oid;
+			$raw = $attrMap[$oid] ?? ($attrMap[(string) $oid] ?? null);
+
+			if ($raw === null || $raw === '') {
+				continue;
+			}
+
+			if (!is_numeric($raw)) {
+				return TrendyolApi::resolveOriginCode((string) $raw);
+			}
+
+			$want = (int) $raw;
+			$values = $api->getAttributeValues($categoryId, $oid);
+
+			foreach ($values as $item) {
+				if (!is_array($item)) {
+					continue;
+				}
+
+				$id = (int) ($item['id'] ?? $item['attributeValueId'] ?? 0);
+
+				if ($id === $want) {
+					return TrendyolApi::resolveOriginCode((string) ($item['name'] ?? $item['attributeValue'] ?? 'TR'));
+				}
+			}
+		}
+
+		return 'TR';
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $baseAttributes
+	 * @param array<int, array<string, mixed>> $categoryAttrs
+	 * @param array<string, string> $options
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function mergeVariationAttributes(array $baseAttributes, array $categoryAttrs, array $options): array
+	{
+		$out = $baseAttributes;
+
+		foreach ($options as $name => $value) {
+			$value = trim((string) $value);
+			$name = trim((string) $name);
+
+			if ($name === '' || $value === '') {
+				continue;
+			}
+
+			$target = self::findVariantCategoryAttribute($categoryAttrs, $name);
+
+			if ($target === null) {
+				continue;
+			}
+
+			$attrId = (int) (($target['attribute']['id'] ?? $target['id'] ?? 0));
+
+			if ($attrId < 1) {
+				continue;
+			}
+
+			$payload = ['attributeId' => $attrId];
+			$matchedValueId = self::matchAttributeValueId($target, $value);
+
+			if ($matchedValueId > 0) {
+				$payload['attributeValueId'] = $matchedValueId;
+			} else {
+				$payload['customAttributeValue'] = mb_substr($value, 0, 50);
+			}
+
+			$filtered = [];
+
+			foreach ($out as $row) {
+				if (!is_array($row) || (int) ($row['attributeId'] ?? 0) === $attrId) {
+					continue;
+				}
+
+				$filtered[] = $row;
+			}
+
+			$filtered[] = $payload;
+			$out = $filtered;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $categoryAttrs
+	 * @return array<string, mixed>|null
+	 */
+	private static function findVariantCategoryAttribute(array $categoryAttrs, string $axis): ?array
+	{
+		$axisNorm = self::normalizeAttrName($axis);
+		$varianters = [];
+
+		foreach ($categoryAttrs as $attr) {
+			if (!is_array($attr)) {
+				continue;
+			}
+
+			$nameNorm = self::normalizeAttrName((string) (($attr['attribute']['name'] ?? $attr['name'] ?? '') ?: ''));
+
+			if ($axisNorm !== '' && $nameNorm === $axisNorm) {
+				return $attr;
+			}
+
+			if (!empty($attr['varianter'])) {
+				$varianters[] = $attr;
+			}
+		}
+
+		if ($varianters !== [] && $axisNorm !== '') {
+			foreach ($varianters as $attr) {
+				$nameNorm = self::normalizeAttrName((string) (($attr['attribute']['name'] ?? $attr['name'] ?? '') ?: ''));
+
+				if ($nameNorm !== '' && (strpos($nameNorm, $axisNorm) !== false || strpos($axisNorm, $nameNorm) !== false)) {
+					return $attr;
+				}
+			}
+
+			return $varianters[0];
+		}
+
+		foreach (['beden', 'size', 'renk', 'color', 'colour', 'numara', 'boyut'] as $fb) {
+			foreach ($categoryAttrs as $attr) {
+				if (!is_array($attr)) {
+					continue;
+				}
+
+				$nameNorm = self::normalizeAttrName((string) (($attr['attribute']['name'] ?? $attr['name'] ?? '') ?: ''));
+
+				if ($nameNorm === $fb) {
+					return $attr;
+				}
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array<string, mixed> $attr
+	 */
+	private static function matchAttributeValueId(array $attr, string $variantValue): int
+	{
+		$want = self::normalizeAttrName($variantValue);
+		$values = [];
+
+		if (isset($attr['attributeValues']) && is_array($attr['attributeValues'])) {
+			$values = $attr['attributeValues'];
+		} elseif (isset($attr['values']) && is_array($attr['values'])) {
+			$values = $attr['values'];
+		}
+
+		foreach ($values as $v) {
+			if (!is_array($v)) {
+				continue;
+			}
+
+			$name = self::normalizeAttrName((string) ($v['name'] ?? ($v['attributeValue'] ?? ($v['attributeValueName'] ?? ''))));
+
+			if ($name !== '' && $name === $want) {
+				return (int) ($v['id'] ?? ($v['attributeValueId'] ?? 0));
+			}
+		}
+
+		foreach ($values as $v) {
+			if (!is_array($v)) {
+				continue;
+			}
+
+			$name = self::normalizeAttrName((string) ($v['name'] ?? ($v['attributeValue'] ?? '')));
+
+			if ($name === '' || $want === '' || (strpos($name, $want) !== 0 && strpos($want, $name) !== 0)) {
+				continue;
+			}
+
+			return (int) ($v['id'] ?? ($v['attributeValueId'] ?? 0));
+		}
+
+		return 0;
+	}
+
+	private static function normalizeAttrName(string $s): string
+	{
+		$s = mb_strtolower(trim($s), 'UTF-8');
+		$s = strtr($s, [
+			'ı' => 'i', 'İ' => 'i', 'ş' => 's', 'Ş' => 's', 'ğ' => 'g', 'Ğ' => 'g',
+			'ü' => 'u', 'Ü' => 'u', 'ö' => 'o', 'Ö' => 'o', 'ç' => 'c', 'Ç' => 'c',
+		]);
+		$s = preg_replace('/\s+/', ' ', $s) ?? $s;
+
+		return $s;
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $items
+	 * @param array<int, array<string, mixed>> $units
+	 */
+	private static function saveItemMappings(int $idProduct, array $items, array $units): void
+	{
+		self::ensureSchema();
+		$now = date('Y-m-d H:i:s');
+
+		foreach ($units as $i => $unit) {
+			if (!is_array($unit)) {
+				continue;
+			}
+
+			$item = $items[$i] ?? [];
+			$barcode = (string) ($item['barcode'] ?? ($unit['barcode'] ?? ''));
+
+			if ($barcode === '') {
+				continue;
+			}
+
+			self::upsertItemMapping($idProduct, (int) ($unit['id_variation'] ?? 0), [
+				'barcode' => $barcode,
+				'stock_code' => (string) ($item['stockCode'] ?? ($unit['stock_code'] ?? '')),
+				'sale_price' => (float) ($item['salePrice'] ?? ($unit['sale_price'] ?? 0)),
+				'list_price' => (float) ($item['listPrice'] ?? ($unit['list_price'] ?? 0)),
+				'quantity' => (int) ($item['quantity'] ?? ($unit['stock'] ?? 0)),
+				'date_upd' => $now,
+			]);
+		}
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $inventoryItems
+	 */
+	private static function saveInventoryItemMappings(int $idProduct, array $inventoryItems): void
+	{
+		self::ensureSchema();
+		$now = date('Y-m-d H:i:s');
+
+		foreach ($inventoryItems as $item) {
+			if (!is_array($item)) {
+				continue;
+			}
+
+			$barcode = trim((string) ($item['barcode'] ?? ''));
+
+			if ($barcode === '') {
+				continue;
+			}
+
+			$idVariation = (int) ($item['id_variation'] ?? 0);
+
+			if ($idVariation <= 0 && class_exists('ProductVariation')) {
+				$variation = \ProductVariation::findUniqueByBarcode($barcode);
+				$idVariation = $variation ? (int) $variation['id_variation'] : 0;
+			}
+
+			self::upsertItemMapping($idProduct, $idVariation, [
+				'barcode' => $barcode,
+				'stock_code' => (string) ($item['stockCode'] ?? ''),
+				'sale_price' => (float) ($item['salePrice'] ?? 0),
+				'list_price' => (float) ($item['listPrice'] ?? 0),
+				'quantity' => (int) ($item['quantity'] ?? 0),
+				'date_upd' => $now,
+			]);
+		}
+	}
+
+	/** @param array<string, mixed> $fields */
+	private static function upsertItemMapping(int $idProduct, int $idVariation, array $fields): void
+	{
+		$existing = \DB::getRowSafe(
+			'trendyol_product_items',
+			'id_product = ? AND id_variation = ?',
+			[$idProduct, $idVariation]
+		);
+		$row = [
+			'barcode' => mb_substr((string) ($fields['barcode'] ?? ''), 0, 64),
+			'stock_code' => mb_substr((string) ($fields['stock_code'] ?? ''), 0, 100),
+			'sale_price' => (float) ($fields['sale_price'] ?? 0),
+			'list_price' => (float) ($fields['list_price'] ?? 0),
+			'quantity' => (int) ($fields['quantity'] ?? 0),
+			'date_upd' => (string) ($fields['date_upd'] ?? date('Y-m-d H:i:s')),
+		];
+
+		if ($existing) {
+			\DB::update(
+				'trendyol_product_items',
+				$row,
+				'id_product = :where_pid AND id_variation = :where_vid',
+				['where_pid' => $idProduct, 'where_vid' => $idVariation]
+			);
+		} else {
+			$row['id_product'] = $idProduct;
+			$row['id_variation'] = $idVariation;
+			\DB::insert('trendyol_product_items', $row);
+		}
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function buildInventoryItems(
+		int $idProduct,
+		array $product,
+		float $salePrice,
+		float $listPrice,
+		string $fallbackBarcode,
+		string $fallbackSku,
+		int $fallbackStock
+	): array {
+		$variations = class_exists('ProductVariation')
+			? \ProductVariation::getByProduct($idProduct, true)
+			: [];
+
+		if ($variations === []) {
+			$item = [
+				'barcode' => $fallbackBarcode,
+				'quantity' => $fallbackStock,
+				'salePrice' => $salePrice,
+				'listPrice' => $listPrice,
+			];
+
+			if ($fallbackSku !== '') {
+				$item['stockCode'] = $fallbackSku;
+			}
+
+			return [$item];
+		}
+
+		$saved = \DB::execute(
+			'SELECT * FROM trendyol_product_items WHERE id_product = ?',
+			[$idProduct]
+		) ?: [];
+		$byVar = [];
+
+		foreach ($saved as $row) {
+			$byVar[(int) ($row['id_variation'] ?? 0)] = $row;
+		}
+
+		$items = [];
+
+		foreach ($variations as $variation) {
+			$vid = (int) ($variation['id_variation'] ?? 0);
+			$map = $byVar[$vid] ?? [];
+			$barcode = trim((string) ($map['barcode'] ?? ($variation['barcode'] ?? '')));
+
+			if ($barcode === '') {
+				$barcode = 'FSV' . $vid;
+			}
+
+			$sku = trim((string) ($variation['sku'] ?? ($map['stock_code'] ?? '')));
+			$varSale = (float) ($map['sale_price'] ?? 0);
+			$varList = (float) ($map['list_price'] ?? 0);
+
+			if ($varSale <= 0) {
+				$varSale = \ProductVariation::getEffectivePrice($variation, $salePrice) ?: $salePrice;
+			}
+
+			if ($varList <= $varSale) {
+				$varList = $varSale;
+			}
+
+			$item = [
+				'barcode' => $barcode,
+				'quantity' => max(0, (int) ($variation['stock'] ?? 0)),
+				'salePrice' => round($varSale, 2),
+				'listPrice' => round($varList, 2),
+				'id_variation' => $vid,
+			];
+
+			if ($sku !== '') {
+				$item['stockCode'] = $sku;
+			}
+
+			$items[] = $item;
+		}
+
+		return $items;
+	}
+
+	/**
+	 * @return array{ok: bool, message: string}
+	 */
+	public static function setArchived(int $idProduct, bool $archived): array
+	{
+		self::ensureSchema();
+
+		if (!self::isConfigured()) {
+			return ['ok' => false, 'message' => 'Trendyol API kimlik bilgileri tanımlı değil'];
+		}
+
+		$mapping = self::findMapping($idProduct);
+
+		if (!self::isLinked($mapping)) {
+			return ['ok' => false, 'message' => 'Trendyol bağlantısı yok'];
+		}
+
+		$barcodes = [];
+		$rows = \DB::execute(
+			'SELECT barcode FROM trendyol_product_items WHERE id_product = ? AND barcode <> \'\'',
+			[$idProduct]
+		) ?: [];
+
+		foreach ($rows as $row) {
+			$bc = trim((string) ($row['barcode'] ?? ''));
+
+			if ($bc !== '' && !in_array($bc, $barcodes, true)) {
+				$barcodes[] = $bc;
+			}
+		}
+
+		$parent = trim((string) ($mapping['barcode'] ?? ''));
+
+		if ($parent !== '' && !in_array($parent, $barcodes, true)) {
+			$barcodes[] = $parent;
+		}
+
+		if ($barcodes === []) {
+			return ['ok' => false, 'message' => 'Arşivlenecek barkod yok'];
+		}
+
+		$items = [];
+
+		foreach ($barcodes as $barcode) {
+			$items[] = ['barcode' => $barcode, 'archived' => $archived];
+		}
+
+		$result = self::api()->archiveProducts(['items' => $items]);
+
+		if (self::isApiError($result)) {
+			return ['ok' => false, 'message' => (string) ($result['message'] ?? 'Satış durumu güncellenemedi')];
+		}
+
+		self::saveMapping($idProduct, [
+			'last_status' => $archived ? 'paused' : 'synced',
+			'last_error' => '',
+			'last_sync_at' => date('Y-m-d H:i:s'),
+		]);
+
+		return [
+			'ok' => true,
+			'message' => $archived ? 'Satış durduruldu' : 'Satışa başlatıldı',
+		];
+	}
+
+	/**
+	 * @return array{id_product: int, id_variation: int}
+	 */
+	public static function findMatchByBarcode(string $barcode): array
+	{
+		$barcode = trim($barcode);
+		$out = ['id_product' => 0, 'id_variation' => 0];
+
+		if ($barcode === '') {
+			return $out;
+		}
+
+		if (class_exists('ProductVariation')) {
+			$variation = \ProductVariation::findByCode($barcode);
+
+			if ($variation) {
+				return [
+					'id_product' => (int) ($variation['id_product'] ?? 0),
+					'id_variation' => (int) ($variation['id_variation'] ?? 0),
+				];
+			}
+		}
+
+		self::ensureSchema();
+		$item = \DB::getRowSafe('trendyol_product_items', 'barcode = ?', [$barcode]);
+
+		if ($item && (int) ($item['id_product'] ?? 0) > 0) {
+			return [
+				'id_product' => (int) $item['id_product'],
+				'id_variation' => (int) ($item['id_variation'] ?? 0),
+			];
+		}
+
+		$map = \DB::getRowSafe('trendyol_products', 'barcode = ?', [$barcode]);
+
+		if ($map && (int) ($map['id_product'] ?? 0) > 0) {
+			$out['id_product'] = (int) $map['id_product'];
+
+			return $out;
+		}
+
+		$id = (int) (\DB::getValue(
+			'SELECT id_product FROM products WHERE barcode = ? LIMIT 1',
+			[$barcode]
+		) ?: 0);
+
+		if ($id > 0) {
+			$out['id_product'] = $id;
+
+			return $out;
+		}
+
+		$out['id_product'] = (int) (\DB::getValue(
+			'SELECT id_product FROM products WHERE stock_code = ? LIMIT 1',
+			[$barcode]
+		) ?: 0);
+
+		return $out;
 	}
 
 	/** @return array<int, array{url: string}> */

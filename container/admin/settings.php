@@ -6,6 +6,76 @@
 
 	}
 
+	if (Tools::getValue('ajax') === 'product-search') {
+
+		header('Content-Type: application/json; charset=utf-8');
+
+		$token = (string) Tools::getValue('token');
+
+		if (!hash_equals((string) $adminToken, $token)) {
+
+			echo json_encode(['success' => false, 'message' => adminT('Invalid request')]);
+
+			exit;
+
+		}
+
+		$q = trim((string) Tools::getValue('q', ''));
+
+		$sql = 'SELECT id_product, product_name, price FROM products WHERE active = 1';
+
+		$params = [];
+
+		if ($q !== '') {
+
+			$sql .= ' AND (product_name LIKE ? OR stock_code LIKE ? OR CAST(id_product AS CHAR) = ?)';
+
+			$like = '%' . $q . '%';
+
+			$params = [$like, $like, $q];
+
+		}
+
+		$sql .= ' ORDER BY product_name ASC LIMIT 40';
+
+		$rows = DB::execute($sql, $params) ?: [];
+
+		$items = [];
+
+		foreach ($rows as $row) {
+
+			$product = Product::getById((int) $row['id_product']);
+
+			if (!$product || empty($product['in_stock'])) {
+
+				continue;
+
+			}
+
+			$items[] = [
+
+				'id_product' => (int) $product['id_product'],
+
+				'product_name' => (string) $product['product_name'],
+
+				'price_formatted' => (string) ($product['price_formatted'] ?? Tools::displayPrice((float) $row['price'])),
+
+			];
+
+			if (count($items) >= 20) {
+
+				break;
+
+			}
+
+		}
+
+		echo json_encode(['success' => true, 'items' => $items], JSON_UNESCAPED_UNICODE);
+
+		exit;
+
+	}
+
 
 
 	$flash = '';
@@ -16,7 +86,7 @@
 
 	$settingsTab = (string) Tools::getValue('tab', 'general');
 
-	$allowedTabs = ['general', 'contact', 'email', 'orders', 'returns'];
+	$allowedTabs = ['general', 'contact', 'email', 'orders', 'returns', 'payment'];
 
 
 
@@ -80,7 +150,35 @@
 
 
 
-			foreach (array_keys($editableKeys) as $key) {
+			$tabGroups = [
+
+				'general' => ['general'],
+
+				'contact' => ['contact'],
+
+				'email' => ['mail', 'smtp', 'mail_template'],
+
+				'orders' => ['orders'],
+
+				'returns' => ['returns'],
+
+				'payment' => ['payment'],
+
+			];
+
+			$activeGroups = $tabGroups[$settingsTab] ?? [];
+
+
+
+			foreach ($editableKeys as $key => $keyMeta) {
+
+				$keyGroup = (string) ($keyMeta['group'] ?? '');
+
+				if ($activeGroups !== [] && !in_array($keyGroup, $activeGroups, true)) {
+
+					continue;
+
+				}
 
 				if ($key === 'SMTP_PASS' && trim((string) Tools::getValue('SMTP_PASS')) === '') {
 
@@ -132,6 +230,20 @@
 
 					$value = (string) max(0, round((float) str_replace(',', '.', $value), 2));
 
+				} elseif ($key === 'ORDER_SUCCESS_NOTE') {
+
+					$value = trim(strip_tags($value));
+
+					if (function_exists('mb_substr')) {
+
+						$value = mb_substr($value, 0, 500);
+
+					} else {
+
+						$value = substr($value, 0, 500);
+
+					}
+
 				} elseif ($key === 'MAIL_HEADER' && $value === Mail::getDefaultEmailHeader()) {
 
 					$value = '';
@@ -143,6 +255,52 @@
 				} elseif ($key === 'SHOP_MAINTENANCE_MESSAGE' && $value === StoreStatus::getDefaultMaintenanceMessage()) {
 
 					$value = '';
+
+				} elseif ($key === 'DEFAULT_PAYMENT_METHOD') {
+
+					$paymentMethods = Module::getPaymentMethods();
+
+					$validIds = [];
+
+					foreach ($paymentMethods as $methodRow) {
+
+						$id = (string) ($methodRow['id'] ?? '');
+
+						if ($id !== '') {
+
+							$validIds[$id] = true;
+
+						}
+
+					}
+
+					if ($value !== '' && $validIds !== [] && empty($validIds[$value])) {
+
+						$value = '';
+
+					}
+
+				} elseif ($key === 'DEFAULT_CARGO_ID') {
+
+					$value = (string) max(0, (int) $value);
+
+				} elseif ($key === 'SANA_OZEL_PRODUCT_IDS') {
+
+					$ids = [];
+
+					foreach (preg_split('/[,\s]+/', $value) ?: [] as $id) {
+
+						$id = (int) $id;
+
+						if ($id > 0) {
+
+							$ids[$id] = $id;
+
+						}
+
+					}
+
+					$value = implode(',', array_slice(array_values($ids), 0, 12));
 
 				}
 
@@ -159,6 +317,18 @@
 
 
 			if ($ok) {
+
+				if (class_exists('Cargo')) {
+
+					$cargoId = (int) Settings::get('DEFAULT_CARGO_ID');
+
+					if ($cargoId > 0) {
+
+						Cargo::setDefaultId($cargoId);
+
+					}
+
+				}
 
 				header('Location: ' . Admin::url('settings') . '?tab=' . rawurlencode($settingsTab) . '&saved=1');
 
@@ -254,7 +424,7 @@
 
 				$flashType = 'danger';
 
-			} elseif (Mail::send($testTo, 'Test Mail - ' . Settings::get('SITE_NAME'), '<p>Bu bir test e-postasıdır. <strong>' . $driverLabel . '</strong> ile gönderildi.</p>')) {
+			} elseif (Mail::sendSample($testTo, (string) Tools::getValue('test_mail_type', 'layout'))) {
 
 				$flash = adminT('Test email sent') . ' (' . $driverLabel . '): ' . $testTo;
 
@@ -286,6 +456,56 @@
 
 
 
+	if ((int) ($values['DEFAULT_CARGO_ID'] ?? 0) <= 0 && class_exists('Cargo')) {
+
+		$defaultCargo = Cargo::getDefault();
+
+		if ($defaultCargo) {
+
+			$values['DEFAULT_CARGO_ID'] = (string) (int) $defaultCargo['id_cargo'];
+
+		}
+
+	}
+
+	if (trim((string) ($values['DEFAULT_PAYMENT_METHOD'] ?? '')) === '') {
+
+		$values['DEFAULT_PAYMENT_METHOD'] = Order::resolveDefaultPaymentMethod();
+
+	}
+
+	$sanaOzelProducts = [];
+
+	$sanaOzelIds = preg_split('/[,\s]+/', (string) ($values['SANA_OZEL_PRODUCT_IDS'] ?? '')) ?: [];
+
+	foreach ($sanaOzelIds as $sanaId) {
+
+		$sanaId = (int) $sanaId;
+
+		if ($sanaId <= 0) {
+
+			continue;
+
+		}
+
+		$product = Product::getById($sanaId);
+
+		if ($product) {
+
+			$sanaOzelProducts[] = [
+
+				'id_product' => (int) $product['id_product'],
+
+				'product_name' => (string) $product['product_name'],
+
+				'price_formatted' => (string) ($product['price_formatted'] ?? ''),
+
+			];
+
+		}
+
+	}
+
 	$smarty->assign([
 
 		'settingsTab' => $settingsTab,
@@ -299,6 +519,8 @@
 		'shopCurrencyLabel' => Currency::label(),
 
 		'orderRefPreview' => Order::previewReference(),
+
+		'orderRefNextId' => Order::peekNextOrderId(),
 
 		'orderRefModes' => Order::getReferenceSuffixModes(),
 
@@ -314,15 +536,14 @@
 
 		'mailLayoutPlaceholders' => Mail::getLayoutPlaceholders(),
 
+		'mailSampleTypes' => Mail::getSampleTypes(),
+
 		'mailTemplatePreview' => Mail::previewTemplate(
 
 			'<h2 style="margin:0 0 12px;font-size:18px;">Örnek e-posta</h2>'
-
 			. '<p style="margin:0 0 12px;">Merhaba <strong>Ali Yılmaz</strong>,</p>'
-
-			. '<p style="margin:0 0 20px;">Bu alan her e-postada değişen içeriktir. Sipariş bildirimleri, kampanyalar ve diğer tüm mailler buraya yerleştirilir.</p>'
-
-			. '<p style="margin:0;"><a href="#" style="display:inline-block;padding:12px 22px;background:#1a1a1a;color:#ffffff;text-decoration:none;border-radius:6px;">Örnek buton</a></p>'
+			. Mail::infoBox('<p style="margin:0;">Bu alan her e-postada değişen içeriktir. Sipariş bildirimleri, kampanyalar ve diğer tüm mailler buraya yerleştirilir.</p>')
+			. Mail::ctaButton('#', 'Örnek buton')
 
 		),
 
@@ -339,6 +560,14 @@
 			'FOLDER' => Settings::get('FOLDER'),
 
 		],
+
+		'paymentMethods' => Module::getPaymentMethods(),
+
+		'cargoCompanies' => class_exists('Cargo') ? Cargo::getList(true) : [],
+
+		'sanaOzelProducts' => $sanaOzelProducts,
+
+		'productSearchUrl' => Admin::url('settings') . '?tab=payment&ajax=product-search',
 
 	]);
 

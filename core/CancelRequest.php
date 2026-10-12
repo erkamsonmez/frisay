@@ -285,6 +285,14 @@ class CancelRequest
 			$updateData['admin_receipt_file'] = $receiptResult['filename'];
 		}
 
+		if ($newStatus === self::STATUS_APPROVED) {
+			$cancelOrder = self::cancelLinkedOrder((int) $cancel['id_order']);
+
+			if (empty($cancelOrder['success'])) {
+				return $cancelOrder;
+			}
+		}
+
 		$updated = DB::update(
 			'cancel_requests',
 			$updateData,
@@ -297,8 +305,6 @@ class CancelRequest
 		}
 
 		if ($newStatus === self::STATUS_APPROVED) {
-			Order::updateStatus((int) $cancel['id_order'], Order::STATUS_CANCELLED);
-
 			Notification::cancelRequestApproved(
 				(int) $cancel['id_user'],
 				(string) $cancel['reference'],
@@ -393,6 +399,43 @@ class CancelRequest
 		}
 
 		return ['success' => true, 'filename' => $filename];
+	}
+
+	private static function cancelLinkedOrder(int $idOrder): array
+	{
+		$order = DB::getRowSafe('orders', 'id_order = ?', [$idOrder]);
+
+		if (!$order) {
+			return self::fail('Sipariş bulunamadı, talep onaylanmadı');
+		}
+
+		if ((int) $order['status'] === Order::STATUS_CANCELLED) {
+			return ['success' => true];
+		}
+
+		try {
+			Order::updateStatus($idOrder, Order::STATUS_CANCELLED);
+		} catch (Throwable $e) {
+			// Durum yine de yazılmış olabilir; aşağıda doğrulanır.
+		}
+
+		$fresh = DB::getRowSafe('orders', 'id_order = ?', [$idOrder]);
+
+		if ($fresh && (int) $fresh['status'] === Order::STATUS_CANCELLED) {
+			return ['success' => true];
+		}
+
+		if (!Order::setStatusQuiet($idOrder, Order::STATUS_CANCELLED)) {
+			return self::fail('Sipariş iptal edilemedi');
+		}
+
+		$fresh = DB::getRowSafe('orders', 'id_order = ?', [$idOrder]);
+
+		if (!$fresh || (int) $fresh['status'] !== Order::STATUS_CANCELLED) {
+			return self::fail('Sipariş iptal edilemedi');
+		}
+
+		return ['success' => true];
 	}
 
 	private static function fail(string $message): array

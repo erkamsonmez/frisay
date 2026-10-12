@@ -30,11 +30,11 @@
 
 	$formData = [
 
-		'full_name' => '',
+		'full_name' => trim((string) Tools::getValue('full_name')),
 
-		'phone' => '',
+		'phone' => trim((string) Tools::getValue('phone')),
 
-		'email' => '',
+		'email' => trim((string) Tools::getValue('email')),
 
 	];
 

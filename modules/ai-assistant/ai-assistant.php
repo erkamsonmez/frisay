@@ -300,6 +300,14 @@ class AiAssistantModule extends ModuleBase
 			];
 		}
 
+		if ($pageName === 'orders') {
+			return [
+				'mode' => 'orders',
+				'hint' => 'Sipariş listesine göre analiz',
+				'label' => 'Siparişleri analiz et',
+			];
+		}
+
 		return [
 			'mode' => 'summary',
 			'hint' => 'Bu sayfadaki önemli noktaları özetleyin',

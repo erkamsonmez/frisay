@@ -1,0 +1,49 @@
+/**
+ * Theme4 colors — managed by theme4 module. Do not edit by hand if using the admin UI.
+ */
+:root {
+	--primary: #0080c0;
+	--primary-hover: #07355F;
+	--primary-light: #EEF4FB;
+	--secondary: #ff8040;
+	--text: #0F172A;
+	--text-muted: #64748B;
+	--border: #E2E8F0;
+	--background: #F5F7FA;
+	--surface: #FFFFFF;
+	--white: #FFFFFF;
+	--danger: #DC2626;
+
+	--radius: 14px;
+	--radius-lg: 18px;
+	--radius-pill: 999px;
+	--shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+	--shadow-nav: 0 8px 28px rgba(15, 23, 42, 0.06);
+	--container: 1320px;
+	--transition: 220ms ease;
+	--font: 'Inter', system-ui, -apple-system, sans-serif;
+
+	/* style.css aliases */
+	--sn-blue: var(--primary);
+	--sn-blue-dark: var(--primary-hover);
+	--sm-primary: var(--primary);
+	--sm-primary-dark: var(--primary-hover);
+	--sm-primary-soft: var(--primary-light);
+	--sm-accent: var(--primary);
+	--sm-accent-dark: var(--primary-hover);
+	--sm-bg: var(--background);
+	--sm-surface: var(--surface);
+	--sm-text: var(--text);
+	--sm-muted: var(--text-muted);
+	--sm-border: var(--border);
+	--sm-radius: var(--radius);
+	--sm-radius-lg: var(--radius-lg);
+	--sm-shadow: var(--shadow);
+	--sm-shadow-nav: var(--shadow-nav);
+}
+
+body.sm-body {
+	background-color: var(--background);
+	color: var(--text);
+	font-family: var(--font);
+}

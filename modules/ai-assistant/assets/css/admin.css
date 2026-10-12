@@ -129,3 +129,119 @@
 	width: 2.5rem;
 	height: 2.5rem;
 }
+
+/* Dashboard / orders — left hover dock */
+.admin-layout-hook--header:has(.ai-assist-header--dock) {
+	margin: 0 !important;
+	height: 0;
+	overflow: visible;
+	padding: 0;
+}
+
+.ai-assist-header--dock {
+	position: fixed;
+	left: calc(var(--sidebar-width, 264px) + 16px);
+	bottom: 28px;
+	z-index: 1030;
+	width: 52px;
+	min-height: 52px;
+	padding: 0;
+	border: 0;
+	border-radius: 16px;
+	overflow: hidden;
+	background: #2457C5;
+	color: #fff;
+	box-shadow: 0 10px 28px rgba(36, 87, 197, 0.28);
+	display: flex;
+	flex-direction: column;
+	flex-wrap: nowrap;
+	align-items: stretch;
+	justify-content: flex-start;
+	gap: 0;
+	transition: width 200ms ease, padding 200ms ease, background 200ms ease, box-shadow 200ms ease;
+}
+
+.ai-assist-dock__fab {
+	width: 52px;
+	height: 52px;
+	border: 0;
+	background: transparent;
+	color: #fff;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.ai-assist-header--dock .ai-assist-header__main,
+.ai-assist-header--dock .ai-assist-header__actions,
+.ai-assist-header--dock .ai-assist-header__status,
+.ai-assist-header--dock .ai-assist-header__hint,
+.ai-assist-header--dock .badge {
+	display: none;
+}
+
+.ai-assist-header--dock:hover,
+.ai-assist-header--dock:focus-within {
+	width: 248px;
+	padding: 12px;
+	background: #fff;
+	color: #171A1F;
+	border: 1px solid #EEF0F3;
+	box-shadow: 0 12px 32px rgba(15, 23, 42, 0.1);
+}
+
+.ai-assist-header--dock:hover .ai-assist-dock__fab,
+.ai-assist-header--dock:focus-within .ai-assist-dock__fab {
+	display: none;
+}
+
+.ai-assist-header--dock:hover .ai-assist-header__main,
+.ai-assist-header--dock:hover .ai-assist-header__actions,
+.ai-assist-header--dock:focus-within .ai-assist-header__main,
+.ai-assist-header--dock:focus-within .ai-assist-header__actions {
+	display: flex;
+}
+
+.ai-assist-header--dock:hover .ai-assist-header__brand,
+.ai-assist-header--dock:focus-within .ai-assist-header__brand {
+	color: #2457C5;
+}
+
+.ai-assist-header--dock .ai-assist-header__actions {
+	flex-direction: column;
+	align-items: stretch;
+	width: 100%;
+}
+
+.ai-assist-header--dock .ai-assist-header__idea {
+	min-width: 0;
+	max-width: none;
+	width: 100%;
+}
+
+.ai-assist-header--dock .btn {
+	width: 100%;
+}
+
+.ai-assist-header--dock .btn-dark {
+	background: #2457C5;
+	border-color: #2457C5;
+}
+
+.ai-assist-header--dock .btn-dark:hover {
+	background: #1746A2;
+	border-color: #1746A2;
+}
+
+body.admin-sidebar-collapsed .ai-assist-header--dock {
+	left: calc(var(--sidebar-width-collapsed, 76px) + 16px);
+}
+
+@media (max-width: 991.98px) {
+	.ai-assist-header--dock {
+		left: 16px;
+		bottom: 20px;
+	}
+}

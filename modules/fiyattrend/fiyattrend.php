@@ -97,6 +97,7 @@ class FiyattrendModule extends ModuleBase
 		}
 
 		$feedUrl = FiyattrendFeedService::buildFeedUrl((string) $domain);
+		$cacheInfo = FiyattrendFeedService::cacheInfo();
 
 		$smarty->assign([
 			'flash' => $flash,
@@ -110,8 +111,12 @@ class FiyattrendModule extends ModuleBase
 			'ftExcludeCats' => Settings::get('FT_EXCLUDE_CATS'),
 			'ftIncludeOutstock' => Settings::get('FT_INCLUDE_OUTSTOCK'),
 			'feedUrl' => $feedUrl,
-			'lastRegen' => Settings::get('FT_LAST_REGEN') ?: '—',
-			'cacheExists' => file_exists(FiyattrendFeedService::cachePath()),
+			'lastRegen' => $cacheInfo['last_regen'] !== '' ? $cacheInfo['last_regen'] : '—',
+			'cacheExists' => $cacheInfo['exists'],
+			'cacheExpired' => $cacheInfo['expired'],
+			'cacheAgeMin' => (int) floor($cacheInfo['age'] / 60),
+			'cacheRemainingMin' => (int) ceil($cacheInfo['remaining'] / 60),
+			'cronFeedsUrl' => rtrim((string) $domain, '/') . '/api/cron.php?action=feeds&token=SHOP_TOKEN',
 		]);
 	}
 }

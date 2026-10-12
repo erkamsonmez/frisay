@@ -10,8 +10,8 @@ class PosModule extends ModuleBase
 {
 	public string $name = 'pos';
 	public string $title = 'Point of Sale (Kasa)';
-	public string $version = '1.4.0';
-	public string $description = 'Mağaza içi satış ekranı — PIN veya admin ile giriş';
+	public string $version = '1.6.4';
+	public string $description = 'Mağaza / kargo satış kasası — barkod, PIN veya admin ile giriş';
 	public string $author = 'FShop';
 
 	public array $routes = [
@@ -33,6 +33,8 @@ class PosModule extends ModuleBase
 		'customers' => 'api/customers.php',
 		'customer' => 'api/customer.php',
 		'stats' => 'api/stats.php',
+		'day-end' => 'api/day-end.php',
+		'close-register' => 'api/close-register.php',
 		'lock' => 'api/lock.php',
 		'unlock' => 'api/unlock.php',
 		'prepare-card' => 'api/prepare-card.php',
@@ -69,6 +71,8 @@ class PosModule extends ModuleBase
 	private const SET_CARD_ADJ_PERCENT = 'POS_CARD_ADJ_PERCENT';
 	private const SET_TRANSFER_ADJ_TYPE = 'POS_TRANSFER_ADJ_TYPE';
 	private const SET_TRANSFER_ADJ_PERCENT = 'POS_TRANSFER_ADJ_PERCENT';
+	private const SET_MANAGER_PIN_HASH = 'POS_MANAGER_PIN_HASH';
+	private const SET_REGISTER_SINCE = 'POS_REGISTER_SINCE';
 
 	public function install(): bool
 	{
@@ -83,6 +87,8 @@ class PosModule extends ModuleBase
 		Settings::set(self::SET_CARD_ADJ_PERCENT, '0');
 		Settings::set(self::SET_TRANSFER_ADJ_TYPE, 'none');
 		Settings::set(self::SET_TRANSFER_ADJ_PERCENT, '0');
+		Settings::set(self::SET_MANAGER_PIN_HASH, '');
+		Settings::set(self::SET_REGISTER_SINCE, date('Y-m-d') . ' 00:00:00');
 
 		return true;
 	}
@@ -101,6 +107,8 @@ class PosModule extends ModuleBase
 		Settings::set(self::SET_CARD_ADJ_PERCENT, '0');
 		Settings::set(self::SET_TRANSFER_ADJ_TYPE, 'none');
 		Settings::set(self::SET_TRANSFER_ADJ_PERCENT, '0');
+		Settings::set(self::SET_MANAGER_PIN_HASH, '');
+		Settings::set(self::SET_REGISTER_SINCE, '');
 
 		return true;
 	}
@@ -120,6 +128,258 @@ class PosModule extends ModuleBase
 		$hash = (string) Settings::get(self::SET_PIN_HASH, '');
 
 		return $hash !== '';
+	}
+
+	public function hasManagerPinConfigured(): bool
+	{
+		$hash = (string) Settings::get(self::SET_MANAGER_PIN_HASH, '');
+
+		return $hash !== '';
+	}
+
+	public function verifyManagerPin(string $pin): bool
+	{
+		$hash = (string) Settings::get(self::SET_MANAGER_PIN_HASH, '');
+
+		if ($hash === '' || !preg_match('/^\d{6}$/', $pin)) {
+			return false;
+		}
+
+		return password_verify($pin, $hash);
+	}
+
+	public function getRegisterSince(): string
+	{
+		$since = trim((string) Settings::get(self::SET_REGISTER_SINCE, ''));
+		$todayStart = date('Y-m-d') . ' 00:00:00';
+
+		if ($since === '' || !preg_match('/^\d{4}-\d{2}-\d{2}/', $since)) {
+			return $todayStart;
+		}
+
+		// Önceki günden kalan cutoff ise bugünün başını kullan
+		if (substr($since, 0, 10) < date('Y-m-d')) {
+			return $todayStart;
+		}
+
+		return $since;
+	}
+
+	public function closeRegister(): array
+	{
+		$now = date('Y-m-d H:i:s');
+		Settings::set(self::SET_REGISTER_SINCE, $now);
+
+		return [
+			'success' => true,
+			'message' => 'Kasa kapatıldı. Yeni satışlar sıfırdan sayılacak.',
+			'register_since' => $now,
+			'stats' => $this->getRegisterStats(),
+		];
+	}
+
+	/** @return array<string, mixed> */
+	public function getRegisterStats(): array
+	{
+		$since = $this->getRegisterSince();
+
+		$rows = DB::execute(
+			"SELECT payment_method, status, COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS total_sum
+			FROM orders
+			WHERE note LIKE '[POS]%'
+			AND date_add >= ?
+			GROUP BY payment_method, status",
+			[$since]
+		) ?: [];
+
+		$stats = [
+			'cash' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
+			'card' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
+			'transfer' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
+			'transfer_ok' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
+			'transfer_pending' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
+		];
+
+		foreach ($rows as $row) {
+			$method = (string) ($row['payment_method'] ?? '');
+			$status = (int) ($row['status'] ?? 0);
+			$cnt = (int) ($row['cnt'] ?? 0);
+			$sum = (float) ($row['total_sum'] ?? 0);
+
+			if ($method === self::PAYMENT_CASH) {
+				$stats['cash']['count'] += $cnt;
+				$stats['cash']['total'] += $sum;
+			} elseif ($method === self::PAYMENT_CARD) {
+				$stats['card']['count'] += $cnt;
+				$stats['card']['total'] += $sum;
+			} elseif ($method === self::PAYMENT_TRANSFER) {
+				$stats['transfer']['count'] += $cnt;
+				$stats['transfer']['total'] += $sum;
+				if ($status === Order::STATUS_PENDING) {
+					$stats['transfer_pending']['count'] += $cnt;
+					$stats['transfer_pending']['total'] += $sum;
+				} else {
+					$stats['transfer_ok']['count'] += $cnt;
+					$stats['transfer_ok']['total'] += $sum;
+				}
+			}
+		}
+
+		foreach ($stats as &$entry) {
+			$entry['total_formatted'] = Tools::displayPrice($entry['total']);
+		}
+		unset($entry);
+
+		$saleCount = $stats['cash']['count'] + $stats['card']['count'] + $stats['transfer']['count'];
+		$grandTotal = $stats['cash']['total'] + $stats['card']['total'] + $stats['transfer']['total'];
+
+		$stats['sale_count'] = $saleCount;
+		$stats['grand_total'] = $grandTotal;
+		$stats['grand_total_formatted'] = Tools::displayPrice($grandTotal);
+		$stats['register_since'] = $since;
+		$stats['register_since_formatted'] = date('d.m.Y H:i', strtotime($since));
+		$stats['generated_at'] = date('d.m.Y H:i');
+		$stats['store_label'] = (string) Settings::get(self::SET_STORE_LABEL, 'Mağaza Satış');
+		$stats['site_name'] = (string) Settings::get('SITE_NAME', 'FShop');
+		$stats['cashier'] = $this->getTerminalUserName();
+		$stats['orders'] = $this->getRegisterOrderDetails($since);
+
+		return $stats;
+	}
+
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function getRegisterOrderDetails(string $since = ''): array
+	{
+		if ($since === '') {
+			$since = $this->getRegisterSince();
+		}
+
+		$orders = DB::execute(
+			"SELECT id_order, reference, payment_method, status, customer_name, customer_phone,
+				address_city, address_district, address_text, note, subtotal, shipping, total, date_add
+			FROM orders
+			WHERE note LIKE '[POS]%'
+			AND date_add >= ?
+			ORDER BY date_add ASC, id_order ASC",
+			[$since]
+		) ?: [];
+
+		if ($orders === []) {
+			return [];
+		}
+
+		$ids = array_map(static function (array $row): int {
+			return (int) ($row['id_order'] ?? 0);
+		}, $orders);
+		$ids = array_values(array_filter($ids));
+
+		$detailsByOrder = [];
+
+		if ($ids !== []) {
+			$placeholders = implode(',', array_fill(0, count($ids), '?'));
+			$detailRows = DB::execute(
+				"SELECT id_order, product_name, variation_label, qty, price, total
+				FROM order_detail
+				WHERE id_order IN ({$placeholders})
+				ORDER BY id_order_detail ASC",
+				$ids
+			) ?: [];
+
+			foreach ($detailRows as $detail) {
+				$idOrder = (int) ($detail['id_order'] ?? 0);
+				if (!isset($detailsByOrder[$idOrder])) {
+					$detailsByOrder[$idOrder] = [];
+				}
+				$detailsByOrder[$idOrder][] = [
+					'product_name' => (string) ($detail['product_name'] ?? ''),
+					'variation_label' => (string) ($detail['variation_label'] ?? ''),
+					'qty' => (int) ($detail['qty'] ?? 0),
+					'price' => (float) ($detail['price'] ?? 0),
+					'price_formatted' => Tools::displayPrice((float) ($detail['price'] ?? 0)),
+					'total' => (float) ($detail['total'] ?? 0),
+					'total_formatted' => Tools::displayPrice((float) ($detail['total'] ?? 0)),
+				];
+			}
+		}
+
+		$list = [];
+
+		foreach ($orders as $order) {
+			$idOrder = (int) ($order['id_order'] ?? 0);
+			$note = (string) ($order['note'] ?? '');
+			$saleType = (strpos($note, 'Kargo satışı') !== false) ? 'shipping' : 'store';
+			$method = (string) ($order['payment_method'] ?? '');
+
+			$list[] = [
+				'id_order' => $idOrder,
+				'reference' => (string) ($order['reference'] ?? ''),
+				'date' => date('d.m.Y H:i', strtotime((string) ($order['date_add'] ?? 'now'))),
+				'customer_name' => (string) ($order['customer_name'] ?? ''),
+				'customer_phone' => (string) ($order['customer_phone'] ?? ''),
+				'sale_type' => $saleType,
+				'sale_type_label' => $saleType === 'shipping' ? 'Kargo satışı' : 'Mağaza satışı',
+				'payment_method' => $method,
+				'payment_label' => self::getPaymentLabel($method),
+				'shipping' => (float) ($order['shipping'] ?? 0),
+				'shipping_formatted' => Tools::displayPrice((float) ($order['shipping'] ?? 0)),
+				'total' => (float) ($order['total'] ?? 0),
+				'total_formatted' => Tools::displayPrice((float) ($order['total'] ?? 0)),
+				'address' => $saleType === 'shipping'
+					? trim(implode(' / ', array_filter([
+						(string) ($order['address_city'] ?? ''),
+						(string) ($order['address_district'] ?? ''),
+						(string) ($order['address_text'] ?? ''),
+					])))
+					: '',
+				'items' => $detailsByOrder[$idOrder] ?? [],
+			];
+		}
+
+		return $list;
+	}
+
+	/** @deprecated Use getRegisterStats() */
+	public function getTodayStats(): array
+	{
+		return $this->getRegisterStats();
+	}
+
+	/** @return array{success: bool, message: string, stats?: array<string, mixed>} */
+	public function openDayEnd(string $managerPin): array
+	{
+		if (!$this->hasManagerPinConfigured()) {
+			return ['success' => false, 'message' => 'Yönetici şifresi tanımlı değil. Modül ayarlarından 6 haneli şifre belirleyin.'];
+		}
+
+		if (!$this->verifyManagerPin($managerPin)) {
+			return ['success' => false, 'message' => 'Yönetici şifresi hatalı'];
+		}
+
+		return [
+			'success' => true,
+			'message' => 'Gün sonu raporu',
+			'stats' => $this->getRegisterStats(),
+		];
+	}
+
+	/** @return array{success: bool, message: string, stats?: array<string, mixed>, register_since?: string} */
+	public function closeRegisterWithPin(string $managerPin): array
+	{
+		if (!$this->hasManagerPinConfigured()) {
+			return ['success' => false, 'message' => 'Yönetici şifresi tanımlı değil'];
+		}
+
+		if (!$this->verifyManagerPin($managerPin)) {
+			return ['success' => false, 'message' => 'Yönetici şifresi hatalı'];
+		}
+
+		$snapshot = $this->getRegisterStats();
+		$result = $this->closeRegister();
+		$result['closed_stats'] = $snapshot;
+
+		return $result;
 	}
 
 	public function hasTerminalAccess(): bool
@@ -497,10 +757,36 @@ class PosModule extends ModuleBase
 			'phone' => '',
 			'email' => '',
 			'label' => 'Ziyaretçi',
+			'addresses' => [],
 		];
 	}
 
-	/** @return array{id_user: int, name: string, phone: string, email: string, label: string} */
+	/** @return array<int, array<string, mixed>> */
+	public function getCustomerAddresses(int $idUser): array
+	{
+		if ($idUser <= 0 || !class_exists('Address')) {
+			return [];
+		}
+
+		$list = [];
+
+		foreach (Address::getListForUser($idUser) as $row) {
+			$list[] = [
+				'id_address' => (int) ($row['id_address'] ?? 0),
+				'label' => (string) ($row['label'] ?? ''),
+				'full_name' => (string) ($row['full_name'] ?? ''),
+				'phone' => (string) ($row['phone'] ?? ''),
+				'city' => (string) ($row['city'] ?? ''),
+				'district' => (string) ($row['district'] ?? ''),
+				'address_text' => (string) ($row['address_text'] ?? ''),
+				'is_default' => !empty($row['is_default']),
+				'summary' => Address::formatSummary($row),
+			];
+		}
+
+		return $list;
+	}
+
 	public function getSessionCustomer(): array
 	{
 		$stored = $_SESSION[self::SESSION_CUSTOMER] ?? null;
@@ -509,12 +795,15 @@ class PosModule extends ModuleBase
 			return $this->getDefaultCustomer();
 		}
 
+		$idUser = (int) ($stored['id_user'] ?? 0);
+
 		return [
-			'id_user' => (int) ($stored['id_user'] ?? 0),
+			'id_user' => $idUser,
 			'name' => (string) ($stored['name'] ?? 'Ziyaretçi'),
 			'phone' => (string) ($stored['phone'] ?? ''),
 			'email' => (string) ($stored['email'] ?? ''),
 			'label' => (string) ($stored['label'] ?? $stored['name'] ?? 'Ziyaretçi'),
+			'addresses' => $this->getCustomerAddresses($idUser),
 		];
 	}
 
@@ -601,8 +890,11 @@ class PosModule extends ModuleBase
 		return $list;
 	}
 
-	/** @return array{success: bool, message: string, customer?: array<string, mixed>, id_user?: int} */
-	public function createCustomer(string $fullName, string $phone, string $email = ''): array
+	/**
+	 * @param array{city?: string, district?: string, address_text?: string} $address
+	 * @return array{success: bool, message: string, customer?: array<string, mixed>, id_user?: int}
+	 */
+	public function createCustomer(string $fullName, string $phone, string $email = '', array $address = []): array
 	{
 		$result = Customer::createByAdmin($fullName, $phone, $email);
 
@@ -611,16 +903,34 @@ class PosModule extends ModuleBase
 		}
 
 		$idUser = (int) ($result['id_user'] ?? 0);
+		$city = trim((string) ($address['city'] ?? ''));
+		$district = trim((string) ($address['district'] ?? ''));
+		$addressText = trim((string) ($address['address_text'] ?? ''));
+
+		if ($idUser > 0 && $city !== '' && $district !== '' && $addressText !== '' && class_exists('Address')) {
+			Address::save($idUser, [
+				'full_name' => $fullName,
+				'phone' => $phone,
+				'city' => $city,
+				'district' => $district,
+				'address_text' => $addressText,
+				'label' => 'POS',
+				'is_default' => 1,
+			]);
+		}
+
+		$set = $this->setSessionCustomer(['id_user' => $idUser]);
 
 		return [
 			'success' => true,
 			'message' => (string) ($result['message'] ?? 'Müşteri oluşturuldu'),
 			'id_user' => $idUser,
-			'customer' => [
+			'customer' => $set['customer'] ?? [
 				'id_user' => $idUser,
 				'name' => trim($fullName),
 				'phone' => Customer::normalizePhone($phone),
 				'email' => trim(strtolower($email)),
+				'addresses' => $this->getCustomerAddresses($idUser),
 			],
 		];
 	}
@@ -726,6 +1036,8 @@ class PosModule extends ModuleBase
 	/** @return array<string, array{type: string, percent: float}> */
 	public function getPaymentAdjustmentConfig(): array
 	{
+		$this->ensurePaymentAdjustmentSettings();
+
 		return [
 			self::PAYMENT_CASH => ['type' => 'none', 'percent' => 0.0],
 			self::PAYMENT_CARD => [
@@ -737,6 +1049,24 @@ class PosModule extends ModuleBase
 				'percent' => $this->getAdjustmentPercent(self::SET_TRANSFER_ADJ_PERCENT),
 			],
 		];
+	}
+
+	private function ensurePaymentAdjustmentSettings(): void
+	{
+		$defaults = [
+			self::SET_CARD_ADJ_TYPE => 'none',
+			self::SET_CARD_ADJ_PERCENT => '0',
+			self::SET_TRANSFER_ADJ_TYPE => 'none',
+			self::SET_TRANSFER_ADJ_PERCENT => '0',
+		];
+
+		foreach ($defaults as $key => $value) {
+			$exists = DB::getValue('SELECT id FROM settings WHERE title = ? LIMIT 1', [$key]);
+
+			if ($exists === false) {
+				Settings::set($key, $value);
+			}
+		}
 	}
 
 	/** @return array<string, mixed> */
@@ -885,55 +1215,6 @@ class PosModule extends ModuleBase
 		return $count;
 	}
 
-	/** @return array<string, mixed> */
-	public function getTodayStats(): array
-	{
-		$rows = DB::execute(
-			"SELECT payment_method, status, COUNT(*) AS cnt, COALESCE(SUM(total), 0) AS total_sum
-			FROM orders
-			WHERE note LIKE '[POS]%'
-			AND DATE(date_add) = CURDATE()
-			GROUP BY payment_method, status"
-		) ?: [];
-
-		$stats = [
-			'cash' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
-			'card' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
-			'transfer_ok' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
-			'transfer_pending' => ['count' => 0, 'total' => 0.0, 'total_formatted' => Tools::displayPrice(0)],
-		];
-
-		foreach ($rows as $row) {
-			$method = (string) ($row['payment_method'] ?? '');
-			$status = (int) ($row['status'] ?? 0);
-			$cnt = (int) ($row['cnt'] ?? 0);
-			$sum = (float) ($row['total_sum'] ?? 0);
-
-			if ($method === self::PAYMENT_CASH) {
-				$stats['cash']['count'] += $cnt;
-				$stats['cash']['total'] += $sum;
-			} elseif ($method === self::PAYMENT_CARD) {
-				$stats['card']['count'] += $cnt;
-				$stats['card']['total'] += $sum;
-			} elseif ($method === self::PAYMENT_TRANSFER) {
-				if ($status === Order::STATUS_PENDING) {
-					$stats['transfer_pending']['count'] += $cnt;
-					$stats['transfer_pending']['total'] += $sum;
-				} else {
-					$stats['transfer_ok']['count'] += $cnt;
-					$stats['transfer_ok']['total'] += $sum;
-				}
-			}
-		}
-
-		foreach ($stats as &$entry) {
-			$entry['total_formatted'] = Tools::displayPrice($entry['total']);
-		}
-		unset($entry);
-
-		return $stats;
-	}
-
 	public function getTerminalUserName(): string
 	{
 		if (!empty($_SESSION['id_admin'])) {
@@ -959,14 +1240,23 @@ class PosModule extends ModuleBase
 			['id_category' => 0, 'name' => 'Tüm Ürünler', 'icon' => 'grid', 'color' => '#14b8a6'],
 		];
 
-		foreach ($rows as $i => $row) {
+		$colorIdx = 0;
+
+		foreach ($rows as $row) {
+			$idCategory = (int) ($row['id_category'] ?? 0);
+
+			if ($idCategory <= 0 || Product::countActive($idCategory) <= 0) {
+				continue;
+			}
+
 			$name = (string) ($row['category_name'] ?? '');
 			$list[] = [
-				'id_category' => (int) $row['id_category'],
+				'id_category' => $idCategory,
 				'name' => $name,
-				'icon' => mb_strtoupper(mb_substr($name, 0, 1, 'UTF-8')),
-				'color' => $palette[$i % count($palette)],
+				'icon' => mb_strtoupper(mb_substr($name !== '' ? $name : 'K', 0, 1, 'UTF-8')),
+				'color' => $palette[$colorIdx % count($palette)],
 			];
+			$colorIdx++;
 		}
 
 		return $list;
@@ -999,6 +1289,21 @@ class PosModule extends ModuleBase
 			}
 
 			Settings::set(self::SET_PIN_HASH, password_hash($newPin, PASSWORD_DEFAULT));
+		}
+
+		$managerPin = trim((string) ($post['pos_manager_pin'] ?? ''));
+		$managerConfirm = trim((string) ($post['pos_manager_pin_confirm'] ?? ''));
+
+		if ($managerPin !== '' || $managerConfirm !== '') {
+			if (!preg_match('/^\d{6}$/', $managerPin)) {
+				return ['success' => false, 'message' => 'Yönetici şifresi tam 6 haneli rakam olmalı'];
+			}
+
+			if ($managerPin !== $managerConfirm) {
+				return ['success' => false, 'message' => 'Yönetici şifresi tekrarı eşleşmiyor'];
+			}
+
+			Settings::set(self::SET_MANAGER_PIN_HASH, password_hash($managerPin, PASSWORD_DEFAULT));
 		}
 
 		Settings::set(self::SET_ENABLED, $enabled);
@@ -1042,6 +1347,8 @@ class PosModule extends ModuleBase
 		$flash = '';
 		$flashType = 'success';
 
+		$this->ensurePaymentAdjustmentSettings();
+
 		if (Tools::isSubmit('savePos')) {
 			$postToken = (string) Tools::getValue('token');
 
@@ -1077,6 +1384,7 @@ class PosModule extends ModuleBase
 			'posCardAdjPercent' => $this->getAdjustmentPercent(self::SET_CARD_ADJ_PERCENT),
 			'posTransferAdjType' => $this->normalizeAdjustmentType((string) Settings::get(self::SET_TRANSFER_ADJ_TYPE, 'none')),
 			'posTransferAdjPercent' => $this->getAdjustmentPercent(self::SET_TRANSFER_ADJ_PERCENT),
+			'posHasManagerPin' => $this->hasManagerPinConfigured(),
 			'posFlash' => $flash,
 			'posFlashType' => $flashType,
 		]);
@@ -1148,10 +1456,36 @@ class PosModule extends ModuleBase
 		$exitUrl = $isAdminContext ? rtrim($adminUrl, '/') . '/' : rtrim($domain, '/') . '/';
 		$customer = $this->getSessionCustomer();
 
+		$cargos = [];
+		if (class_exists('Cargo')) {
+			foreach (Cargo::getList(true) as $cargo) {
+				$cargos[] = [
+					'id_cargo' => (int) $cargo['id_cargo'],
+					'name' => (string) $cargo['name'],
+					'rates' => array_map(static function (array $rate): array {
+						return [
+							'min_amount' => (float) ($rate['min_amount'] ?? 0),
+							'max_amount' => (float) ($rate['max_amount'] ?? 0),
+							'fee' => (float) ($rate['fee'] ?? 0),
+						];
+					}, is_array($cargo['rates'] ?? null) ? $cargo['rates'] : []),
+				];
+			}
+		}
+
 		$html = $this->renderFrontTemplate('pos', [
 			'posApiBase' => rtrim($domain, '/') . '/api/module.php?m=pos&action=',
 			'posToken' => $this->getApiToken(),
 			'posCategories' => $categories,
+			'posCargos' => $cargos,
+			'posPaymentAdjustmentsJson' => json_encode(
+				$this->getPaymentAdjustmentConfig(),
+				JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+			),
+			'posCargosJson' => json_encode(
+				$cargos,
+				JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+			),
 			'posStoreLabel' => Settings::get(self::SET_STORE_LABEL, 'Mağaza Satış'),
 			'posCssUrl' => $this->getAssetUrl('css/pos.css'),
 			'posJsUrl' => $this->getAssetUrl('js/pos.js'),
@@ -1159,11 +1493,13 @@ class PosModule extends ModuleBase
 			'posFullscreenAuto' => $this->isFullscreenAuto(),
 			'posHideOutOfStock' => $this->hideOutOfStock(),
 			'posAllowOutOfStockSale' => $this->allowOutOfStockSale(),
-			'posPaymentAdjustmentsJson' => json_encode($this->getPaymentAdjustmentConfig(), JSON_UNESCAPED_UNICODE),
 			'posIsAdmin' => $isAdminContext,
 			'posExitUrl' => $exitUrl,
 			'posAdminUrl' => rtrim($adminUrl, '/'),
 			'posSiteName' => Settings::get('SITE_NAME', 'FShop'),
+			'posLogoUrl' => (class_exists('SiteAssets') && SiteAssets::logoExists('header'))
+				? SiteAssets::getLogoUrl('header')
+				: '',
 			'posUserName' => $this->getTerminalUserName(),
 			'posCustomer' => $customer,
 			'posHasPin' => $this->hasPinConfigured(),
@@ -1534,7 +1870,8 @@ class PosModule extends ModuleBase
 		string $customerPhone,
 		string $note,
 		float $cashPaid = 0.0,
-		int $idUser = -1
+		int $idUser = -1,
+		array $shippingOpts = []
 	): array {
 		Order::ensureSchema();
 
@@ -1548,6 +1885,40 @@ class PosModule extends ModuleBase
 			return ['success' => false, 'message' => 'Geçersiz ödeme yöntemi'];
 		}
 
+		$saleType = trim((string) ($shippingOpts['sale_type'] ?? 'store'));
+		$isShipping = $saleType === 'shipping';
+		$idCargo = $isShipping ? (int) ($shippingOpts['id_cargo'] ?? 0) : 0;
+		$shipCity = $isShipping ? mb_substr(trim(strip_tags((string) ($shippingOpts['address_city'] ?? ''))), 0, 64) : '';
+		$shipDistrict = $isShipping ? mb_substr(trim(strip_tags((string) ($shippingOpts['address_district'] ?? ''))), 0, 64) : '';
+		$shipAddress = $isShipping ? trim(strip_tags((string) ($shippingOpts['address_text'] ?? ''))) : '';
+		$shipEmail = trim(strtolower((string) ($shippingOpts['customer_email'] ?? '')));
+		$shippingFee = 0.0;
+		$cargoCompanyName = '';
+
+		if ($isShipping) {
+			if ($shipCity === '' || $shipDistrict === '' || $shipAddress === '') {
+				return ['success' => false, 'message' => 'Kargo satışı için il, ilçe ve adres gerekli'];
+			}
+
+			if ($idCargo <= 0 || !class_exists('Cargo')) {
+				return ['success' => false, 'message' => 'Kargo firması seçin'];
+			}
+
+			$cargoRow = Cargo::getById($idCargo);
+
+			if (!$cargoRow || empty($cargoRow['active'])) {
+				return ['success' => false, 'message' => 'Geçersiz kargo firması'];
+			}
+
+			$cargoCompanyName = (string) ($cargoRow['name'] ?? '');
+			$shippingFee = max(0.0, Cargo::getFeeForCargo((float) $cart['subtotal'], $idCargo));
+		} else {
+			// Mağaza satışı: kargo ücreti / firması yok
+			$shippingFee = 0.0;
+			$cargoCompanyName = '';
+			$idCargo = 0;
+		}
+
 		$sessionCustomer = $this->getSessionCustomer();
 
 		if ($idUser < 0) {
@@ -1559,7 +1930,9 @@ class PosModule extends ModuleBase
 
 			if ($user) {
 				$customerName = trim((string) ($user['user_full_name'] ?? ''));
-				$customerPhone = Customer::normalizePhone((string) ($user['phone'] ?? ''));
+				if (trim($customerPhone) === '') {
+					$customerPhone = Customer::normalizePhone((string) ($user['phone'] ?? ''));
+				}
 				$customerEmail = trim((string) ($user['email'] ?? ''));
 			} else {
 				$idUser = 0;
@@ -1567,6 +1940,10 @@ class PosModule extends ModuleBase
 			}
 		} else {
 			$customerEmail = trim((string) ($sessionCustomer['email'] ?? ''));
+		}
+
+		if ($shipEmail !== '') {
+			$customerEmail = $shipEmail;
 		}
 
 		$customerName = mb_substr(trim(strip_tags($customerName)), 0, 128);
@@ -1579,6 +1956,9 @@ class PosModule extends ModuleBase
 		$customerPhone = Customer::normalizePhone($customerPhone);
 
 		if ($customerPhone === '' || !Customer::isValidPhone($customerPhone)) {
+			if ($isShipping) {
+				return ['success' => false, 'message' => 'Kargo satışı için geçerli telefon gerekli'];
+			}
 			$customerPhone = '05000000000';
 		}
 
@@ -1588,10 +1968,11 @@ class PosModule extends ModuleBase
 
 		$note = trim(strip_tags($note));
 		$posNote = '[POS] ' . self::getPaymentLabel($payment);
+		$posNote .= $isShipping ? ' | Kargo satışı' : ' | Mağaza satışı';
 
 		$subtotal = (float) $cart['subtotal'];
 		$payable = $this->calculatePaymentTotal($subtotal, $payment);
-		$orderTotal = (float) $payable['total'];
+		$orderTotal = (float) $payable['total'] + ($isShipping ? $shippingFee : 0.0);
 
 		if (abs((float) $payable['adjustment']) > 0.009 && ($payable['adjustment_label'] ?? '') !== '') {
 			$posNote .= ' | ' . $payable['adjustment_label'] . ': ' . $payable['adjustment_signed_formatted'];
@@ -1607,15 +1988,31 @@ class PosModule extends ModuleBase
 			$posNote .= ' — ' . $note;
 		}
 
-		$status = (int) Settings::get(self::SET_ORDER_STATUS, (string) Order::STATUS_DELIVERED);
+		if ($isShipping) {
+			$status = $payment === self::PAYMENT_TRANSFER
+				? Order::STATUS_PENDING
+				: Order::STATUS_PROCESSING;
+			if (!isset(Order::getStatusOptions()[$status])) {
+				$status = Order::STATUS_PENDING;
+			}
+			$addressCity = $shipCity;
+			$addressDistrict = $shipDistrict;
+			$addressText = $shipAddress;
+		} else {
+			$status = (int) Settings::get(self::SET_ORDER_STATUS, (string) Order::STATUS_DELIVERED);
 
-		if ($payment === self::PAYMENT_TRANSFER) {
-			$status = Order::STATUS_PENDING;
-		} elseif (!isset(Order::getStatusOptions()[$status])) {
-			$status = Order::STATUS_DELIVERED;
+			if ($payment === self::PAYMENT_TRANSFER) {
+				$status = Order::STATUS_PENDING;
+			} elseif (!isset(Order::getStatusOptions()[$status])) {
+				$status = Order::STATUS_DELIVERED;
+			}
+
+			$addressCity = $storeLabel;
+			$addressDistrict = 'Mağaza';
+			$addressText = 'Mağaza içi satış (POS)';
+			$shippingFee = 0.0;
+			$cargoCompanyName = '';
 		}
-
-		$subtotal = (float) $cart['subtotal'];
 
 		if ($payment === self::PAYMENT_CASH && $cashPaid > 0 && $cashPaid + 0.009 < $orderTotal) {
 			return ['success' => false, 'message' => 'Alınan tutar toplamdan az'];
@@ -1658,20 +2055,23 @@ class PosModule extends ModuleBase
 				'customer_name' => $customerName,
 				'customer_phone' => $customerPhone,
 				'customer_email' => $customerEmail,
-				'address_city' => $storeLabel,
-				'address_district' => 'Mağaza',
-				'address_text' => 'Mağaza içi satış (POS)',
+				'address_city' => $addressCity,
+				'address_district' => $addressDistrict,
+				'address_text' => $addressText,
 				'note' => $posNote,
 				'coupon_code' => '',
 				'coupon_discount' => 0,
 				'subtotal' => $subtotal,
-				'shipping' => 0,
+				'shipping' => $shippingFee,
+				'cargo_company' => $cargoCompanyName,
 				'total' => $orderTotal,
 			]);
 
 			if (!$idOrder) {
 				throw new RuntimeException('Sipariş kaydedilemedi');
 			}
+
+			$reference = Order::finalizeOrderIdReference((int) $idOrder, $reference);
 
 			foreach ($cart['items'] as $item) {
 				$ok = DB::insert('order_detail', [
@@ -1699,6 +2099,17 @@ class PosModule extends ModuleBase
 			return ['success' => false, 'message' => $e->getMessage()];
 		}
 
+		if ($isShipping && $idUser > 0 && class_exists('Address') && (int) ($shippingOpts['id_address'] ?? 0) <= 0) {
+			Address::save($idUser, [
+				'full_name' => $customerName,
+				'phone' => $customerPhone,
+				'city' => $addressCity,
+				'district' => $addressDistrict,
+				'address_text' => $addressText,
+				'label' => 'POS',
+			]);
+		}
+
 		$this->clearCart();
 		$this->resetSessionCustomer();
 
@@ -1709,6 +2120,8 @@ class PosModule extends ModuleBase
 		$placedOrder = Order::getByIdAdmin((int) $idOrder);
 
 		if ($placedOrder) {
+			AdminNotification::notifyNewOrder($placedOrder);
+
 			Module::runHook('order.placed', [$placedOrder]);
 
 			if ($status !== Order::STATUS_PENDING) {
@@ -1744,7 +2157,6 @@ class PosModule extends ModuleBase
 			),
 		];
 	}
-
 	/** @param array<string, mixed>|null $payable */
 	public function buildReceiptPayload(
 		string $reference,

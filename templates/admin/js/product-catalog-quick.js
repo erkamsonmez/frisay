@@ -24,6 +24,50 @@
 		});
 	}
 
+	function rebuildExtraCategoryList(options) {
+		var list = document.getElementById('extraCategoryList');
+		if (!list) {
+			return;
+		}
+
+		var checked = {};
+		list.querySelectorAll('input[type="checkbox"]:checked').forEach(function (cb) {
+			checked[String(cb.value)] = true;
+		});
+
+		list.innerHTML = '';
+
+		(options || []).forEach(function (opt) {
+			var id = String(opt.id_category);
+			var wrap = document.createElement('div');
+			wrap.className = 'form-check';
+			wrap.setAttribute('data-extra-cat', id);
+
+			var input = document.createElement('input');
+			input.className = 'form-check-input';
+			input.type = 'checkbox';
+			input.name = 'extra_category_ids[]';
+			input.value = id;
+			input.id = 'extraCat' + id;
+			if (checked[id]) {
+				input.checked = true;
+			}
+
+			var label = document.createElement('label');
+			label.className = 'form-check-label';
+			label.htmlFor = input.id;
+			label.textContent = opt.category_name || '';
+
+			wrap.appendChild(input);
+			wrap.appendChild(label);
+			list.appendChild(wrap);
+		});
+
+		if (typeof window.syncProductExtraCategories === 'function') {
+			window.syncProductExtraCategories();
+		}
+	}
+
 	function rebuildCategoryParentSelect(select, options, selectedId) {
 		if (!select) {
 			return;
@@ -165,6 +209,7 @@
 
 					rebuildSelect(categorySelect, data.categoryOptions || [], 'id_category', 'category_name', data.id);
 					rebuildCategoryParentSelect(categoryParentSelect, data.categoryOptions || [], parentId);
+					rebuildExtraCategoryList(data.categoryOptions || []);
 
 					var modal = bootstrap.Modal.getInstance(categoryModalEl);
 					if (modal) {

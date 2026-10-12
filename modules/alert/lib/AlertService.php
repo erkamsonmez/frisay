@@ -441,31 +441,19 @@ class AlertService
 		if ($emails === []) {
 			return;
 		}
-		$customer = htmlspecialchars((string) ($order['customer_name'] ?? ''), ENT_QUOTES, 'UTF-8');
-		$total = Tools::displayPrice((float) ($order['total'] ?? 0));
+
 		$idOrder = (int) ($order['id_order'] ?? 0);
-		$adminUrl = htmlspecialchars(self::adminPanelUrl('order?id=' . $idOrder), ENT_QUOTES, 'UTF-8');
-		$siteName = htmlspecialchars(Settings::get('SITE_NAME') ?: 'FShop', ENT_QUOTES, 'UTF-8');
-
-		$body = '<h2 style="margin:0 0 16px;">Yeni sipariş</h2>'
-			. '<p><strong>Sipariş no:</strong> ' . $reference . '</p>'
-			. '<p><strong>Müşteri:</strong> ' . ($customer !== '' ? $customer : 'Misafir') . '</p>'
-			. '<p><strong>Toplam:</strong> ' . htmlspecialchars($total, ENT_QUOTES, 'UTF-8') . '</p>'
-			. '<p style="margin:24px 0;"><a href="' . $adminUrl . '" style="display:inline-block;padding:12px 24px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:6px;">Siparişi görüntüle</a></p>';
-
-		$subject = $siteName . ' — Yeni sipariş #' . (string) ($order['reference'] ?? '');
 
 		foreach ($emails as $email) {
-			Mail::send($email, $subject, $body);
+			Mail::sendAdminNewOrder($email, $order);
 		}
 
-		if ($idOrder > 0 && class_exists('AdminNotification', false)) {
-			AdminNotification::add(
-				'Yeni sipariş #' . (string) ($order['reference'] ?? ''),
-				($customer !== '' ? $customer : 'Misafir') . ' — ' . $total,
-				self::adminPanelUrl('order?id=' . $idOrder),
-				'order'
-			);
+		if ($idOrder > 0) {
+			if (!class_exists('AdminNotification', false)) {
+				require_once dirname(__DIR__, 3) . '/core/AdminNotification.php';
+			}
+
+			AdminNotification::notifyNewOrder($order);
 		}
 	}
 
@@ -481,28 +469,10 @@ class AlertService
 			return;
 		}
 
-		$name = htmlspecialchars((string) ($product['product_name'] ?? 'Ürün'), ENT_QUOTES, 'UTF-8');
-		$stockCode = htmlspecialchars((string) ($product['stock_code'] ?? ''), ENT_QUOTES, 'UTF-8');
 		$threshold = self::getCriticalThreshold();
 		$adminUrl = htmlspecialchars(self::adminPanelUrl('product?id=' . $idProduct), ENT_QUOTES, 'UTF-8');
 		$siteName = htmlspecialchars(Settings::get('SITE_NAME') ?: 'FShop', ENT_QUOTES, 'UTF-8');
-		$variationNote = '';
-
-		if ($idVariation > 0) {
-			$variation = ProductVariation::getById($idVariation);
-			$label = trim((string) ($variation['label'] ?? ''));
-
-			if ($label !== '') {
-				$variationNote = ' (' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . ')';
-			}
-		}
-
-		$body = '<h2 style="margin:0 0 16px;">Kritik stok uyarısı</h2>'
-			. '<p><strong>Ürün:</strong> ' . $name . $variationNote . '</p>'
-			. ($stockCode !== '' ? '<p><strong>Stok kodu:</strong> ' . $stockCode . '</p>' : '')
-			. '<p><strong>Güncel stok:</strong> ' . (int) $newStock . '</p>'
-			. '<p><strong>Eşik:</strong> ' . $threshold . ' ve altı</p>'
-			. '<p style="margin:24px 0;"><a href="' . $adminUrl . '" style="display:inline-block;padding:12px 24px;background:#dc3545;color:#fff;text-decoration:none;border-radius:6px;">Ürünü düzenle</a></p>';
+		$body = Mail::buildCriticalStockBody($product, $newStock, $threshold, $idVariation, $adminUrl);
 
 		$subject = $siteName . ' — Kritik stok: ' . (string) ($product['product_name'] ?? 'Ürün');
 
@@ -553,11 +523,10 @@ class AlertService
 
 			$url = htmlspecialchars($productUrl, ENT_QUOTES, 'UTF-8');
 			$name = htmlspecialchars($productName, ENT_QUOTES, 'UTF-8');
-			$body = '<h2 style="margin:0 0 16px;">' . self::storefrontT('Back in stock') . '</h2>'
+			$body = '<h2 style="margin:0 0 16px;font-size:22px;color:#111827;">' . self::storefrontT('Back in stock') . '</h2>'
 				. '<p>' . self::storefrontT('The product you requested is back in stock:') . '</p>'
-				. '<p><strong>' . $name . '</strong></p>'
-				. '<p style="margin:24px 0;"><a href="' . $url . '" style="display:inline-block;padding:12px 24px;background:#28a745;color:#fff;text-decoration:none;border-radius:6px;">'
-				. self::storefrontT('View product') . '</a></p>';
+				. Mail::infoBox('<p style="margin:0;"><strong>' . $name . '</strong></p>')
+				. Mail::ctaButton($url, self::storefrontT('View product'), '#15803d');
 
 			$sent = Mail::send(
 				(string) $row['email'],

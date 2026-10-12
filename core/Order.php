@@ -9,6 +9,7 @@ class Order
 	const STATUS_CANCELLED = 5;
 	const STATUS_RETURNED = 6;
 	const STATUS_RETURN_PENDING = 7;
+	const STATUS_PAID = 8;
 
 	private static bool $schemaReady = false;
 
@@ -151,6 +152,27 @@ class Order
 		return trim((string) ($_SESSION[self::PAYMENT_SESSION_KEY] ?? ''));
 	}
 
+	public static function resolveDefaultPaymentMethod(?array $methods = null): string
+	{
+		if (!is_array($methods) || $methods === []) {
+			$methods = Module::getPaymentMethods();
+		}
+
+		$configured = trim((string) Settings::get('DEFAULT_PAYMENT_METHOD'));
+
+		if ($configured !== '' && isset($methods[$configured])) {
+			return $configured;
+		}
+
+		if (isset($methods['bank_transfer'])) {
+			return 'bank_transfer';
+		}
+
+		$key = array_key_first($methods);
+
+		return $key ? (string) $key : '';
+	}
+
 	public static function setSelectedPaymentMethod(string $method): bool
 	{
 		$method = trim($method);
@@ -180,6 +202,7 @@ class Order
 	{
 		$labels = [
 			self::STATUS_PENDING => translate('Order status pending'),
+			self::STATUS_PAID => translate('Order status paid'),
 			self::STATUS_PROCESSING => translate('Order status processing'),
 			self::STATUS_SHIPPED => translate('Order status shipped'),
 			self::STATUS_DELIVERED => translate('Order status delivered'),
@@ -210,6 +233,138 @@ class Order
 		return isset($labels[$method]) ? $labels[$method] : $method;
 	}
 
+	/**
+	 * Kart / sanal POS ödemesinin banka yanıtı ve referans no.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public static function getGatewayPaymentDetails(array $order): ?array
+	{
+		$idOrder = (int) ($order['id_order'] ?? 0);
+		$reference = (string) ($order['reference'] ?? '');
+		$method = (string) ($order['payment_method'] ?? '');
+
+		$empty = [
+			'provider' => self::getPaymentLabel($method),
+			'payment_method' => $method,
+			'reference' => $reference,
+			'message' => '',
+			'code' => '',
+			'status' => '',
+			'raw' => '',
+			'fields' => [],
+			'logs' => [],
+			'card_number' => '',
+			'provision_number' => '',
+			'rrn' => '',
+			'stan' => '',
+			'bank_order_id' => '',
+		];
+
+		$helperFile = dirname(__DIR__) . '/modules/kuveytturk/lib/KuveytTurkHelper.php';
+
+		if (self::paymentTableExists('kuveytturk_log') && is_file($helperFile)) {
+			require_once $helperFile;
+
+			if (class_exists('KuveytTurkHelper')) {
+				$helper = new KuveytTurkHelper();
+				$logs = $helper->getLogsForOrder($idOrder, $reference, 20);
+				$best = self::pickGatewayLogRow($logs);
+
+				if ($best) {
+					$fields = is_array($best['bank_fields'] ?? null) ? $best['bank_fields'] : [];
+
+					return [
+						'provider' => 'KuveytTürk Sanal POS',
+						'payment_method' => $method !== '' ? $method : 'kuveytturk',
+						'reference' => (string) ($best['merchant_order_id'] ?: $reference),
+						'message' => (string) ($best['response_message'] ?? ''),
+						'code' => (string) ($best['response_code'] ?? ''),
+						'status' => (string) ($best['status'] ?? ''),
+						'raw' => (string) ($best['response_data'] ?? ''),
+						'fields' => $fields,
+						'logs' => $logs,
+						'card_number' => (string) ($best['card_number'] ?? ''),
+						'provision_number' => (string) ($best['provision_number'] ?? ''),
+						'rrn' => (string) ($best['rrn'] ?? ''),
+						'stan' => (string) ($best['stan'] ?? ''),
+						'bank_order_id' => (string) ($best['bank_order_id'] ?? ''),
+					];
+				}
+			}
+		}
+
+		if ($idOrder <= 0 || !self::isOnlineCardPayment($method)) {
+			return null;
+		}
+
+		if (self::paymentTableExists('iyzico_orders')) {
+			$row = DB::getRowSafe('iyzico_orders', 'id_order = ?', [$idOrder]);
+
+			if (!$row && $reference !== '') {
+				$row = DB::getRowSafe('iyzico_orders', 'reference = ?', [$reference]);
+			}
+
+			if ($row) {
+				$empty['provider'] = 'iyzico';
+				$empty['reference'] = (string) ($row['payment_id'] ?: $reference);
+				$empty['message'] = (string) ($row['status'] ?? 'SUCCESS');
+				$empty['status'] = (string) ($row['status'] ?? '');
+
+				return $empty;
+			}
+		}
+
+		if ($empty['reference'] === '') {
+			return null;
+		}
+
+		$empty['message'] = translate('Payment approved');
+
+		return $empty;
+	}
+
+	/**
+	 * @param array<int, array<string, mixed>> $logs
+	 * @return array<string, mixed>|null
+	 */
+	private static function pickGatewayLogRow(array $logs): ?array
+	{
+		if ($logs === []) {
+			return null;
+		}
+
+		foreach ($logs as $row) {
+			if (($row['status'] ?? '') === 'completed' && trim((string) ($row['response_data'] ?? '')) !== '') {
+				return $row;
+			}
+		}
+
+		foreach ($logs as $row) {
+			if (trim((string) ($row['response_data'] ?? '')) !== '') {
+				return $row;
+			}
+		}
+
+		return $logs[0];
+	}
+
+	private static function paymentTableExists(string $table): bool
+	{
+		static $cache = [];
+		$table = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+
+		if ($table === '') {
+			return false;
+		}
+
+		if (!isset($cache[$table])) {
+			$cache[$table] = !empty(DB::execute("SHOW TABLES LIKE '" . $table . "'"));
+		}
+
+		return $cache[$table];
+	}
+
 	public static function getShippingFee(float $subtotal, ?int $idCargo = null): float
 	{
 		if (!class_exists('Cargo') && is_file(dirname(__DIR__) . '/core/Cargo.php')) {
@@ -228,10 +383,52 @@ class Order
 	public static function isPaymentAccepted(int $status): bool
 	{
 		return in_array($status, [
+			self::STATUS_PAID,
 			self::STATUS_PROCESSING,
 			self::STATUS_SHIPPED,
 			self::STATUS_DELIVERED,
 		], true);
+	}
+
+	/** Online kart / sanal POS ödemesi alındıktan sonra sipariş bu duruma geçer. */
+	public static function markPaidByGateway(int $idOrder): array
+	{
+		$order = DB::getRowSafe('orders', 'id_order = ?', [$idOrder]);
+
+		if (!$order) {
+			return self::fail('Sipariş bulunamadı');
+		}
+
+		$status = (int) ($order['status'] ?? 0);
+
+		if (self::isPaymentAccepted($status)) {
+			return self::ok('Sipariş durumu zaten güncel');
+		}
+
+		if ($status !== self::STATUS_PENDING) {
+			return self::fail('Sipariş durumu ödeme için uygun değil');
+		}
+
+		return self::updateStatus($idOrder, self::STATUS_PAID);
+	}
+
+	public static function isOnlineCardPayment(string $method): bool
+	{
+		$method = strtolower(trim($method));
+
+		if ($method === '') {
+			return false;
+		}
+
+		$offline = [
+			'bank_transfer',
+			'cash_on_delivery',
+			'pos_cash',
+			'pos_card',
+			'pos_transfer',
+		];
+
+		return !in_array($method, $offline, true);
 	}
 
 	public static function getCheckoutTotals(float $subtotal, float $discount = 0.0, ?array $cart = null, ?int $idCargo = null, ?string $paymentMethod = null, ?bool $giftWrap = null): array
@@ -359,8 +556,16 @@ class Order
 			return self::fail(translate('Please enter a valid email'));
 		}
 
+		if ($idUser <= 0 && Customer::emailIsRegistered($customerEmail)) {
+			return self::fail(translate('This email is already registered'));
+		}
+
 		if (!Customer::isValidPhone($phone)) {
 			return self::fail(translate('Please enter a valid phone number'));
+		}
+
+		if ($idUser <= 0 && Customer::phoneIsRegistered($phone)) {
+			return self::fail(translate('This phone is already registered'));
 		}
 
 		if ($city === '' || $district === '' || $address === '') {
@@ -539,6 +744,10 @@ class Order
 				throw new RuntimeException('Sipariş kaydedilemedi');
 			}
 
+			if (empty($data['_reference'])) {
+				$reference = self::finalizeOrderIdReference((int) $idOrder, $reference);
+			}
+
 			foreach ($cart['items'] as $item) {
 				$lineQty = round((float) ($item['qty'] ?? 0), 3);
 				$measure = is_array($item['measure'] ?? null) ? $item['measure'] : [];
@@ -597,8 +806,13 @@ class Order
 
 			$placedOrder = self::getByIdAdmin((int) $idOrder);
 
-			if ($placedOrder && class_exists('Module', false)) {
-				Module::runHook('order.placed', [$placedOrder]);
+			if ($placedOrder) {
+				AdminNotification::notifyNewOrder($placedOrder);
+				Mail::sendOrderConfirmation($placedOrder);
+
+				if (class_exists('Module', false)) {
+					Module::runHook('order.placed', [$placedOrder]);
+				}
 			}
 
 			if ($idAddress === 0 && $idUser > 0 && !empty($data['save_address'])) {
@@ -704,6 +918,115 @@ class Order
 		}
 	}
 
+	/** Misafir siparişindeki iletişim/adres alanlarını üyelik formundan günceller */
+	public static function updateGuestContact(int $idOrder, array $data): bool
+	{
+		if ($idOrder <= 0) {
+			return false;
+		}
+
+		$order = DB::getRowSafe('orders', 'id_order = ?', [$idOrder]);
+
+		if (!$order || (int) ($order['id_user'] ?? 0) > 0) {
+			return false;
+		}
+
+		$name = mb_substr(trim(strip_tags((string) ($data['customer_name'] ?? ''))), 0, 128);
+		$phone = Customer::normalizePhone((string) ($data['customer_phone'] ?? ''));
+		$email = strtolower(trim((string) ($data['customer_email'] ?? '')));
+		$city = mb_substr(trim(strip_tags((string) ($data['address_city'] ?? ''))), 0, 64);
+		$district = mb_substr(trim(strip_tags((string) ($data['address_district'] ?? ''))), 0, 64);
+		$address = mb_substr(trim(strip_tags((string) ($data['address_text'] ?? ''))), 0, 500);
+
+		return DB::update('orders', [
+			'customer_name' => $name,
+			'customer_phone' => $phone,
+			'customer_email' => $email,
+			'address_city' => $city,
+			'address_district' => $district,
+			'address_text' => $address,
+		], 'id_order = :id_order', ['id_order' => $idOrder]) !== false;
+	}
+
+	/** Misafir siparişi, aynı e-posta veya telefonla üye olunca / girişte hesaba bağlar */
+	public static function attachGuestOrdersToUser(int $idUser): void
+	{
+		if ($idUser <= 0) {
+			return;
+		}
+
+		$user = DB::getRowSafe('users', 'id_user = ?', [$idUser]);
+
+		if (!$user) {
+			return;
+		}
+
+		$userEmail = strtolower(trim((string) ($user['email'] ?? '')));
+		$userPhone = Customer::normalizePhone((string) ($user['phone'] ?? ''));
+		$ids = [];
+		$sessionIds = [];
+
+		if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['guest_order_ids']) && is_array($_SESSION['guest_order_ids'])) {
+			foreach (array_keys($_SESSION['guest_order_ids']) as $sessionOrderId) {
+				$sessionIds[] = (int) $sessionOrderId;
+				$ids[] = (int) $sessionOrderId;
+			}
+		}
+
+		if ($userEmail !== '') {
+			$emailRows = DB::execute(
+				'SELECT id_order FROM orders WHERE id_user = 0 AND customer_email = ? ORDER BY id_order DESC LIMIT 20',
+				[$userEmail]
+			) ?: [];
+
+			foreach ($emailRows as $row) {
+				$ids[] = (int) ($row['id_order'] ?? 0);
+			}
+		}
+
+		if ($userPhone !== '') {
+			$phoneRows = DB::execute(
+				'SELECT id_order FROM orders WHERE id_user = 0 AND customer_phone = ? ORDER BY id_order DESC LIMIT 20',
+				[$userPhone]
+			) ?: [];
+
+			foreach ($phoneRows as $row) {
+				$ids[] = (int) ($row['id_order'] ?? 0);
+			}
+		}
+
+		$ids = array_values(array_unique(array_filter($ids)));
+
+		foreach ($ids as $idOrder) {
+			if ($idOrder <= 0) {
+				continue;
+			}
+
+			$order = DB::getRowSafe('orders', 'id_order = ? AND id_user = 0', [$idOrder]);
+
+			if (!$order) {
+				continue;
+			}
+
+			$orderEmail = strtolower(trim((string) ($order['customer_email'] ?? '')));
+			$orderPhone = Customer::normalizePhone((string) ($order['customer_phone'] ?? ''));
+			$emailMatch = $userEmail !== '' && $orderEmail !== '' && hash_equals($userEmail, $orderEmail);
+			$phoneMatch = $userPhone !== '' && $orderPhone !== '' && hash_equals($userPhone, $orderPhone);
+			$fromSession = in_array($idOrder, $sessionIds, true);
+
+			if (!$fromSession && !$emailMatch && !$phoneMatch) {
+				continue;
+			}
+
+			DB::update(
+				'orders',
+				['id_user' => $idUser],
+				'id_order = :attach_id_order AND id_user = 0',
+				['attach_id_order' => $idOrder]
+			);
+		}
+	}
+
 	public static function guestCanViewOrder(int $idOrder): bool
 	{
 		return $idOrder > 0
@@ -795,6 +1118,7 @@ class Order
 		$order['manual_discount_value'] = (float) ($order['manual_discount_value'] ?? 0);
 		$order['date_formatted'] = Tools::formatDate3($order['date_add']);
 		$order = self::enrichInvoiceFields($order);
+		$order = self::enrichCargoFields($order);
 		$order['items'] = DB::execute(
 			'SELECT od.*, p.barcode, p.stock_code, p.vat, p.product_type, p.virtual_kind
 			FROM order_detail od
@@ -813,6 +1137,28 @@ class Order
 		unset($item);
 
 		return $order;
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 * @return array<string, mixed>
+	 */
+	private static function enrichCargoFields(array $row): array
+	{
+		$cargoName = trim((string) ($row['cargo_company'] ?? ''));
+		$cargo = class_exists('Cargo') && $cargoName !== '' ? Cargo::getByName($cargoName) : null;
+		$row['cargo_name'] = $cargoName;
+		$row['cargo_logo_url'] = class_exists('Cargo')
+			? (Cargo::resolveLogoUrl($cargoName, $cargo ? (int) $cargo['id_cargo'] : null) ?? '')
+			: '';
+		$row['tracking_number'] = trim((string) ($row['tracking_number'] ?? ''));
+		$row['tracking_url'] = '';
+
+		if ($row['tracking_number'] !== '' && class_exists('Cargo')) {
+			$row['tracking_url'] = Cargo::buildTrackingUrl($row['tracking_number'], $cargo ?: $cargoName);
+		}
+
+		return $row;
 	}
 
 	public static function getUserOrders(int $idUser): array
@@ -848,7 +1194,7 @@ class Order
 			$row['payment_label'] = self::getPaymentLabel($row['payment_method']);
 			$row['total_formatted'] = Tools::displayPrice($row['total']);
 			$row['date_formatted'] = Tools::formatDate3($row['date_add']);
-			$row['is_ongoing'] = in_array($status, [self::STATUS_PENDING, self::STATUS_PROCESSING, self::STATUS_SHIPPED], true);
+			$row['is_ongoing'] = in_array($status, [self::STATUS_PENDING, self::STATUS_PAID, self::STATUS_PROCESSING, self::STATUS_SHIPPED], true);
 			$row['is_cancelled'] = $status === self::STATUS_CANCELLED;
 			$row['is_returned'] = in_array($status, [self::STATUS_RETURNED, self::STATUS_RETURN_PENDING], true);
 			$row['is_return_pending'] = $status === self::STATUS_RETURN_PENDING;
@@ -866,12 +1212,40 @@ class Order
 
 			$row['item_count'] = count($items);
 			$first = $items[0] ?? null;
-			$row['thumb_product'] = $first['product_name'] ?? '';
-			$row['thumb_url'] = !empty($first['id_image'])
-				? Product::getImageUrl((int) $first['id_image'])
-				: '../img/default.jpg';
+			$row['thumb_product'] = (string) ($first['product_name'] ?? '');
 			$row['first_product_id'] = (int) ($first['id_product'] ?? 0);
 			$row['can_review'] = $status === self::STATUS_DELIVERED && $row['first_product_id'] > 0;
+			$row['location'] = trim(($row['address_city'] ?? '') . '/' . ($row['address_district'] ?? ''), '/');
+			$row['date_full'] = date('d.m.Y H:i', strtotime((string) $row['date_add']));
+
+			$shipping = (float) ($row['shipping'] ?? 0);
+			$row['shipping_formatted'] = $shipping > 0
+				? Tools::displayPrice($shipping)
+				: translate('Free');
+
+			$row = self::enrichCargoFields($row);
+
+			$thumbs = [];
+
+			foreach ($items as $item) {
+				if (empty($item['id_image'])) {
+					continue;
+				}
+
+				$url = Product::getImageUrl((int) $item['id_image']);
+
+				if ($url !== '' && !in_array($url, $thumbs, true)) {
+					$thumbs[] = $url;
+				}
+
+				if (count($thumbs) >= 3) {
+					break;
+				}
+			}
+
+			$row['thumb_url'] = $thumbs[0] ?? Product::getImageUrl(!empty($first['id_image']) ? (int) $first['id_image'] : null);
+			$row['thumb_urls'] = $thumbs !== [] ? $thumbs : [$row['thumb_url']];
+			$row = self::enrichInvoiceFields($row);
 		}
 		unset($row);
 
@@ -880,7 +1254,7 @@ class Order
 
 	public static function canCustomerCancel(int $status): bool
 	{
-		return in_array($status, [self::STATUS_PENDING, self::STATUS_PROCESSING], true);
+		return in_array($status, [self::STATUS_PENDING, self::STATUS_PAID, self::STATUS_PROCESSING], true);
 	}
 
 	/** Ana sayfa: teslim edilmemiş son siparişler (en fazla 3). */
@@ -925,6 +1299,8 @@ class Order
 		switch ((int) $status) {
 			case self::STATUS_PENDING:
 				return 10;
+			case self::STATUS_PAID:
+				return 20;
 			case self::STATUS_PROCESSING:
 				return 25;
 			case self::STATUS_SHIPPED:
@@ -944,6 +1320,8 @@ class Order
 		switch ((int) $status) {
 			case self::STATUS_PENDING:
 				return 'Sipariş alındı';
+			case self::STATUS_PAID:
+				return translate('Order status paid');
 			case self::STATUS_PROCESSING:
 				return 'Hazırlanıyor';
 			case self::STATUS_SHIPPED:
@@ -1016,6 +1394,7 @@ class Order
 	{
 		return [
 			self::STATUS_PENDING => self::getStatusLabel(self::STATUS_PENDING),
+			self::STATUS_PAID => self::getStatusLabel(self::STATUS_PAID),
 			self::STATUS_PROCESSING => self::getStatusLabel(self::STATUS_PROCESSING),
 			self::STATUS_SHIPPED => self::getStatusLabel(self::STATUS_SHIPPED),
 			self::STATUS_DELIVERED => self::getStatusLabel(self::STATUS_DELIVERED),
@@ -1029,6 +1408,7 @@ class Order
 	{
 		$map = [
 			self::STATUS_PENDING => 'pending',
+			self::STATUS_PAID => 'paid',
 			self::STATUS_PROCESSING => 'processing',
 			self::STATUS_SHIPPED => 'shipped',
 			self::STATUS_DELIVERED => 'delivered',
@@ -1067,21 +1447,10 @@ class Order
 			$row['date_full'] = date('Y-m-d H:i:s', strtotime((string) $row['date_add']));
 			$row['date_list'] = date('d.m.Y H:i', strtotime((string) $row['date_add']));
 
-			$cargoName = trim((string) ($row['cargo_company'] ?? ''));
-			$cargo = class_exists('Cargo', false) && $cargoName !== '' ? Cargo::getByName($cargoName) : null;
-			$row['cargo_name'] = $cargoName;
-			$row['cargo_logo_url'] = class_exists('Cargo', false)
-				? (Cargo::resolveLogoUrl($cargoName, $cargo ? (int) $cargo['id_cargo'] : null) ?? '')
-				: '';
-			$row['tracking_url'] = '';
-			$row['tracking_number'] = trim((string) ($row['tracking_number'] ?? ''));
+			$row = self::enrichCargoFields($row);
 
 			$row['gift_wrap'] = (int) ($row['gift_wrap'] ?? 0);
 			$row['has_gift_wrap'] = $row['gift_wrap'] === 1;
-
-			if ($row['tracking_number'] !== '' && class_exists('Cargo', false)) {
-				$row['tracking_url'] = Cargo::buildTrackingUrl($row['tracking_number'], $cargo ?: $cargoName);
-			}
 
 			$channel = self::resolveAdminChannel($row);
 			$row['channel'] = $channel;
@@ -1108,7 +1477,7 @@ class Order
 			$row['ship_tone'] = 'none';
 			if ($status === self::STATUS_SHIPPED || $status === self::STATUS_DELIVERED) {
 				$row['ship_tone'] = 'shipped';
-			} elseif ($status === self::STATUS_PROCESSING) {
+			} elseif ($status === self::STATUS_PROCESSING || $status === self::STATUS_PAID) {
 				$row['ship_tone'] = 'today';
 			} elseif ($status === self::STATUS_PENDING) {
 				$row['ship_tone'] = 'later';
@@ -1138,11 +1507,33 @@ class Order
 
 			$row['thumb_product'] = (string) ($first['product_name'] ?? '');
 
+			$thumbs = [];
+			foreach ($lines as $line) {
+				if (empty($line['id_image'])) {
+					continue;
+				}
+				$url = Product::getImageUrl((int) $line['id_image']);
+				if ($url !== '' && !in_array($url, $thumbs, true)) {
+					$thumbs[] = $url;
+				}
+				if (count($thumbs) >= 3) {
+					break;
+				}
+			}
+
 			if (!empty($first['id_image'])) {
 				$row['thumb_url'] = Product::getImageUrl((int) $first['id_image']);
+			} elseif ($thumbs !== []) {
+				$row['thumb_url'] = $thumbs[0];
 			} else {
-				$row['thumb_url'] = '../img/default.jpg';
+				$row['thumb_url'] = Product::getImageUrl(null);
 			}
+
+			if ($thumbs === [] && $row['thumb_url'] !== '') {
+				$thumbs[] = $row['thumb_url'];
+			}
+
+			$row['thumb_urls'] = $thumbs;
 		}
 		unset($row);
 
@@ -1292,17 +1683,24 @@ class Order
 
 		self::applyAdminFilters($sql, $params, $status, $dateFrom, $dateTo, $filters);
 
-		$sort = (string) ($filters['sort'] ?? 'date_desc');
-		$orderBy = 'id_order DESC';
+		$sort = (string) ($filters['sort'] ?? 'date');
+		$dir = strtolower((string) ($filters['dir'] ?? 'desc')) === 'asc' ? 'ASC' : 'DESC';
+		$orderBy = trim((string) ($filters['order_by'] ?? ''));
 
-		if ($sort === 'date_asc') {
-			$orderBy = 'date_add ASC, id_order ASC';
-		} elseif ($sort === 'total_desc') {
-			$orderBy = 'total DESC, id_order DESC';
-		} elseif ($sort === 'total_asc') {
-			$orderBy = 'total ASC, id_order ASC';
-		} else {
-			$orderBy = 'date_add DESC, id_order DESC';
+		if ($orderBy === '') {
+			$columns = [
+				'date' => 'date_add',
+				'total' => 'total',
+				'id' => 'id_order',
+				'reference' => 'reference',
+			];
+
+			if (isset($columns[$sort])) {
+				$tie = $sort === 'id' ? '' : ', id_order ' . $dir;
+				$orderBy = $columns[$sort] . ' ' . $dir . $tie;
+			} else {
+				$orderBy = 'date_add DESC, id_order DESC';
+			}
 		}
 
 		$sql .= ' ORDER BY ' . $orderBy . ' LIMIT ' . (int) $limit . ' OFFSET ' . (int) $offset;
@@ -1340,11 +1738,30 @@ class Order
 	 */
 	public static function normalizeAdminFilters(array $input): array
 	{
-		$sort = trim((string) ($input['sort'] ?? 'date_desc'));
-		$allowedSort = ['date_desc', 'date_asc', 'total_desc', 'total_asc'];
+		$sort = trim((string) ($input['sort'] ?? 'date'));
+		$dir = strtolower(trim((string) ($input['dir'] ?? '')));
+
+		$legacyMap = [
+			'date_desc' => ['date', 'desc'],
+			'date_asc' => ['date', 'asc'],
+			'total_desc' => ['total', 'desc'],
+			'total_asc' => ['total', 'asc'],
+			'id_desc' => ['id', 'desc'],
+			'id_asc' => ['id', 'asc'],
+		];
+
+		if (isset($legacyMap[$sort])) {
+			[$sort, $dir] = $legacyMap[$sort];
+		}
+
+		$allowedSort = ['date', 'total', 'id', 'reference'];
 
 		if (!in_array($sort, $allowedSort, true)) {
-			$sort = 'date_desc';
+			$sort = 'date';
+		}
+
+		if ($dir !== 'asc' && $dir !== 'desc') {
+			$dir = 'desc';
 		}
 
 		$channel = trim((string) ($input['channel'] ?? 'all'));
@@ -1364,7 +1781,12 @@ class Order
 			'tracking_number' => mb_substr(trim((string) ($input['tracking_number'] ?? '')), 0, 64),
 			'cargo_company' => mb_substr(trim((string) ($input['cargo_company'] ?? '')), 0, 128),
 			'channel' => $channel,
+			'id_min' => trim((string) ($input['id_min'] ?? '')),
+			'id_max' => trim((string) ($input['id_max'] ?? '')),
+			'total_min' => trim((string) ($input['total_min'] ?? '')),
+			'total_max' => trim((string) ($input['total_max'] ?? '')),
 			'sort' => $sort,
+			'dir' => $dir,
 		];
 	}
 
@@ -1376,11 +1798,20 @@ class Order
 		foreach ([
 			'reference', 'customer', 'date_from', 'date_to',
 			'payment_method', 'sku', 'product_name', 'tracking_number',
-			'cargo_company', 'channel', 'sort',
+			'cargo_company', 'channel', 'id_min', 'id_max', 'total_min', 'total_max',
+			'sort', 'dir',
 		] as $key) {
 			$value = trim((string) ($filters[$key] ?? ''));
 
-			if ($value === '' || ($key === 'channel' && $value === 'all') || ($key === 'sort' && $value === 'date_desc')) {
+			if ($value === '' || ($key === 'channel' && $value === 'all')) {
+				continue;
+			}
+
+			if ($key === 'sort' && $value === 'date' && strtolower((string) ($filters['dir'] ?? 'desc')) === 'desc') {
+				continue;
+			}
+
+			if ($key === 'dir' && (string) ($filters['sort'] ?? 'date') === 'date' && $value === 'desc') {
 				continue;
 			}
 
@@ -1444,6 +1875,30 @@ class Order
 		if ($customer !== '') {
 			$sql .= ' AND customer_name LIKE ?';
 			$params[] = '%' . $customer . '%';
+		}
+
+		$idMin = $filters['id_min'] ?? '';
+		if ($idMin !== '' && $idMin !== null && is_numeric($idMin)) {
+			$sql .= ' AND id_order >= ?';
+			$params[] = (int) $idMin;
+		}
+
+		$idMax = $filters['id_max'] ?? '';
+		if ($idMax !== '' && $idMax !== null && is_numeric($idMax)) {
+			$sql .= ' AND id_order <= ?';
+			$params[] = (int) $idMax;
+		}
+
+		$totalMin = str_replace(',', '.', trim((string) ($filters['total_min'] ?? '')));
+		if ($totalMin !== '' && is_numeric($totalMin)) {
+			$sql .= ' AND total >= ?';
+			$params[] = (float) $totalMin;
+		}
+
+		$totalMax = str_replace(',', '.', trim((string) ($filters['total_max'] ?? '')));
+		if ($totalMax !== '' && is_numeric($totalMax)) {
+			$sql .= ' AND total <= ?';
+			$params[] = (float) $totalMax;
 		}
 
 		$paymentMethod = trim((string) ($filters['payment_method'] ?? ''));
@@ -1542,6 +1997,8 @@ class Order
 		$order = self::enrichGiftWrapFields($order);
 		$order['coupon_discount'] = (float) ($order['coupon_discount'] ?? 0);
 		$order['coupon_discount_formatted'] = Tools::displayPrice($order['coupon_discount']);
+		$order['coupon_code'] = (string) ($order['coupon_code'] ?? '');
+		$order['promotion_name'] = (string) ($order['promotion_name'] ?? '');
 		$order['promotion_discount'] = (float) ($order['promotion_discount'] ?? 0);
 		$order['promotion_discount_formatted'] = Tools::displayPrice($order['promotion_discount']);
 		$order['payment_discount'] = (float) ($order['payment_discount'] ?? 0);
@@ -1571,6 +2028,154 @@ class Order
 		unset($item);
 
 		return $order;
+	}
+
+	/**
+	 * Plain-text order summary for WhatsApp (wa.me / Wapio) or email to the customer.
+	 *
+	 * @param array<string, mixed> $order Admin order row from getByIdAdmin()
+	 */
+	public static function buildCustomerNotifyMessage(array $order, string $trackingUrl = ''): string
+	{
+		global $domain;
+
+		$lines = [];
+		$status = (int) ($order['status'] ?? 0);
+		$title = $status === self::STATUS_CANCELLED
+			? 'SİPARİŞ İPTAL EDİLDİ'
+			: 'SİPARİŞ BİLGİLERİNİZ';
+
+		$lines[] = '*' . $title . '*';
+		$lines[] = '';
+		$lines[] = 'ADRES BİLGİLERİNİZ';
+		$lines[] = trim((string) ($order['customer_name'] ?? ''));
+		$city = trim((string) ($order['address_city'] ?? ''));
+		$district = trim((string) ($order['address_district'] ?? ''));
+		$location = trim($city . ($city !== '' && $district !== '' ? ' / ' : '') . $district);
+		if ($location !== '') {
+			$lines[] = $location;
+		}
+		$address = trim((string) ($order['address_text'] ?? ''));
+		if ($address !== '') {
+			$lines[] = $address;
+		}
+		$phone = trim((string) ($order['customer_phone'] ?? ''));
+		if ($phone !== '') {
+			$lines[] = 'Tel: ' . $phone;
+		}
+
+		$lines[] = '';
+		$lines[] = 'SİPARİŞ DETAYI';
+		$lines[] = 'Sipariş Numarası: ' . trim((string) ($order['reference'] ?? ''));
+		$lines[] = 'Durum: ' . (string) ($order['status_label'] ?? self::getStatusLabel($status));
+		$lines[] = 'Ödeme: ' . (string) ($order['payment_label'] ?? self::getPaymentLabel((string) ($order['payment_method'] ?? '')));
+
+		$items = is_array($order['items'] ?? null) ? $order['items'] : [];
+		foreach ($items as $item) {
+			$qty = isset($item['qty_label']) && (string) $item['qty_label'] !== ''
+				? (string) $item['qty_label']
+				: ((string) (int) ($item['qty'] ?? 0) . 'x');
+			$name = trim((string) ($item['product_name'] ?? ''));
+			$variation = trim((string) ($item['variation_label'] ?? ''));
+			if ($variation !== '') {
+				$name .= ' (' . $variation . ')';
+			}
+			$lineTotal = (string) ($item['total_formatted'] ?? Tools::displayPrice((float) ($item['total'] ?? 0)));
+			$lines[] = '*' . $qty . '* ' . $name . ' — ' . $lineTotal;
+		}
+
+		$lines[] = '';
+		$lines[] = 'Ara toplam: ' . (string) ($order['subtotal_formatted'] ?? Tools::displayPrice((float) ($order['subtotal'] ?? 0)));
+
+		if ((float) ($order['coupon_discount'] ?? 0) > 0) {
+			$couponLabel = 'Kupon';
+			$code = trim((string) ($order['coupon_code'] ?? ''));
+			if ($code !== '') {
+				$couponLabel .= ' (' . $code . ')';
+			}
+			$lines[] = $couponLabel . ': -' . (string) ($order['coupon_discount_formatted'] ?? Tools::displayPrice((float) $order['coupon_discount']));
+		}
+		if ((float) ($order['promotion_discount'] ?? 0) > 0) {
+			$promoLabel = trim((string) ($order['promotion_name'] ?? ''));
+			if ($promoLabel === '') {
+				$promoLabel = 'Kampanya';
+			}
+			$lines[] = $promoLabel . ': -' . (string) ($order['promotion_discount_formatted'] ?? Tools::displayPrice((float) $order['promotion_discount']));
+		}
+		if ((float) ($order['payment_discount'] ?? 0) > 0) {
+			$payLabel = trim((string) ($order['payment_discount_label'] ?? ''));
+			if ($payLabel === '') {
+				$payLabel = 'Ödeme indirimi';
+			}
+			$lines[] = $payLabel . ': -' . (string) ($order['payment_discount_formatted'] ?? Tools::displayPrice((float) $order['payment_discount']));
+		}
+		if ((float) ($order['manual_discount'] ?? 0) > 0) {
+			$manualLabel = 'Sipariş indirimi';
+			if (($order['manual_discount_type'] ?? '') === 'percent') {
+				$manualLabel .= ' (%' . rtrim(rtrim(number_format((float) ($order['manual_discount_value'] ?? 0), 2, '.', ''), '0'), '.') . ')';
+			}
+			$lines[] = $manualLabel . ': -' . (string) ($order['manual_discount_formatted'] ?? Tools::displayPrice((float) $order['manual_discount']));
+		}
+
+		$lines[] = 'Kargo: ' . (string) ($order['shipping_formatted'] ?? Tools::displayPrice((float) ($order['shipping'] ?? 0)));
+		if (!empty($order['has_gift_wrap'])) {
+			$gift = (float) ($order['gift_wrap_fee'] ?? 0) > 0
+				? (string) ($order['gift_wrap_fee_formatted'] ?? Tools::displayPrice((float) $order['gift_wrap_fee']))
+				: 'Ücretsiz';
+			$lines[] = 'Hediye paketi: ' . $gift;
+		}
+		$lines[] = '*Toplam: ' . (string) ($order['total_formatted'] ?? Tools::displayPrice((float) ($order['total'] ?? 0))) . '*';
+
+		$paymentMethod = (string) ($order['payment_method'] ?? '');
+		if ($paymentMethod === 'bank_transfer') {
+			$holder = trim((string) Settings::get('BANKWIRE_HOLDER'));
+			$bank = trim((string) Settings::get('BANKWIRE_BANK'));
+			$iban = trim((string) Settings::get('BANKWIRE_IBAN'));
+			if ($holder !== '' || $bank !== '' || $iban !== '') {
+				$lines[] = '';
+				$lines[] = 'BANKA BİLGİLERİ';
+				if ($holder !== '') {
+					$lines[] = 'İsim: ' . $holder;
+				}
+				if ($iban !== '') {
+					$ibanDigits = strtoupper(preg_replace('/\s+/', '', $iban) ?: $iban);
+					$ibanDisplay = preg_match('/^[A-Z]{2}\d{2}[A-Z0-9]+$/', $ibanDigits)
+						? trim(chunk_split($ibanDigits, 4, ' '))
+						: $iban;
+					$lines[] = 'IBAN: ' . $ibanDisplay;
+				}
+				if ($bank !== '') {
+					$lines[] = 'Banka: ' . $bank;
+				}
+				$lines[] = 'Açıklama: ' . trim((string) ($order['reference'] ?? ''));
+			}
+		}
+
+		$cargo = trim((string) ($order['cargo_company'] ?? ''));
+		$trackNo = trim((string) ($order['tracking_number'] ?? ''));
+		if ($cargo !== '' || $trackNo !== '') {
+			$lines[] = '';
+			if ($cargo !== '') {
+				$lines[] = 'Kargo firması: ' . $cargo;
+			}
+			if ($trackNo !== '') {
+				$lines[] = 'Takip no: ' . $trackNo;
+			}
+		}
+
+		$base = rtrim((string) $domain, '/') . '/';
+		$trackPage = $base . 'truck?reference=' . rawurlencode((string) ($order['reference'] ?? ''));
+		$nameQ = trim((string) ($order['customer_name'] ?? ''));
+		if ($nameQ !== '') {
+			$trackPage .= '&name=' . rawurlencode($nameQ);
+		}
+		$lines[] = '';
+		$lines[] = 'Sipariş detayı: ' . $trackPage;
+		if ($trackingUrl !== '') {
+			$lines[] = 'Kargo takip: ' . $trackingUrl;
+		}
+
+		return implode("\n", $lines);
 	}
 
 	public static function invoiceDir(): string
@@ -2618,6 +3223,7 @@ class Order
 	{
 		return [
 			'sequential' => 'Sequential number (00123)',
+			'order_id' => 'Order ID number (ECZ0001)',
 			'timestamp' => 'Unix timestamp (time)',
 			'datetime' => 'Date and time (YmdHis)',
 			'random' => 'Random code',
@@ -2661,6 +3267,59 @@ class Order
 		$settings = $override ?? self::getReferenceSettings();
 
 		return self::composeReference($settings, true);
+	}
+
+	public static function peekNextOrderId(): int
+	{
+		return max(1, (int) DB::getValue('SELECT COALESCE(MAX(id_order), 0) FROM orders') + 1);
+	}
+
+	public static function finalizeOrderIdReference(int $idOrder, string $currentReference): string
+	{
+		$settings = self::getReferenceSettings();
+
+		if ((string) ($settings['suffix_mode'] ?? '') !== 'order_id' || $idOrder <= 0) {
+			return $currentReference;
+		}
+
+		$reference = self::composeOrderIdReference($idOrder, $settings);
+
+		if ($reference === '' || strtoupper($reference) === strtoupper($currentReference)) {
+			return $currentReference !== '' ? $currentReference : $reference;
+		}
+
+		$exists = (int) DB::getValue(
+			'SELECT id_order FROM orders WHERE reference = ? AND id_order <> ? LIMIT 1',
+			[$reference, $idOrder]
+		);
+
+		if ($exists > 0) {
+			$reference = mb_substr($reference . strtoupper(bin2hex(random_bytes(2))), 0, 32);
+		}
+
+		DB::update(
+			'orders',
+			['reference' => $reference],
+			'id_order = :id_order',
+			['id_order' => $idOrder]
+		);
+
+		return $reference;
+	}
+
+	/** @param array{prefix?:string,pad?:int} $settings */
+	private static function composeOrderIdReference(int $idOrder, array $settings): string
+	{
+		$prefix = self::sanitizeReferencePrefix((string) ($settings['prefix'] ?? ''));
+		$pad = (int) ($settings['pad'] ?? 5);
+
+		if ($pad < 3 || $pad > 10) {
+			$pad = 5;
+		}
+
+		$suffix = str_pad((string) max(1, $idOrder), $pad, '0', STR_PAD_LEFT);
+
+		return mb_substr(strtoupper($prefix . $suffix), 0, 32);
 	}
 
 	public static function sanitizeReferencePrefix(string $prefix): string
@@ -2719,6 +3378,15 @@ class Order
 
 			case 'date_random':
 				return date('ymd') . strtoupper(substr(bin2hex(random_bytes(3)), 0, 4));
+
+			case 'order_id':
+				if ($preview) {
+					$next = (int) DB::getValue('SELECT COALESCE(MAX(id_order), 0) FROM orders') + 1;
+
+					return str_pad((string) max(1, $next), max(3, min(10, $pad)), '0', STR_PAD_LEFT);
+				}
+
+				return 'T' . strtoupper(bin2hex(random_bytes(4)));
 
 			case 'sequential':
 			default:

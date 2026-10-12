@@ -103,7 +103,7 @@ class NkolaypayModule extends ModuleBase
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}
@@ -555,7 +555,7 @@ class NkolaypayModule extends ModuleBase
 
 		$status = (int) $order['status'];
 
-		if ($status === Order::STATUS_PROCESSING || $status === Order::STATUS_SHIPPED || $status === Order::STATUS_DELIVERED) {
+		if (Order::isPaymentAccepted($status)) {
 			return ['success' => true];
 		}
 
@@ -563,7 +563,7 @@ class NkolaypayModule extends ModuleBase
 			return ['success' => false, 'message' => 'Sipariş durumu ödeme için uygun değil'];
 		}
 
-		Order::updateStatus((int) $order['id_order'], Order::STATUS_PROCESSING);
+		Order::markPaidByGateway((int) $order['id_order']);
 
 		return ['success' => true];
 	}

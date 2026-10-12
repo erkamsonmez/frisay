@@ -104,7 +104,7 @@ class TamiModule extends ModuleBase
 			return null;
 		}
 
-		$html = $this->renderFrontTemplate('order_payment', []);
+		$html = $this->renderFrontTemplate('order_payment', $context);
 
 		return $html !== '' ? $html : null;
 	}
@@ -480,7 +480,7 @@ class TamiModule extends ModuleBase
 		$idOrder = (int) ($result['id_order'] ?? 0);
 
 		if ($idOrder > 0) {
-			Order::updateStatus($idOrder, Order::STATUS_PROCESSING);
+			Order::markPaidByGateway($idOrder);
 		}
 
 		self::deletePendingCheckout($orderId);

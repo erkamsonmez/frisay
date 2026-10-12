@@ -3,7 +3,7 @@
 <div class="d-flex flex-wrap gap-2 mb-3">
 	{foreach $marketplacePlatforms as $platform}
 	{if $platform.active}
-	<a href="{$adminUrl}marketplace-settings?platform={$platform.key|escape:url}&amp;tab={$tab|escape:url}"
+	<a href="{$adminUrl}marketplace-settings?platform={$platform.key|escape:url}"
 		class="btn btn-sm {if $marketplacePlatform == $platform.key}btn-dark{else}btn-outline-secondary{/if}">
 		{$platform.label|escape}
 	</a>
@@ -19,6 +19,12 @@
 {include file='admin/marketplace/settings_hepsiburada.tpl'}
 {elseif $marketplacePlatform == 'n11'}
 {include file='admin/marketplace/settings_n11.tpl'}
+{elseif $marketplacePlatform == 'prestashop'}
+{include file='admin/marketplace/settings_prestashop.tpl'}
+{elseif $marketplacePlatform == 'frisay'}
+{include file='admin/marketplace/settings_frisay.tpl'}
+{elseif $marketplacePlatform == 'fiyattrend'}
+{include file='admin/marketplace/settings_fiyattrend.tpl'}
 {else}
 <div class="admin-panel p-4 text-center">
 	<h2 class="h5 mb-2">Yakında</h2>

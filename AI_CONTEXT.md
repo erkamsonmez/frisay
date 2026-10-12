@@ -10,7 +10,7 @@ Bu dosya, yapay zeka asistanlarının FShop kod tabanını hızlıca anlaması i
 ## Project Type
 
 Açık kaynak PHP e-ticaret platformu (Türkiye odaklı).  
-GitHub: https://github.com/bera65/fshop
+GitHub: https://github.com/bera65/frisay
 
 ---
 
@@ -185,7 +185,7 @@ modules/ornek/
 
 ### Display hook noktaları (tema)
 
-`footer`, `home_slider`, `home_promo_slider`, `product`, `product_inf`, `product_detail`, `product_tab`, `product_tab_content`, `order_payment`, `order_confirmation`
+`footer`, `home_slider`, `home_promo_slider`, `home_bottom`, `product`, `product_inf`, `product_detail`, `product_tab`, `product_tab_content`, `order_payment`, `order_confirmation`
 
 ### Dahili hook'lar
 

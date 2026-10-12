@@ -1,0 +1,13 @@
+.home-text__body {
+	max-width: 100%;
+	line-height: 1.6;
+}
+
+.home-text__body img {
+	max-width: 100%;
+	height: auto;
+}
+
+.home-text__body p:last-child {
+	margin-bottom: 0;
+}

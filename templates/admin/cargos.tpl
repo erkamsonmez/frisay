@@ -18,7 +18,7 @@
 	<div class="col-lg-5">
 		<div class="admin-panel p-3">
 			<h2 class="h6 mb-3">{if $editCargo}{'Edit carrier'|adminT}{else}{'Add new carrier'|adminT}{/if}</h2>
-			<form method="post" id="cargoForm">
+			<form method="post" id="cargoForm" enctype="multipart/form-data">
 				<input type="hidden" name="saveCargo" value="1">
 				<input type="hidden" name="token" value="{$adminToken}">
 				{if $editCargo}
@@ -29,6 +29,21 @@
 					<label class="form-label">{'Carrier company'|adminT}</label>
 					<input type="text" name="name" class="form-control" required maxlength="128"
 						value="{$editCargo.name|default:''|escape}" placeholder="{'e.g. PTT Cargo'|adminT}">
+				</div>
+
+				<div class="mb-3">
+					<label class="form-label">{'Carrier logo'|adminT}</label>
+					{if $editCargo && $editCargo.logo_url|default:'' != ''}
+					<div class="d-flex align-items-center gap-3 mb-2">
+						<img src="{$editCargo.logo_url|escape}" alt="{$editCargo.name|escape}" class="border rounded bg-white p-1" style="max-height:48px;max-width:120px;object-fit:contain;">
+						<div class="form-check mb-0">
+							<input class="form-check-input" type="checkbox" name="remove_logo" id="cargoRemoveLogo" value="1">
+							<label class="form-check-label" for="cargoRemoveLogo">{'Remove logo'|adminT}</label>
+						</div>
+					</div>
+					{/if}
+					<input type="file" name="logo" id="cargoLogo" class="form-control" accept="image/png,image/jpeg,image/webp">
+					<div class="form-text">{'Saved as img/cargos/ID.png — shown on orders'|adminT}</div>
 				</div>
 
 				<div class="mb-3">
@@ -163,7 +178,11 @@
 				{foreach $cargos as $cargo}
 				<div class="border rounded p-3">
 					<div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
-						<div>
+						<div class="d-flex align-items-center gap-2">
+							{if $cargo.logo_url|default:'' != ''}
+							<img src="{$cargo.logo_url|escape}" alt="{$cargo.name|escape}" class="border rounded bg-white p-1" style="height:36px;width:72px;object-fit:contain;">
+							{/if}
+							<div>
 							<strong>{$cargo.name|escape}</strong>
 							{if $cargo.is_default}<span class="badge text-bg-primary">{'Default'|adminT}</span>{/if}
 							{if $cargo.active}
@@ -171,6 +190,7 @@
 							{else}
 							<span class="badge text-bg-secondary">{'Inactive'|adminT}</span>
 							{/if}
+							</div>
 						</div>
 						<div class="d-flex gap-1">
 							<a href="{$adminUrl}cargos?edit={$cargo.id_cargo}" class="btn btn-sm btn-outline-primary">{'Edit'|adminT}</a>

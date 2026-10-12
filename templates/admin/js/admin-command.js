@@ -30,6 +30,7 @@
 		{ group: 'Settings', label: 'Themes', keywords: 'tema theme', url: adminUrl + 'templates', icon: 'palette' },
 		{ group: 'Settings', label: 'SEO', keywords: 'seo', url: adminUrl + 'seo', icon: 'search' },
 		{ group: 'Settings', label: 'Performance', keywords: 'cache performance', url: adminUrl + 'performance', icon: 'zap' },
+		{ group: 'Settings', label: 'Security', keywords: 'guvenlik security session https timeout', url: adminUrl + 'security', icon: 'shield' },
 		{ group: 'Settings', label: 'API', keywords: 'api', url: adminUrl + 'api', icon: 'link-2' },
 		{ group: 'Store', label: 'View Store', keywords: 'magaza store site', url: storeUrl, icon: 'external-link' },
 		{ group: 'General', label: 'Dashboard', keywords: 'dashboard ana', url: adminUrl + 'dashboard', icon: 'layout-dashboard' }

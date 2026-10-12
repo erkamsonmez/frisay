@@ -12,5 +12,5 @@ $pos->requireApiToken();
 
 echo json_encode([
 	'success' => true,
-	'stats' => $pos->getTodayStats(),
+	'stats' => $pos->getRegisterStats(),
 ]);

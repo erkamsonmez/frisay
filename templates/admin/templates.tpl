@@ -157,7 +157,7 @@
 						<button type="submit" class="btn btn-sm btn-light rounded-pill px-3 shadow-sm">{'Active'|adminT}</button>
 					</form>
 					{if $theme.edit_module}
-					<a href="{$adminUrl}module-{$theme.edit_module|escape}" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">{'Edit'|adminT}</a>
+					<a href="{$adminUrl}module-{$theme.edit_module|escape}?theme={$theme.name|escape:url}" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">{'Edit'|adminT}</a>
 					{elseif $theme.has_schema}
 					<a href="{$adminUrl}theme-customize?theme={$theme.name|escape:url}" class="btn btn-sm btn-dark rounded-pill px-3 shadow-sm">{'Customize'|adminT}</a>
 					{/if}
@@ -173,7 +173,7 @@
 				</div>
 				<div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
 				{if $theme.edit_module}
-				<a href="{$adminUrl}module-{$theme.edit_module|escape}" class="btn btn-sm btn-outline-light rounded-pill px-3">{'Edit'|adminT}</a>
+				<a href="{$adminUrl}module-{$theme.edit_module|escape}?theme={$theme.name|escape:url}" class="btn btn-sm btn-outline-light rounded-pill px-3">{'Edit'|adminT}</a>
 				{elseif $theme.has_schema}
 				<a href="{$adminUrl}theme-customize?theme={$theme.name|escape:url}" class="btn btn-sm btn-outline-light rounded-pill px-3">{'Customize'|adminT}</a>
 				{/if}

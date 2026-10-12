@@ -2,6 +2,8 @@
 
 JSON tabanlı REST API ile uzaktan **sipariş çekme**, **ürün ekleme/güncelleme/silme**, **kategori ve marka listeleme**, **mesaj okuma/cevaplama** ve **admin bildirimleri** yapabilirsiniz.
 
+Kargo / pazaryeri firmaları için PrestaShop WebService kopyası (XML, `ws_key`, `/api/orders`) ayrıdır ve `/api/v1`’i değiştirmez: [PRESTASHOP_WEBSERVICE.md](PRESTASHOP_WEBSERVICE.md).
+
 ---
 
 ## 1. Kurulum (ilk adım)

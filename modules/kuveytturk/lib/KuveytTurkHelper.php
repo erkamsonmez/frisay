@@ -61,6 +61,114 @@ class KuveytTurkHelper
 		return $this->sha1Base64Iso($raw);
 	}
 
+	/**
+	 * gzip (1f 8b) gövdeyi aç. Banka bazen Content-Encoding göndermeden gzip basar.
+	 */
+	public static function gunzipBody(string $body): ?string
+	{
+		if ($body === '' || strlen($body) < 2 || $body[0] !== "\x1f" || $body[1] !== "\x8b") {
+			return null;
+		}
+
+		if (function_exists('gzdecode')) {
+			$decoded = @gzdecode($body);
+			if (is_string($decoded) && $decoded !== '') {
+				return $decoded;
+			}
+		}
+
+		if (function_exists('inflate_init') && defined('ZLIB_ENCODING_GZIP')) {
+			$ctx = @inflate_init(ZLIB_ENCODING_GZIP);
+			if ($ctx !== false) {
+				$decoded = @inflate_add($ctx, $body, ZLIB_FINISH);
+				if (is_string($decoded) && $decoded !== '') {
+					return $decoded;
+				}
+			}
+		}
+
+		// gzopen yedek (FNAME/FCOMMENT bayraklı gzip için)
+		$tmp = tempnam(sys_get_temp_dir(), 'ktgz');
+		if ($tmp !== false) {
+			$gzPath = $tmp . '.gz';
+			@unlink($tmp);
+			if (@file_put_contents($gzPath, $body) !== false) {
+				$zh = @gzopen($gzPath, 'rb');
+				if ($zh) {
+					$decoded = '';
+					while (!gzeof($zh)) {
+						$chunk = gzread($zh, 8192);
+						if ($chunk === false) {
+							break;
+						}
+						$decoded .= $chunk;
+					}
+					gzclose($zh);
+					@unlink($gzPath);
+					if ($decoded !== '') {
+						return $decoded;
+					}
+				}
+				@unlink($gzPath);
+			}
+		}
+
+		// Manuel header atla + inflate (basit gzip, bayrak yok)
+		if (function_exists('gzinflate') && strlen($body) > 18 && ord($body[2]) === 8) {
+			$flags = ord($body[3]);
+			$offset = 10;
+			if ($flags & 4) { // FEXTRA
+				if (strlen($body) < $offset + 2) {
+					return null;
+				}
+				$xlen = unpack('v', substr($body, $offset, 2));
+				$offset += 2 + (int) ($xlen[1] ?? 0);
+			}
+			if ($flags & 8) { // FNAME
+				$end = strpos($body, "\0", $offset);
+				if ($end === false) {
+					return null;
+				}
+				$offset = $end + 1;
+			}
+			if ($flags & 16) { // FCOMMENT
+				$end = strpos($body, "\0", $offset);
+				if ($end === false) {
+					return null;
+				}
+				$offset = $end + 1;
+			}
+			if ($flags & 2) { // FHCRC
+				$offset += 2;
+			}
+			if (strlen($body) <= $offset + 8) {
+				return null;
+			}
+			$decoded = @gzinflate(substr($body, $offset, -8));
+			if (is_string($decoded) && $decoded !== '') {
+				return $decoded;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Yanıt hâlâ sıkıştırılmışsa aç; birden fazla katmanı dene.
+	 */
+	public static function ensurePlainBody(string $body): string
+	{
+		for ($i = 0; $i < 3; $i++) {
+			$decoded = self::gunzipBody($body);
+			if ($decoded === null) {
+				break;
+			}
+			$body = $decoded;
+		}
+
+		return $body;
+	}
+
 	private function curlPostXml(string $url, string $xml): array
 	{
 		$ch = curl_init();
@@ -72,11 +180,15 @@ class KuveytTurkHelper
 		curl_setopt($ch, CURLOPT_HTTPHEADER, [
 			'Content-Type: application/xml; charset=utf-8',
 			'Content-Length: ' . strlen($xml),
+			'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+			'Accept-Encoding: identity',
 			'Expect:',
 		]);
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $xml);
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+		curl_setopt($ch, CURLOPT_HEADER, false);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
 		$response = curl_exec($ch);
 		$httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -84,12 +196,14 @@ class KuveytTurkHelper
 		$errno = curl_errno($ch);
 		curl_close($ch);
 
+		$body = ($response === false) ? '' : self::ensurePlainBody((string) $response);
+
 		return [
 			'success' => ($response !== false && $httpCode >= 200 && $httpCode < 400),
 			'http_code' => $httpCode,
 			'errno' => $errno,
 			'error' => $error,
-			'response' => ($response === false ? '' : $response),
+			'response' => $body,
 		];
 	}
 
@@ -194,6 +308,122 @@ class KuveytTurkHelper
 		$result['response_message'] = $responseMessage;
 
 		return $result;
+	}
+
+	/**
+	 * Banka XML yanıtından iptal/iade için gereken alanları çıkarır.
+	 *
+	 * @return array<int, array{key:string,label:string,value:string}>
+	 */
+	public static function parseBankResponseFields(string $xml): array
+	{
+		$xml = self::ensurePlainBody($xml);
+
+		if ($xml === '') {
+			return [];
+		}
+
+		if (strpos($xml, '&lt;') !== false && strpos($xml, '<CardNumber>') === false) {
+			$xml = html_entity_decode($xml, ENT_QUOTES | ENT_XML1, 'UTF-8');
+		}
+
+		$labels = [
+			'CardNumber' => 'Kart no',
+			'CardHolderName' => 'Kart sahibi',
+			'ProvisionNumber' => 'Provizyon no',
+			'RRN' => 'RRN',
+			'Stan' => 'STAN',
+			'ResponseCode' => 'Yanıt kodu',
+			'ResponseMessage' => 'Yanıt mesajı',
+			'OrderId' => 'Banka sipariş no (OrderId)',
+			'MerchantOrderId' => 'Üye işyeri sipariş no',
+			'Amount' => 'Tutar (kuruş)',
+			'TransactionType' => 'İşlem tipi',
+			'InstallmentCount' => 'Taksit',
+			'CurrencyCode' => 'Para birimi',
+		];
+
+		$fields = [];
+
+		foreach ($labels as $tag => $label) {
+			$value = '';
+
+			if (preg_match('/<' . preg_quote($tag, '/') . '>([^<]*)<\/' . preg_quote($tag, '/') . '>/i', $xml, $match)) {
+				$value = html_entity_decode(trim((string) $match[1]), ENT_QUOTES | ENT_XML1, 'UTF-8');
+			}
+
+			if ($value === '') {
+				continue;
+			}
+
+			$fields[] = [
+				'key' => $tag,
+				'label' => $label,
+				'value' => $value,
+			];
+		}
+
+		return $fields;
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 * @return array<string, mixed>
+	 */
+	public static function hydrateLogRow(array $row): array
+	{
+		$row['bank_fields'] = self::parseBankResponseFields((string) ($row['response_data'] ?? ''));
+
+		foreach ($row['bank_fields'] as $field) {
+			$key = strtolower((string) ($field['key'] ?? ''));
+
+			if ($key === 'cardnumber') {
+				$row['card_number'] = $field['value'];
+			} elseif ($key === 'provisionnumber') {
+				$row['provision_number'] = $field['value'];
+			} elseif ($key === 'rrn') {
+				$row['rrn'] = $field['value'];
+			} elseif ($key === 'stan') {
+				$row['stan'] = $field['value'];
+			} elseif ($key === 'orderid') {
+				$row['bank_order_id'] = $field['value'];
+			}
+		}
+
+		return $row;
+	}
+
+	public function getLogsForOrder(int $idOrder, string $merchantOrderId = '', int $limit = 20): array
+	{
+		$limit = max(1, min(150, $limit));
+		$where = [];
+		$params = [];
+
+		if ($idOrder > 0) {
+			$where[] = 'id_order = ?';
+			$params[] = $idOrder;
+		}
+
+		if ($merchantOrderId !== '') {
+			$where[] = 'merchant_order_id = ?';
+			$params[] = $merchantOrderId;
+		}
+
+		if ($where === []) {
+			return [];
+		}
+
+		$rows = DB::execute(
+			'SELECT * FROM kuveytturk_log WHERE (' . implode(' OR ', $where) . ') ORDER BY id_log DESC LIMIT ' . $limit,
+			$params
+		) ?: [];
+
+		foreach ($rows as &$row) {
+			$row = self::hydrateLogRow($row);
+		}
+		unset($row);
+
+		return $rows;
 	}
 
 	public function getXmlValue($xml, string $nodeName): string
@@ -309,8 +539,16 @@ class KuveytTurkHelper
 		DB::execute($sql, $params);
 	}
 
-	public function getRecentLogs(int $limit = 50): array
+	public function getRecentLogs(int $limit = 150): array
 	{
-		return DB::execute('SELECT * FROM kuveytturk_log ORDER BY id_log DESC LIMIT ' . (int) $limit) ?: [];
+		$limit = max(1, min(500, $limit));
+		$rows = DB::execute('SELECT * FROM kuveytturk_log ORDER BY id_log DESC LIMIT ' . (int) $limit) ?: [];
+
+		foreach ($rows as &$row) {
+			$row = self::hydrateLogRow($row);
+		}
+		unset($row);
+
+		return $rows;
 	}
 }

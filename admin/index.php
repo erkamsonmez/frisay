@@ -13,7 +13,7 @@
 	if ($container === '') {
 		$container = 'dashboard';
 	}
-	$publicPages = ['login', 'forgot-password', 'reset-password'];
+	$publicPages = ['login', 'forgot-password', 'reset-password', 'sso'];
 
 	if (!in_array($container, $publicPages, true) && !Admin::isLoggedIn()) {
 		header('Location: ' . Admin::url('login'));

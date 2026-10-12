@@ -57,50 +57,70 @@ class DB
 	{
 		global $db;
 
-		$prep = [];
-		foreach ($data as $k => $v) {
-			$prep[':'.$k] = $v;
-		}
+		try {
+			$table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $table);
+			$prep = [];
+			$cols = [];
+			foreach ($data as $k => $v) {
+				$col = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $k);
+				if ($col === '') {
+					continue;
+				}
+				$cols[] = '`' . $col . '`';
+				$prep[':' . $col] = $v;
+			}
 
-		$sql = "INSERT INTO {$table} (".implode(', ', array_keys($data)).") 
-				VALUES (".implode(', ', array_keys($prep)).")";
+			$sql = "INSERT INTO `{$table}` (".implode(', ', $cols).") 
+					VALUES (".implode(', ', array_keys($prep)).")";
 
-		$sth = $db->prepare($sql);
-		$res = $sth->execute($prep);
+			$sth = $db->prepare($sql);
+			$res = $sth->execute($prep);
 
-		if (!$res) {
-			error_log('Insert error on ' . $table . ': ' . implode(', ', $sth->errorInfo()));
+			if (!$res) {
+				error_log('Insert error on ' . $table . ': ' . implode(', ', $sth->errorInfo()));
+				return false;
+			}
+
+			$lastId = $db->lastInsertId();
+			return $lastId ? (int)$lastId : false;
+		} catch (Exception $e) {
+			error_log('Insert error on ' . $table . ': ' . $e->getMessage());
 			return false;
 		}
-
-		$lastId = $db->lastInsertId();
-		return $lastId ? (int)$lastId : false;
 	}
 
 	public static function update($table, $data, $where, $whereParams = []) 
 	{
 		global $db;
-		$prep = [];
-		foreach ($data as $k => $v) {
-			$prep[] = $k . ' = :' . $k;
-		}
 
-		$sql = "UPDATE {$table} SET " . implode(', ', $prep) . " WHERE {$where}";
-		$sth = $db->prepare($sql);
+		try {
+			$table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $table);
+			$prep = [];
+			$params = [];
+			foreach ($data as $k => $v) {
+				$col = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $k);
+				if ($col === '') {
+					continue;
+				}
+				$prep[] = '`' . $col . '` = :' . $col;
+				$params[$col] = $v;
+			}
 
-		// Parametreleri birleştir (SET + WHERE)
-		$params = array_merge($data, $whereParams);
+			$sql = "UPDATE `{$table}` SET " . implode(', ', $prep) . " WHERE {$where}";
+			$sth = $db->prepare($sql);
+			$params = array_merge($params, $whereParams);
+			$res = $sth->execute($params);
 
-		// SQL log için
-		//error_log('Update SQL: ' . $sql . ' | Params: ' . json_encode($params));
+			if (!$res) {
+				error_log('Update error: ' . implode(', ', $sth->errorInfo()));
+				return false;
+			}
 
-		$res = $sth->execute($params);
-
-		if (!$res) {
-			error_log('Update error: ' . implode(', ', $sth->errorInfo()));
+			return $sth->rowCount();
+		} catch (Exception $e) {
+			error_log('Update error: ' . $e->getMessage());
 			return false;
 		}
-		return $sth->rowCount(); 
 	}
 	public static function getValue($sql, $params = [])
 	{
@@ -114,7 +134,8 @@ class DB
 	}
 	public static function getRowSafe($table, $whereSql, $params = [])
 	{
-		$sql = "SELECT * FROM {$table} WHERE {$whereSql} LIMIT 1";
+		$table = preg_replace('/[^a-zA-Z0-9_]/', '', (string) $table);
+		$sql = "SELECT * FROM `{$table}` WHERE {$whereSql} LIMIT 1";
 		$rows = self::execute($sql, $params);
 		return ($rows && isset($rows[0])) ? $rows[0] : false;
 	}

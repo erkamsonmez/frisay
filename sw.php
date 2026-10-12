@@ -10,29 +10,19 @@ if (!headers_sent()) {
 	http_response_code(200);
 }
 
-$scope = '/fshop/';
-$script = str_replace('\\', '/', (string) (isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : ''));
+require_once __DIR__ . '/config/pwa_helpers.php';
 
-if (preg_match('#^(/.+?)/sw\.php#', $script, $m)) {
-	$scope = rtrim($m[1], '/') . '/';
-}
-
-$uri = str_replace('\\', '/', (string) (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : ''));
-$path = (string) parse_url($uri, PHP_URL_PATH);
-
-if (preg_match('#^(/[^/]+)/#', $path, $m)) {
-	$scope = rtrim($m[1], '/') . '/';
-}
-
+$scope = fshop_pwa_resolve_scope(isset($_SERVER['SCRIPT_NAME']) ? (string) $_SERVER['SCRIPT_NAME'] : '');
 $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
 	|| (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
 $host = isset($_SERVER['HTTP_HOST']) ? (string) $_SERVER['HTTP_HOST'] : 'localhost';
-$icon = ($https ? 'https' : 'http') . '://' . $host . rtrim($scope, '/') . '/pwa-icon.php?size=192';
+$base = ($https ? 'https' : 'http') . '://' . $host . rtrim($scope, '/');
+$icon = $base . '/pwa-icon.php?size=192';
 $offline = $scope . 'offline.html';
 
 header('Service-Worker-Allowed: ' . $scope);
 
-echo 'const CACHE_NAME="mobil-app-v3";const SCOPE_PATH=' . json_encode($scope) . ';const OFFLINE_URL=' . json_encode($offline) . ';const DEFAULT_ICON=' . json_encode($icon) . ";\n";
+echo 'const CACHE_NAME="mobil-app-v5";const SCOPE_PATH=' . json_encode($scope) . ';const OFFLINE_URL=' . json_encode($offline) . ';const DEFAULT_ICON=' . json_encode($icon) . ";\n";
 echo <<<'JS'
 self.addEventListener('install', function (event) {
   self.skipWaiting();
@@ -83,7 +73,8 @@ self.addEventListener('push', function (event) {
   }));
 });
 self.addEventListener('fetch', function (event) {
-  if (event.request.method !== 'GET') {
+  var url = event.request.url || '';
+  if (event.request.method !== 'GET' || url.indexOf('/install') !== -1) {
     return;
   }
   event.respondWith(

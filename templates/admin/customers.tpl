@@ -1,9 +1,31 @@
-<div class="admin-toolbar d-flex flex-wrap gap-2 mb-3">
-	<form method="get" action="{$adminUrl}customers" class="d-flex gap-2 flex-grow-1">
-		<input type="search" name="q" class="form-control form-control-sm" placeholder="{'Search name, phone or email...'|adminT}" value="{$searchQuery|escape}">
-		<button type="submit" class="btn btn-sm btn-dark">{'Search'|adminT}</button>
-	</form>
-	<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createCustomerModal">{'Add customer'|adminT}</button>
+<div class="admin-panel p-3 mb-3">
+	<div class="mp-filter-card mb-0">
+		<div class="mp-filter-header">
+			<div>
+				<div class="mp-filter-title">
+					{include file='admin/partials/filter-funnel-icon.tpl'}
+					{'Filters'|adminT}
+				</div>
+				<div class="mp-filter-sub">{'Search name, phone or email...'|adminT}</div>
+			</div>
+		</div>
+		<form method="get" action="{$adminUrl}customers" id="admCustomersFilterForm">
+			<div class="row">
+				<div class="col-md-6 mb-3">
+					<label for="cst_q">{'Search'|adminT}</label>
+					<input type="search" id="cst_q" name="q" class="form-control form-control-sm" placeholder="{'Search name, phone or email...'|adminT}" value="{$searchQuery|escape}">
+				</div>
+			</div>
+		</form>
+		<div class="mp-filter-actions">
+			<div class="mp-filter-actions__btns">
+				<button type="submit" form="admCustomersFilterForm" class="btn btn-warning">{'Search'|adminT}</button>
+			</div>
+			<div class="mp-filter-actions__right">
+				<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCustomerModal">{'Add customer'|adminT}</button>
+			</div>
+		</div>
+	</div>
 </div>
 
 {if $customerFlash}
@@ -61,17 +83,7 @@
 	</div>
 </div>
 
-{if $pagination.total_pages > 1}
-<nav class="mt-3">
-	<ul class="pagination pagination-sm">
-		{foreach $pagination.pages as $p}
-		<li class="page-item{if $p.current} active{/if}">
-			<a class="page-link" href="{$p.url}">{$p.number}</a>
-		</li>
-		{/foreach}
-	</ul>
-</nav>
-{/if}
+{include file='admin/plugin/pagination.tpl'}
 
 <div class="modal fade" id="createCustomerModal" tabindex="-1" aria-labelledby="createCustomerModalLabel" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered">

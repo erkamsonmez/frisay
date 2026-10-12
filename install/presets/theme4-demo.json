@@ -1,0 +1,74 @@
+{
+    "format": "fshop-theme4-demo",
+    "version": 1,
+    "settings": {
+        "SITE_WIDTH": "1320px",
+        "FONT_FAMILY": "'Inter', system-ui, -apple-system, sans-serif",
+        "LOGO": "img/logo2.png",
+        "FAVICON": "img/default.jpg",
+        "FOOTER_COPYRIGHT": "© {year} {site}. Tüm hakları saklıdır.",
+        "HEADER_LAYOUT": "{\"rows\":[]}",
+        "FOOTER_LAYOUT": "{\"rows\":[]}",
+        "HOME_LAYOUT": "{\"rows\":[{\"id\":\"rowslider\",\"class\":\"\",\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"cols\":[{\"id\":\"columnslider\",\"class\":\"\",\"width\":{\"mobile\":12,\"tablet\":12,\"desktop\":12},\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"widgets\":[{\"id\":\"w_slider\",\"type\":\"hook\",\"settings\":{\"hook\":\"home_slider\"}}]}]},{\"id\":\"rowproducts\",\"class\":\"\",\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"cols\":[{\"id\":\"columnproducts\",\"class\":\"\",\"width\":{\"mobile\":12,\"tablet\":12,\"desktop\":12},\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"widgets\":[{\"id\":\"w_products\",\"type\":\"category_products\",\"settings\":{\"id_category\":0,\"limit\":12,\"title\":\"Öne çıkan ürünler\",\"show_link\":0,\"layout\":\"list\"}}]}]},{\"id\":\"rowelectronics\",\"class\":\"\",\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"cols\":[{\"id\":\"columnelectronics\",\"class\":\"\",\"width\":{\"mobile\":12,\"tablet\":12,\"desktop\":12},\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"widgets\":[{\"id\":\"w_electronics\",\"type\":\"category_products\",\"settings\":{\"id_category\":4,\"limit\":8,\"title\":\"Elektronik\",\"show_link\":1,\"layout\":\"list\"}}]}]},{\"id\":\"rowhomebottom\",\"class\":\"\",\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"cols\":[{\"id\":\"columnhomebottom\",\"class\":\"\",\"width\":{\"mobile\":12,\"tablet\":12,\"desktop\":12},\"hide\":{\"mobile\":0,\"tablet\":0,\"desktop\":0},\"widgets\":[{\"id\":\"w_home_bottom\",\"type\":\"hook\",\"settings\":{\"hook\":\"home_bottom\"}}]}]}]}",
+        "CHROME_TEXTS": "{\"header_support_label\":\"7/24 Canlı Destek\",\"header_support_value\":\"0555 000 00 00\",\"header_delivery_label\":\"Hızlı Kargo\",\"header_delivery_value\":\"Stoktan Gönderim\",\"header_bar_1\":\"Ücretsiz Kargo\",\"header_bar_2\":\"Kolay İade\",\"header_bar_3\":\"Destek\",\"header_bar_bg\":\"#ebebeb\",\"header_bar_color\":\"#000000\",\"trust1_title\":\"%100 Güvenli Ödeme\",\"trust1_text\":\"3D güvenlik ile ödeme\",\"trust2_title\":\"14 Gün İade Hakkı\",\"trust2_text\":\"14 gün içinde iade edebilirsiniz\",\"trust3_title\":\"Aynı Gün Kargo\",\"trust3_text\":\"Saat 15e kadar gelen siparişler\",\"footer_brand_text\":\"\",\"footer_menu_title\":\"\",\"footer_featured_title\":\"\",\"footer_corporate_title\":\"\",\"footer_service_title\":\"\",\"footer_service_text\":\"Deneme mahallesi 1234. sokak no : 11 Antalya/Muratpaşa\",\"footer_news_title\":\"\",\"footer_news_text\":\"\",\"footer_col_service\":\"\",\"footer_col_company\":\"\",\"footer_col_account\":\"\",\"footer_col_contact\":\"\"}"
+    },
+    "menu": [
+        {
+            "label": "Ana Sayfa",
+            "link_type": "home",
+            "link_value": "",
+            "position": 0,
+            "show_header": 1,
+            "show_mobile": 0,
+            "show_footer": 1
+        },
+        {
+            "label": "Elektronik",
+            "link_type": "category",
+            "link_value": "4",
+            "position": 1,
+            "show_header": 1,
+            "show_mobile": 1,
+            "show_footer": 1
+        },
+        {
+            "label": "Kozmetik",
+            "link_type": "category",
+            "link_value": "2",
+            "position": 2,
+            "show_header": 1,
+            "show_mobile": 1,
+            "show_footer": 1
+        },
+        {
+            "label": "Vitamin & Takviye",
+            "link_type": "category",
+            "link_value": "3",
+            "position": 3,
+            "show_header": 1,
+            "show_mobile": 1,
+            "show_footer": 1
+        },
+        {
+            "label": "İletişim",
+            "link_type": "custom",
+            "link_value": "contact",
+            "position": 4,
+            "show_header": 1,
+            "show_mobile": 1,
+            "show_footer": 0
+        }
+    ],
+    "slider": [
+        {
+            "slide_group": "hero",
+            "title": "",
+            "subtitle": "",
+            "button_text": "Keşfet",
+            "link_url": "",
+            "image_file": "slide_4.jpg",
+            "position": 0,
+            "active": 1
+        }
+    ]
+}

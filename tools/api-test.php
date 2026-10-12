@@ -31,7 +31,7 @@ function apiRequest($method, $url, $apiKey, $data = null)
 		CURLOPT_RETURNTRANSFER => true,
 		CURLOPT_CUSTOMREQUEST => $method,
 		CURLOPT_HTTPHEADER => $headers,
-		CURLOPT_SSL_VERIFYPEER => false,
+		CURLOPT_SSL_VERIFYPEER => true,
 	]);
 
 	if ($data !== null) {
@@ -66,7 +66,7 @@ function apiUploadImage($url, $apiKey, $filePath)
 		CURLOPT_POSTFIELDS => [
 			'image' => new CURLFile($filePath, mime_content_type($filePath) ?: 'image/jpeg', basename($filePath)),
 		],
-		CURLOPT_SSL_VERIFYPEER => false,
+		CURLOPT_SSL_VERIFYPEER => true,
 	]);
 
 	$response = curl_exec($ch);

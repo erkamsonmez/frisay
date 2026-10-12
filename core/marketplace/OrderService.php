@@ -280,9 +280,12 @@ class OrderService
 
 			$barcode = trim((string) ($line['barcode'] ?? ($line['merchantSku'] ?? '')));
 			$idProduct = 0;
+			$idVariation = 0;
 
 			if ($barcode !== '') {
-				$idProduct = self::findProductIdByBarcode($barcode);
+				$match = ProductSyncService::findMatchByBarcode($barcode);
+				$idProduct = (int) ($match['id_product'] ?? 0);
+				$idVariation = (int) ($match['id_variation'] ?? 0);
 
 				if ($idProduct > 0) {
 					$salePrice = ProductSyncService::extractOrderLineSalePrice($line);
@@ -296,6 +299,7 @@ class OrderService
 			}
 
 			$line['id_product'] = $idProduct;
+			$line['id_variation'] = $idVariation;
 		}
 		unset($line);
 
@@ -327,14 +331,16 @@ class OrderService
 				continue;
 			}
 
-			$idProduct = self::findProductIdByBarcode($barcode);
+			$match = ProductSyncService::findMatchByBarcode($barcode);
+			$idProduct = (int) ($match['id_product'] ?? 0);
+			$idVariation = (int) ($line['id_variation'] ?? ($match['id_variation'] ?? 0));
 
 			if ($idProduct <= 0) {
 				continue;
 			}
 
 			$product = \Product::getByIdAdmin($idProduct);
-			$oldStock = $product ? \Product::getStock($product) : 0;
+			$oldStock = $product ? \Product::getStock($product, $idVariation) : 0;
 			$ref = trim((string) ($product['stock_code'] ?? ''));
 
 			if ($ref === '') {
@@ -344,11 +350,11 @@ class OrderService
 			$ok = false;
 
 			if ($restore) {
-				\Product::increaseStock($idProduct, $qty);
+				\Product::increaseStock($idProduct, $qty, $idVariation);
 				$ok = true;
 				$moved++;
 			} else {
-				if (\Product::decreaseStock($idProduct, $qty)) {
+				if (\Product::decreaseStock($idProduct, $qty, $idVariation)) {
 					$ok = true;
 					$moved++;
 				}
@@ -405,35 +411,9 @@ class OrderService
 
 	private static function findProductIdByBarcode(string $barcode): int
 	{
-		$barcode = trim($barcode);
+		$match = ProductSyncService::findMatchByBarcode($barcode);
 
-		if ($barcode === '') {
-			return 0;
-		}
-
-		ProductSyncService::ensureSchema();
-
-		$map = \DB::getRowSafe('trendyol_products', 'barcode = ?', [$barcode]);
-
-		if ($map && (int) ($map['id_product'] ?? 0) > 0) {
-			return (int) $map['id_product'];
-		}
-
-		$id = (int) (\DB::getValue(
-			'SELECT id_product FROM products WHERE barcode = ? LIMIT 1',
-			[$barcode]
-		) ?: 0);
-
-		if ($id > 0) {
-			return $id;
-		}
-
-		$id = (int) (\DB::getValue(
-			'SELECT id_product FROM products WHERE stock_code = ? LIMIT 1',
-			[$barcode]
-		) ?: 0);
-
-		return $id;
+		return (int) ($match['id_product'] ?? 0);
 	}
 
 	/** @return array<int, array<string, mixed>> */

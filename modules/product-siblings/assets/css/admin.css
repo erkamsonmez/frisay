@@ -1,0 +1,15 @@
+.product-siblings-admin__results {
+	position: relative;
+	z-index: 5;
+	margin-top: 0.35rem;
+}
+
+.product-siblings-admin__results .list-group {
+	max-height: 220px;
+	overflow: auto;
+	box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.product-siblings-admin .table td {
+	vertical-align: middle;
+}

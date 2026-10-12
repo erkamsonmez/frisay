@@ -253,6 +253,29 @@ abstract class ModuleBase
 		$tplFile = $this->getFrontTemplatePath($template);
 		$compileId = 'module_front_' . $this->name;
 
+		if (!array_key_exists('formData', $vars)) {
+			$parentForm = $smarty->getTemplateVars('formData');
+			$vars['formData'] = is_array($parentForm) ? $parentForm : [];
+		}
+
+		if (!array_key_exists('selectedPaymentMethod', $vars)) {
+			$selected = $smarty->getTemplateVars('selectedPaymentMethod');
+
+			if ($selected === null || $selected === '') {
+				$selected = $vars['formData']['payment_method'] ?? '';
+			}
+
+			if (($selected === null || $selected === '') && class_exists('Order', false)) {
+				$selected = Order::getSelectedPaymentMethod();
+			}
+
+			$vars['selectedPaymentMethod'] = (string) $selected;
+		}
+
+		if (($vars['formData']['payment_method'] ?? '') === '' && $vars['selectedPaymentMethod'] !== '') {
+			$vars['formData']['payment_method'] = $vars['selectedPaymentMethod'];
+		}
+
 		// Modül değişkenlerini ana şablondan ayır; clearAssign global isLoggedIn vb. siliyordu
 		$tpl = $smarty->createTemplate('file:' . $tplFile, $vars, $compileId, $smarty);
 

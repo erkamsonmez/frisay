@@ -11,11 +11,38 @@
 		</div>
 	</div>
 {/if}
-<div class="admin-toolbar d-flex flex-wrap gap-2 mb-3">
-	<a href="{$adminUrl}suppliers" class="btn btn-sm {if $activeFilter == -1}btn-dark{else}btn-outline-dark{/if}">{'All'|adminT}</a>
-	<a href="{$adminUrl}suppliers?active=1" class="btn btn-sm {if $activeFilter == 1}btn-dark{else}btn-outline-dark{/if}">{'Active'|adminT}</a>
-	<a href="{$adminUrl}suppliers?active=0" class="btn btn-sm {if $activeFilter == 0}btn-dark{else}btn-outline-dark{/if}">{'Inactive'|adminT}</a>
-	<a href="{$adminUrl}supplier" class="btn btn-sm btn-primary ms-auto">{'+ New supplier'|adminT}</a>
+<div class="admin-panel p-3 mb-3">
+	<div class="mp-filter-card mb-0">
+		<div class="mp-filter-header">
+			<div>
+				<div class="mp-filter-title">
+					{include file='admin/partials/filter-funnel-icon.tpl'}
+					{'Filters'|adminT}
+				</div>
+			</div>
+		</div>
+		<form method="get" action="{$adminUrl}suppliers" id="admSuppliersFilterForm">
+			<div class="row">
+				<div class="col-md-4 mb-3">
+					<label for="sup_active">{'Status'|adminT}</label>
+					<select id="sup_active" name="active" class="form-select form-select-sm">
+						<option value="-1"{if $activeFilter == -1} selected{/if}>{'All'|adminT}</option>
+						<option value="1"{if $activeFilter == 1} selected{/if}>{'Active'|adminT}</option>
+						<option value="0"{if $activeFilter == 0} selected{/if}>{'Inactive'|adminT}</option>
+					</select>
+				</div>
+			</div>
+		</form>
+		<div class="mp-filter-actions">
+			<div class="mp-filter-actions__btns">
+				<button type="submit" form="admSuppliersFilterForm" class="btn btn-warning">{'Filter'|adminT}</button>
+				<a href="{$adminUrl}suppliers" class="btn btn-outline-secondary">{'Clear'|adminT}</a>
+			</div>
+			<div class="mp-filter-actions__right">
+				<a href="{$adminUrl}supplier" class="btn btn-primary">{'+ New supplier'|adminT}</a>
+			</div>
+		</div>
+	</div>
 </div>
 
 <div class="admin-panel p-0">

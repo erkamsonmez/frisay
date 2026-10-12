@@ -12,6 +12,7 @@
 
 	$customer = Customer::getCurrent();
 	$idUser = (int) $customer['id_user'];
+	Order::attachGuestOrdersToUser($idUser);
 	$addresses = Address::getListForUser($idUser);
 	$notifications = Notification::getListForUser($idUser);
 	$allOrders = Order::enrichUserOrderRows(Order::getUserOrders($idUser));
@@ -51,10 +52,11 @@
 		}
 	}
 
-	if ($activeTab === '' && $selectedOrderId <= 0) {
-		$activeTab = 'orders';
+	$allowedTabs = ['profile', 'orders', 'notifications', 'addresses', 'password'];
+	if ($activeTab !== '' && !in_array($activeTab, $allowedTabs, true)) {
+		$activeTab = '';
 	}
-	if ($selectedOrderId > 0) {
+	if ($selectedOrderId > 0 || Tools::getValue('filter') !== '') {
 		$activeTab = 'orders';
 	}
 
@@ -88,9 +90,14 @@
 	}
 
 	$fullName = trim((string) ($customer['user_full_name'] ?? ''));
-	$accountInitial = $fullName !== ''
-		? mb_strtoupper(mb_substr($fullName, 0, 1, 'UTF-8'))
-		: '?';
+	$nameParts = preg_split('/\s+/u', $fullName, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+	$accountInitial = '?';
+	if ($nameParts !== []) {
+		$accountInitial = mb_strtoupper(mb_substr((string) $nameParts[0], 0, 1, 'UTF-8'));
+		if (isset($nameParts[1])) {
+			$accountInitial .= mb_strtoupper(mb_substr((string) $nameParts[1], 0, 1, 'UTF-8'));
+		}
+	}
 
 	$smarty->assign([
 		'customer' => $customer,

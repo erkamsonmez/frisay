@@ -373,16 +373,6 @@ class UpdateChecker
 			$body = curl_exec($ch);
 			$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 			$err = (string) curl_error($ch);
-
-			// Dev/WAMP fallback if CA bundle missing.
-			if (($body === false || $code === 0) && $err !== '' && stripos($err, 'SSL') !== false) {
-				curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-				curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-				$body = curl_exec($ch);
-				$code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-				$err = (string) curl_error($ch);
-			}
-
 			curl_close($ch);
 
 			if ($body === false) {

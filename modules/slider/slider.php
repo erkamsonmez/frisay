@@ -60,6 +60,7 @@ class SliderModule extends ModuleBase
 
 			if (hash_equals($adminToken, $postToken)) {
 				Settings::set('SLIDER_PROMO_TITLE', trim((string) Tools::getValue('promo_title')));
+				Settings::set('SLIDER_PROMO_HIDE_TITLE', Tools::getValue('promo_hide_title') ? '1' : '0');
 				$flash = 'Ayarlar kaydedildi';
 			} else {
 				$flash = 'Geçersiz istek';
@@ -119,6 +120,7 @@ class SliderModule extends ModuleBase
 			'slides' => self::getList($group, false),
 			'editSlide' => $editSlide,
 			'promoTitle' => Settings::get('SLIDER_PROMO_TITLE') ?: 'En Avantajlı Fırsatlar',
+			'promoHideTitle' => Settings::get('SLIDER_PROMO_HIDE_TITLE') === '1',
 			'flash' => $flash,
 		]);
 	}
@@ -149,6 +151,7 @@ class SliderModule extends ModuleBase
 			$html = $this->renderFrontTemplate('home_promo_slider', [
 				'slides' => $slides,
 				'promoTitle' => Settings::get('SLIDER_PROMO_TITLE') ?: 'En Avantajlı Fırsatlar',
+				'promoHideTitle' => Settings::get('SLIDER_PROMO_HIDE_TITLE') === '1',
 			]);
 
 			return $html !== '' ? $html : null;

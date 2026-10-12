@@ -5,11 +5,56 @@ Version numbers follow [Semantic Versioning](https://semver.org/).
 
 | Durum | Sürüm |
 |--------|--------|
-| **Yayında (canlı)** | **2.5.6** |
-| **Geliştirme / bir sonraki yayın** | **2.5.7** (henüz yayınlanmadı) |
-| **İleride** | 3.0.0 |
+| **Yayında (canlı)** | **3.0.0** |
+| **Önceki kararlı** | **2.5.6** |
 
-2.5.6 yayımlandı. Yeni düzeltme ve küçük iyileştirmeler **2.5.7** altında toplanır. Daha büyük yeni işler 2.6.0 veya 3.0.0 altında planlanır.
+2.5.6 sonrası işler **3.0.0** altında toplandı.
+
+---
+## [3.0.0] — 2026-09-10
+
+### Added
+- **Healt theme** — teal accent `#169ba0`, homepage chips from admin “show on home” categories only, app-style mobile chrome
+- **PrestaShop-compatible shop WebService** — `/api/orders?ws_key=` XML/JSON facade (xlink resources, `display=full`, filters) so cargo/marketplace PS clients can talk to FriSay without using `/api/v1`; existing JSON Web API unchanged
+- **ShopNova storefront** (`templates/shopnova`) — marketplace layout: navy utility bar, category search, full-width hero, popular grid, deal/mega banners; editorial product page (studio gallery + filmstrip)
+- **Theme Edit (theme4)** — click-to-edit storefront: Bootstrap modal (no live iframe while typing; apply on Save), header/service-bar/footer chrome texts, category widgets as grid or list, **Container** section (side-by-side divs: category / image / text)
+- **Admin products list** — active/inactive switch; ⋮ menu (Preview, Copy, Delete); search by name, stock code or barcode; clickable column sort (ASC/DESC)
+- **Multi-category products** — default category plus extra categories; product appears on those category pages too
+- **Category images** — upload on category edit (PNG/JPG/WEBP/GIF); homepage circles only request a file when one exists (no 404)
+
+### Changed
+- **Site version** — `FShop::VERSION` 3.0.0 (admin footer)
+- **Default storefront theme** — `templates/dress` renamed to `templates/default`; installer and schema ship it as the stock theme (existing `THEME=dress` is remapped)
+- **Admin dashboard Data period** — snapshot panel uses hero metrics, operation rows, and compact cancel/return/basket cards instead of a flat list
+- **Admin UI** — SaaS design system (blue/coral tokens, airy cards, coral active nav, pill search, modern forms/tables) aligned with a light premium dashboard look
+- **Admin sidebar** — account block removed from the top and bottom of the left menu; My Account stays under System (header user menu unchanged)
+- **Admin AI dock** — dashboard, orders, and other AI pages use a left hover dock instead of a large banner
+- **Admin filters** — list pages use the marketplace-orders filter card (funnel title, dashed rules, yellow search button)
+- **Admin top bar** — height and padding match the sidebar header strip
+- **Admin typography** — body and scale ~1px smaller (html 15px, base 13.5px)
+
+### Fixed
+- **Collapsed admin sidebar** — section submenus open as a flyout to the right of the rail (hover or click); previously the accordion did nothing when the menu was collapsed
+- **Security** — `cache/` cookie dumps removed and blocked over HTTP; core update download no longer disables TLS verification on SSL errors; ParamPOS live SOAP always verifies TLS (bundled CA); sanalpos simulation payments disabled when `APP_ENV=production`; Backup Pro download/delete/restore paths stay under `backups/`; `Notification::getByIdForUser` uses parameterized `getRowSafe`; installer schema no longer ships a known default admin password hash
+- **Security** — module/theme/core ZIP symlink and NTFS-ADS path checks; Nginx deny example (`nginx.conf.example`); `tools/` `config/` `core/` `storage/` blocked over HTTP; product/invoice PHP execution denied; toast/comment DOM XSS (`.text()`); admin logout is POST+CSRF; 30-minute admin idle timeout; `Cache-Control: no-store` on admin and account/checkout; customer password-reset and search-suggest rate limits; hardcoded sample Web API key removed
+- **PrestaShop WebService** — currencies match PS 1.7 XML (`names`/`symbol`/`numeric_iso_code`); VAT via `taxes`, `tax_rule_groups`, `tax_rules` from the shop tax table
+- **PrestaShop WebService request log** — Prapazar/cargo `/api/` calls (method, URL, body, status) stored in `logs/psws-requests.jsonl` and listed under Admin → API
+- **Prapazar product GET** — `/api/products` without `display=full` now returns full product objects (name, barcode, tax, manufacturer); list limit default 1000 (was 80)
+- **Prapazar product POST** — `POST /api/products` (and GET with product XML body) creates/updates the shop product from PrestaShop XML; GET `/api/products` no longer dumps every full product (that 500'd)
+- **Prapazar specific_prices + images** — `GET /api/specific_prices` was 404 so the client aborted before image upload; empty list is now 200. `GET /api/images/products/{id}` returns PrestaShop XML (not JPEG 404); `POST` accepts multipart `image`
+- **Prapazar product slug 400** — deleting a product left `product_lang` rows, so the next POST hit “Bu URL slug zaten kullanılıyor”; delete now clears lang rows and WebService uniquifies/reclaims orphan slugs
+- **Prapazar price + PUT** — PrestaShop `price` is tax-excluded; FShop stores tax-included (706.96 + %1 → 714.03). `PUT /api/products` with `<id>` in the body (no URL id) updates instead of 400
+- **Prapazar order ship 404** — after `POST /api/order_histories` the client `GET /api/order_histories/{id}`; that id is the order id and now returns the current state instead of 404
+- **Prapazar order_carriers** — `POST /api/order_carriers` writes tracking number and cargo company onto the order (was 404 Resource not found)
+- **Prapazar order PUT** — `PUT /api/orders` with `<id>` in the body (no URL id) updates tracking/state instead of 400 Order id is required
+- **Prapazar order_states** — API now exposes PrestaShop 1.7 statuses (4 = Shipped, 5 = Delivered); Prapazar “kargola” no longer maps to FriSay delivered
+- **Prapazar image DELETE** — product edit deletes the old image then uploads a new one; `DELETE /api/images/products/{id}/{imageId}` was 405; empty `<prestashop/>` body now returns `<image><id>` so RestSharp can deserialize
+- **Prapazar specific_prices GET** — after POST the client GET `/api/specific_prices/{id}` (id = product id); rows are stored and the amount/percent reduction is applied to the shop price
+- **Prapazar catalog vs sale price** — `GET /api/products` now returns PrestaShop catalog price (before specific_prices). Discount is applied once from that catalog (600 list + 100 off → 500/600, not 400/500)
+- **Prapazar address district** — order addresses expose ilçe as PrestaShop `id_state` + `/api/states/{id}` (was always 0, so cargo/Prapazar dropped the district)
+- **Prapazar product front URL** — `index.php?id_product={id}&controller=product` 301-redirects to the shop SEO URL (`/kategori/slug-id`); native FShop links unchanged
+- **Home text module install** — table renamed `home-text` → `home_text` so install no longer 500s (`DB::insert` strips hyphens); content renders via `home_text` hook on the default homepage
+- **Welcome admin page** — controller no longer redirects to dashboard; sidebar link restored under General
 
 ---
 ## [2.5.6] — 2026-08-22
@@ -609,6 +654,8 @@ Version numbers follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+[3.0.0]: https://github.com/bera65/frisay/compare/v2.5.6...v3.0.0
+[2.5.6]: https://github.com/bera65/frisay/compare/v2.5.5...v2.5.6
 [2.5.3]: https://github.com/bera65/fshop/compare/v2.5.2...HEAD
 [2.5.2]: https://github.com/bera65/fshop/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/bera65/fshop/compare/v2.5.0...v2.5.1

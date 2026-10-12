@@ -17,6 +17,19 @@ class Marketplace
 			'label' => 'N11',
 			'active' => true,
 		],
+		'prestashop' => [
+			'label' => 'PrestaShop',
+			'active' => true,
+		],
+		'frisay' => [
+			'label' => 'FriSay',
+			'active' => true,
+		],
+		'fiyattrend' => [
+			'label' => 'FiyatTrend',
+			'active' => true,
+			'settings_only' => true,
+		],
 	];
 
 	/** send=0 ile kapatılır: pazaryerine stok/fiyat push yok, yalnızca FShop stok düşer */
@@ -38,6 +51,8 @@ class Marketplace
 		Trendyol\ProductSyncService::ensureSchema();
 		Hepsiburada\ProductSyncService::ensureSchema();
 		N11\ProductSyncService::ensureSchema();
+		Prestashop\ProductSyncService::ensureSchema();
+		Frisay\ProductSyncService::ensureSchema();
 	}
 
 	public static function isEnabled(): bool
@@ -50,6 +65,39 @@ class Marketplace
 		return self::PLATFORMS;
 	}
 
+	/**
+	 * Sipariş/ürün kataloğu olan aktif platformlar (FiyatTrend hariç).
+	 *
+	 * @return array<int, string>
+	 */
+	public static function orderPlatformKeys(): array
+	{
+		$keys = [];
+
+		foreach (self::PLATFORMS as $key => $platform) {
+			if (!empty($platform['active']) && empty($platform['settings_only'])) {
+				$keys[] = $key;
+			}
+		}
+
+		return $keys;
+	}
+
+	public static function isOrderPlatform(string $key): bool
+	{
+		return in_array($key, self::orderPlatformKeys(), true);
+	}
+
+	public static function isValidOrderPlatformFilter(string $platform): bool
+	{
+		return $platform === 'all' || self::isOrderPlatform($platform);
+	}
+
+	public static function isSettingsOnly(string $key): bool
+	{
+		return !empty(self::PLATFORMS[$key]['settings_only']);
+	}
+
 	public static function platformList(): array
 	{
 		$list = [];
@@ -59,6 +107,7 @@ class Marketplace
 				'key' => $key,
 				'label' => $platform['label'],
 				'active' => !empty($platform['active']),
+				'settings_only' => !empty($platform['settings_only']),
 				'configured' => self::isPlatformConfigured($key),
 				'settings_url' => self::settingsUrl($key),
 			];
@@ -86,7 +135,65 @@ class Marketplace
 			return N11\ProductSyncService::isConfigured();
 		}
 
+		if ($key === 'prestashop') {
+			return Prestashop\ProductSyncService::isConfigured();
+		}
+
+		if ($key === 'frisay') {
+			return Frisay\ProductSyncService::isConfigured();
+		}
+
+		if ($key === 'fiyattrend') {
+			return trim((string) Settings::get('TRENDYOL_FIYATTREND_TOKEN')) !== '';
+		}
+
 		return false;
+	}
+
+	/**
+	 * @return array{ok: bool, message: string, count?: int, stock_updates?: int, orders?: array<int, array<string, mixed>>}
+	 */
+	public static function syncOrdersForPlatform(string $platform, ?string $start = null, ?string $end = null): array
+	{
+		if ($platform === 'hepsiburada') {
+			return Hepsiburada\OrderService::syncOrders($start, $end);
+		}
+
+		if ($platform === 'n11') {
+			return N11\OrderService::syncOrders();
+		}
+
+		if ($platform === 'prestashop') {
+			return Prestashop\OrderService::syncOrders($start, $end);
+		}
+
+		if ($platform === 'frisay') {
+			return Frisay\OrderService::syncOrders($start, $end);
+		}
+
+		return Trendyol\OrderService::syncOrders($start, $end);
+	}
+
+	/** @return array<int, array<string, mixed>> */
+	public static function getRecentOrders(string $platform, int $limit = 50): array
+	{
+		if ($platform === 'hepsiburada') {
+			return Hepsiburada\OrderService::getRecent($limit);
+		}
+
+		if ($platform === 'n11') {
+			return N11\OrderService::getRecent($limit);
+		}
+
+		if ($platform === 'prestashop') {
+			return Prestashop\OrderService::getRecent($limit);
+		}
+
+		if ($platform === 'frisay') {
+			return Frisay\OrderService::getRecent($limit);
+		}
+
+		return Trendyol\OrderService::getRecent($limit);
 	}
 
 	public static function handleAdminPosts(string $adminToken): string
@@ -101,37 +208,33 @@ class Marketplace
 			$platform = trim((string) \Tools::getValue('marketplace_platform', 'trendyol'));
 			$start = trim((string) \Tools::getValue('start_date'));
 			$end = trim((string) \Tools::getValue('end_date'));
-
-			$messages = [];
-
 			$syncStart = $start !== '' ? $start : null;
 			$syncEnd = $end !== '' ? $end : null;
 
 			if ($platform === 'all') {
-				$result = Trendyol\OrderService::syncOrders($syncStart, $syncEnd);
-				$messages[] = (string) ($result['message'] ?? 'Trendyol siparişleri senkronize edildi');
+				$messages = [];
 
-				$result = Hepsiburada\OrderService::syncOrders($syncStart, $syncEnd);
-				$messages[] = (string) ($result['message'] ?? 'Hepsiburada siparişleri senkronize edildi');
+				foreach (self::orderPlatformKeys() as $key) {
+					if (!self::isPlatformConfigured($key)) {
+						continue;
+					}
 
-				$result = N11\OrderService::syncOrders();
-				$messages[] = (string) ($result['message'] ?? 'N11 siparişleri senkronize edildi');
+					$result = self::syncOrdersForPlatform($key, $syncStart, $syncEnd);
+					$messages[] = (string) ($result['message'] ?? (self::PLATFORMS[$key]['label'] . ' siparişleri senkronize edildi'));
+				}
 
-				return implode(' · ', $messages);
+				return $messages === []
+					? 'Yapılandırılmış pazaryeri yok'
+					: implode(' · ', $messages);
 			}
 
-			if ($platform === 'hepsiburada') {
-				$result = Hepsiburada\OrderService::syncOrders($syncStart, $syncEnd);
-				return (string) ($result['message'] ?? 'Hepsiburada siparişleri senkronize edildi');
+			if (!self::isOrderPlatform($platform)) {
+				$platform = 'trendyol';
 			}
 
-			if ($platform === 'n11') {
-				$result = N11\OrderService::syncOrders();
-				return (string) ($result['message'] ?? 'N11 siparişleri senkronize edildi');
-			}
+			$result = self::syncOrdersForPlatform($platform, $syncStart, $syncEnd);
 
-			$result = Trendyol\OrderService::syncOrders($syncStart, $syncEnd);
-			return (string) ($result['message'] ?? 'Trendyol siparişleri senkronize edildi');
+			return (string) ($result['message'] ?? 'Siparişler senkronize edildi');
 		}
 
 		$flash = Trendyol\TrendyolAdminPages::handlePosts($adminToken);
@@ -142,6 +245,14 @@ class Marketplace
 
 		if ($flash === '') {
 			$flash = N11\N11AdminPages::handlePosts($adminToken);
+		}
+
+		if ($flash === '') {
+			$flash = Prestashop\PrestashopAdminPages::handlePosts($adminToken);
+		}
+
+		if ($flash === '') {
+			$flash = Frisay\FrisayAdminPages::handlePosts($adminToken);
 		}
 
 		return $flash;
@@ -163,6 +274,8 @@ class Marketplace
 		$urls['cronQuestionsUrlHb'] = $api . '?action=cron&type=questions&platform=hepsiburada&token=' . $token;
 		$urls['cronOrdersUrlN11'] = $api . '?action=cron&type=orders&platform=n11&token=' . $token;
 		$urls['cronQuestionsUrlN11'] = $api . '?action=cron&type=questions&platform=n11&token=' . $token;
+		$urls['cronOrdersUrlPs'] = $api . '?action=cron&type=orders&platform=prestashop&token=' . $token;
+		$urls['cronOrdersUrlFrisay'] = $api . '?action=cron&type=orders&platform=frisay&token=' . $token;
 
 		$urls['exportOrdersUrl'] = $api . '?action=export-orders';
 		$urls['orderActionUrl'] = $api . '?action=order-action';
@@ -191,7 +304,7 @@ class Marketplace
 		return [
 			'css' => [],
 			'js' => [
-				$domain . 'templates/admin/js/marketplace-admin.js',
+				$domain . 'templates/admin/js/marketplace-admin.js?v=' . filemtime(__DIR__ . '/../templates/admin/js/marketplace-admin.js'),
 			],
 		];
 	}
@@ -210,6 +323,12 @@ class Marketplace
 		} elseif ($platform === 'n11') {
 			$vars = N11\N11AdminPages::productPanelVars($idProduct);
 			$tpl = 'admin/marketplace/product_panel_n11.tpl';
+		} elseif ($platform === 'prestashop') {
+			$vars = Prestashop\PrestashopAdminPages::productPanelVars($idProduct);
+			$tpl = 'admin/marketplace/product_panel_prestashop.tpl';
+		} elseif ($platform === 'frisay') {
+			$vars = Frisay\FrisayAdminPages::productPanelVars($idProduct);
+			$tpl = 'admin/marketplace/product_panel_frisay.tpl';
 		} else {
 			$vars = Trendyol\TrendyolAdminPages::productPanelVars($idProduct);
 			$tpl = 'admin/marketplace/product_panel.tpl';
@@ -243,6 +362,9 @@ class Marketplace
 	{
 		$idProduct = (int) ($row['id_product'] ?? 0);
 		$row['ty_linked'] = !empty($row['ty_linked']) || trim((string) ($row['ty_barcode'] ?? '')) !== '';
+		$row['ty_paused'] = strtolower(trim((string) ($row['ty_last_status'] ?? ''))) === 'paused';
+		$row['edit_url'] = Admin::url('product?id=' . $idProduct);
+		$cost = (float) ($row['cost'] ?? 0);
 
 		$hb = $idProduct > 0 ? Hepsiburada\ProductSyncService::findMapping($idProduct) : null;
 		$row['hb_linked'] = Hepsiburada\ProductSyncService::isLinked($hb);
@@ -253,10 +375,98 @@ class Marketplace
 		$row['n11_linked'] = N11\ProductSyncService::isLinked($n11);
 		$row['n11_sale_price'] = (float) ($n11['sale_price'] ?? 0);
 		$row['n11_stock_code'] = (string) ($n11['stock_code'] ?? '');
+
+		$ps = $idProduct > 0 ? Prestashop\ProductSyncService::findMapping($idProduct) : null;
+		$row['ps_linked'] = Prestashop\ProductSyncService::isLinked($ps);
+		$row['ps_sale_price'] = (float) ($ps['sale_price'] ?? 0);
+		$row['ps_product_id'] = (int) ($ps['ps_product_id'] ?? 0);
+
+		$frisay = $idProduct > 0 ? Frisay\ProductSyncService::findMapping($idProduct) : null;
+		$row['frisay_linked'] = Frisay\ProductSyncService::isLinked($frisay);
+		$row['frisay_sale_price'] = (float) ($frisay['sale_price'] ?? 0);
+		$row['frisay_remote_id'] = (int) ($frisay['remote_id'] ?? 0);
+
 		$row['stock'] = round((float) ($row['stock'] ?? 0), 2);
 		$row['stock_formatted'] = Tools::displayStock($row['stock']);
+		$row['price_formatted'] = $row['price_formatted'] ?? Tools::displayPrice((float) ($row['price'] ?? 0));
+		$row['vat'] = (float) ($row['vat'] ?? 20);
+		$row['has_variations'] = class_exists('ProductVariation') && $idProduct > 0
+			? ProductVariation::hasVariations($idProduct)
+			: false;
+		$row['variation_chips'] = [];
+
+		if ($row['has_variations']) {
+			foreach (ProductVariation::getByProduct($idProduct, true) as $variation) {
+				$row['variation_chips'][] = [
+					'label' => ProductVariation::formatLabel($variation),
+					'stock' => (int) ($variation['stock'] ?? 0),
+				];
+			}
+		}
+
+		$row['listings'] = [];
+		$channels = [
+			['key' => 'trendyol', 'linked' => !empty($row['ty_linked']), 'price' => (float) ($row['ty_sale_price'] ?? 0), 'url' => (string) ($row['ty_product_url'] ?? ''), 'paused' => !empty($row['ty_paused']), 'status' => (string) ($row['ty_last_status'] ?? '')],
+			['key' => 'hepsiburada', 'linked' => !empty($row['hb_linked']), 'price' => (float) $row['hb_sale_price'], 'url' => '', 'paused' => false, 'status' => ''],
+			['key' => 'n11', 'linked' => !empty($row['n11_linked']), 'price' => (float) $row['n11_sale_price'], 'url' => '', 'paused' => false, 'status' => ''],
+			['key' => 'prestashop', 'linked' => !empty($row['ps_linked']), 'price' => (float) $row['ps_sale_price'], 'url' => '', 'paused' => false, 'status' => ''],
+			['key' => 'frisay', 'linked' => !empty($row['frisay_linked']), 'price' => (float) $row['frisay_sale_price'], 'url' => '', 'paused' => false, 'status' => ''],
+		];
+
+		foreach ($channels as $ch) {
+			if (empty($ch['linked'])) {
+				continue;
+			}
+
+			$price = (float) $ch['price'];
+			$profitPct = null;
+
+			if ($price > 0) {
+				$profitPct = round((($price - $cost) / $price) * 100, 0);
+			}
+
+			$status = 'sale';
+
+			if (!empty($ch['paused']) || $ch['status'] === 'paused') {
+				$status = 'paused';
+			} elseif (in_array($ch['status'], ['pending', 'failed'], true)) {
+				$status = $ch['status'] === 'failed' ? 'closed' : 'pending';
+			}
+
+			$row['listings'][] = [
+				'platform' => $ch['key'],
+				'label' => (string) (self::PLATFORMS[$ch['key']]['label'] ?? $ch['key']),
+				'price' => $price,
+				'price_formatted' => $price > 0 ? number_format($price, 2, ',', '.') . ' ₺' : '—',
+				'profit_pct' => $profitPct,
+				'status' => $status,
+				'product_url' => $ch['url'],
+				'modal_id' => self::listingModalId($ch['key'], $idProduct),
+			];
+		}
 
 		return $row;
+	}
+
+	private static function listingModalId(string $platform, int $idProduct): string
+	{
+		if ($platform === 'trendyol') {
+			return 'mp-modal-' . $idProduct;
+		}
+
+		if ($platform === 'hepsiburada') {
+			return 'mp-modal-hb-' . $idProduct;
+		}
+
+		if ($platform === 'n11') {
+			return 'mp-modal-n11-' . $idProduct;
+		}
+
+		if ($platform === 'prestashop') {
+			return 'mp-modal-ps-' . $idProduct;
+		}
+
+		return 'mp-modal-frisay-' . $idProduct;
 	}
 
 	/**
@@ -290,6 +500,20 @@ class Marketplace
 			$mapping = N11\ProductSyncService::findMapping($idProduct);
 			if ($mapping && N11\ProductSyncService::isLinked($mapping)) {
 				$results['n11'] = N11\ProductSyncService::updatePriceStock($idProduct);
+			}
+		}
+
+		if ($excludePlatform !== 'prestashop' && self::isPlatformActive('prestashop') && self::isPlatformConfigured('prestashop')) {
+			$mapping = Prestashop\ProductSyncService::findMapping($idProduct);
+			if ($mapping && Prestashop\ProductSyncService::isLinked($mapping)) {
+				$results['prestashop'] = Prestashop\ProductSyncService::updatePriceStock($idProduct);
+			}
+		}
+
+		if ($excludePlatform !== 'frisay' && self::isPlatformActive('frisay') && self::isPlatformConfigured('frisay')) {
+			$mapping = Frisay\ProductSyncService::findMapping($idProduct);
+			if ($mapping && Frisay\ProductSyncService::isLinked($mapping)) {
+				$results['frisay'] = Frisay\ProductSyncService::updatePriceStock($idProduct);
 			}
 		}
 

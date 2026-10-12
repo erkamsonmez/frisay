@@ -18,6 +18,10 @@
 <div class="alert alert-success">
 	<strong>{'New API key (shown once — copy it):'|adminT}</strong><br>
 	<code class="user-select-all">{$newApiKey|escape}</code>
+	{if $newWsKey|default:'' != ''}
+	<br><span class="d-block mt-2">PrestaShop / Prapazar (32 karakter):</span>
+	<code class="user-select-all">{$newWsKey|escape}</code>
+	{/if}
 </div>
 {/if}
 
@@ -25,7 +29,8 @@
 	<div class="col-lg-5">
 		<div class="admin-panel p-3">
 			<h2 class="h6 mb-3">{'API status'|adminT}</h2>
-			<p class="small text-muted mb-2">Base URL: <code>{$webApiUrl|escape}</code></p>
+			<p class="small text-muted mb-2">FriSay JSON API: <code>{$webApiUrl|escape}</code></p>
+			<p class="small text-muted mb-2">PrestaShop uyumlu (kargo entegrasyonu): <code>{$psWsUrl|escape}</code></p>
 			<form method="post">
 				<input type="hidden" name="saveApiEnabled" value="1">
 				<input type="hidden" name="token" value="{$adminToken}">
@@ -38,6 +43,7 @@
 			<ul class="small text-muted mt-3 mb-0 ps-3">
 				<li>Header: <code>X-API-Key: ...</code></li>
 				<li>{'or'|adminT} <code>Authorization: Bearer ...</code></li>
+				<li>PrestaShop / Prapazar: 32 karakterlik anahtar + HTTP Basic (Admin listesindeki Prapazar satırı)</li>
 				<li><a href="{$apiDocsPortalUrl|escape}" target="_blank" rel="noopener">{'FriSay API documentation'|adminT}</a></li>
 			</ul>
 		</div>
@@ -129,6 +135,12 @@
 					<div class="small mb-1">
 						<code class="user-select-all">{$key.api_key|escape}</code>
 					</div>
+					{if $key.ws_key|default:'' != ''}
+					<div class="small mb-1">
+						<span class="text-muted">PrestaShop / Prapazar (32 karakter):</span>
+						<code class="user-select-all">{$key.ws_key|escape}</code>
+					</div>
+					{/if}
 					<div class="small text-muted mb-1">
 						{foreach $key.permission_labels as $label}
 						<span class="badge text-bg-light border me-1 mb-1">{$label|escape}</span>
@@ -176,4 +188,68 @@
 			<p class="small text-muted mb-0"><strong>BizimHesap</strong>{' — read/pull orders only'|adminT}</p>
 		</div>
 	</div>
+</div>
+
+<div class="admin-panel p-3 mt-4">
+	<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+		<h2 class="h6 mb-0">Prapazar / PrestaShop hata kaydı</h2>
+		<form method="post">
+			<input type="hidden" name="clearPsWsLog" value="1">
+			<input type="hidden" name="token" value="{$adminToken}">
+			<button type="submit" class="btn btn-sm btn-outline-danger">Kaydı temizle</button>
+		</form>
+	</div>
+	<p class="small text-muted mb-3">Yalnızca hatalı istekler (HTTP 4xx / 5xx) kaydedilir: method, URL, gövde, yanıt. Başarılı senkron çağrıları loglanmaz. Anahtarlar maskelenir.</p>
+	{if $psWsLogs|@count == 0}
+	<p class="small text-muted mb-0">Henüz hata kaydı yok.</p>
+	{else}
+	<div class="vstack gap-3">
+		{foreach $psWsLogs as $log}
+		<div class="border rounded p-3">
+			<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+				<code class="small">{$log.method|default:'?'|escape}</code>
+				{assign var=st value=$log.status|default:0}
+				{if $st >= 200 && $st < 300}
+				<span class="badge text-bg-success">{$st|escape}</span>
+				{elseif $st == 401 || $st == 403}
+				<span class="badge text-bg-warning">{$st|escape}</span>
+				{elseif $st >= 400}
+				<span class="badge text-bg-danger">{$st|escape}</span>
+				{else}
+				<span class="badge text-bg-secondary">{$st|escape}</span>
+				{/if}
+				<span class="small text-muted">{$log.at|default:''|escape}</span>
+				{if $log.auth|default:'' != ''}
+				<span class="badge text-bg-light border">auth: {$log.auth|escape}</span>
+				{/if}
+			</div>
+			<div class="small mb-1"><code>{$log.uri|default:''|escape}</code></div>
+			{if $log.resource|default:'' != ''}
+			<div class="small text-muted mb-1">kaynak: <code>{$log.resource|escape}</code>{if $log.id|default:0 > 0} #{$log.id|escape}{/if}{if $log.sub|default:'' != ''} / {$log.sub|escape}{/if}</div>
+			{/if}
+			{if $log.error|default:'' != ''}
+			<div class="small text-danger mb-1">{$log.error|escape}</div>
+			{/if}
+			{if $log.query_json|default:'' != '' && $log.query_json != '[]'}
+			<div class="small text-muted mb-1">query: <code>{$log.query_json|escape}</code></div>
+			{/if}
+			{if $log.ua|default:'' != ''}
+			<div class="small text-muted mb-1">UA: {$log.ua|escape}</div>
+			{/if}
+			{if $log.format|default:'' != ''}
+			<div class="small text-muted mb-1">yanıt: <code>{$log.format|escape}</code></div>
+			{/if}
+			{if $log.body|default:'' != ''}
+			<pre class="small bg-light border rounded p-2 mb-2" style="max-height:240px;overflow:auto;white-space:pre-wrap">{$log.body|escape}</pre>
+			{else}
+			<p class="small text-muted mb-2">İstek gövdesi yok (GET).</p>
+			{/if}
+			{if $log.response|default:'' != ''}
+			<div class="small text-muted mb-1">Bizim yanıt (kısaltılmış):</div>
+			<pre class="small bg-light border rounded p-2 mb-0" style="max-height:240px;overflow:auto;white-space:pre-wrap">{$log.response|escape}</pre>
+			{/if}
+		</div>
+		{/foreach}
+	</div>
+	{/if}
 </div>

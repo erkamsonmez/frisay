@@ -25,13 +25,23 @@
 </IfModule>
 
 RewriteEngine On
-RewriteBase /fshop2/
+RewriteBase /
+
+# PrestaShop / Prapazar HTTP Basic (mod_fcgid Authorization başlığını PHP'ye geçirir)
+<IfModule mod_authz_core.c>
+	CGIPassAuth On
+</IfModule>
+RewriteCond %{HTTP:Authorization} .
+RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
 # Sensitive paths / VCS — never serve from docroot
 RewriteRule ^\.git(/|$) - [F,L]
 RewriteRule ^\.svn(/|$) - [F,L]
-RewriteRule ^(logs|upgrade)(/|$) - [F,L]
+RewriteRule ^(logs|upgrade|cache|backups|config|core|container|storage|lang|tools)(/|$) - [F,L]
 RewriteRule ^install/.*\.sql$ - [F,L]
+RewriteRule ^modules/.*\.php$ - [F,L]
+RewriteRule ^img/.*\.php$ - [F,L]
+RewriteRule \.(sql|tpl)$ - [F,L]
 
 # PWA — dynamic manifest & service worker (mobil-app module)
 RewriteRule ^manifest\.json$ manifest.php [L]
@@ -66,6 +76,10 @@ RewriteRule ^api/cron$ api/cron.php [L,QSA]
 # 4d. Web API (uzaktan sipariş / ürün)
 RewriteRule ^api/v1/?$ api/webapi.php [L,QSA]
 RewriteRule ^api/v1/(.*)$ api/webapi.php?route=$1 [L,QSA]
+
+# 4d1. PrestaShop-compatible WebService (FriSay facade — does not replace /api/v1)
+RewriteRule ^api/?$ api/psws.php [L,QSA]
+RewriteRule ^api/(.+)$ api/psws.php?ps_path=$1 [L,QSA]
 
 # 5a0. Blog kategori (yazı kuralından önce)
 RewriteRule ^blog/kategori/(.+)-([0-9]+)/?$ index.php?container=blog&cat_slug=$1&id_category=$2 [L,QSA,NC]

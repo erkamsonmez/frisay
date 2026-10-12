@@ -174,6 +174,19 @@
 									{/foreach}
 								</select>
 							</div>
+							<div class="col-12">
+								<input type="hidden" name="extra_categories_present" value="1">
+								<label class="form-label">{'Also show in'|adminT}</label>
+								<div id="extraCategoryList" class="border rounded p-2" style="max-height:220px;overflow:auto">
+									{foreach $categoryOptions as $cat}
+									<div class="form-check" data-extra-cat="{$cat.id_category}">
+										<input class="form-check-input" type="checkbox" name="extra_category_ids[]" value="{$cat.id_category}" id="extraCat{$cat.id_category}"{if $extraCategoryIds && in_array($cat.id_category, $extraCategoryIds)} checked{/if}>
+										<label class="form-check-label" for="extraCat{$cat.id_category}">{$cat.category_name|escape}</label>
+									</div>
+									{/foreach}
+								</div>
+								<div class="form-text">{'Default category is chosen above. Tick others to list this product on those category pages too.'|adminT}</div>
+							</div>
 						</div>
 					</div>
 				</div>
@@ -242,8 +255,7 @@
 													<th>{'Barcode'|adminT}</th>
 													<th>{'Price'|adminT}</th>
 													<th>{'Stock'|adminT}</th>
-													<th>{'Active'|adminT}</th>
-													<th class="text-end" style="width:48px;"></th>
+													<th class="text-center">{'Active'|adminT}</th>
 												</tr>
 											</thead>
 											<tbody id="variationsBody">
@@ -257,12 +269,16 @@
 													<td><input type="text" name="variations[{$idx}][barcode]" class="form-control form-control-sm" value="{$var.barcode|escape}"></td>
 													<td><input type="text" name="variations[{$idx}][price]" class="form-control form-control-sm" value="{$var.price|escape}" placeholder="{'Empty = base price'|adminT}"></td>
 													<td><input type="number" name="variations[{$idx}][stock]" class="form-control form-control-sm variation-stock-input" value="{$var.stock|escape}" min="0"></td>
-													<td class="text-center">
-														<input type="hidden" name="variations[{$idx}][id_variation]" value="{$var.id_variation|escape}">
-														<input type="checkbox" name="variations[{$idx}][active]" value="1" class="form-check-input"{if $var.active} checked{/if}>
-													</td>
-													<td class="text-end">
-														<button type="button" class="btn btn-sm btn-outline-danger variation-remove" title="{'Remove row'|adminT}">&times;</button>
+													<td class="variation-row__actions">
+														<div class="variation-row__actions-inner">
+															<input type="hidden" name="variations[{$idx}][id_variation]" value="{$var.id_variation|escape}">
+															<div class="form-check form-switch">
+																<input class="form-check-input" type="checkbox" role="switch" name="variations[{$idx}][active]" value="1" aria-label="{'Active'|adminT}"{if $var.active} checked{/if}>
+															</div>
+															<button type="button" class="variation-remove" title="{'Remove row'|adminT}" aria-label="{'Remove row'|adminT}">
+																<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+															</button>
+														</div>
 													</td>
 												</tr>
 												{/foreach}
@@ -634,6 +650,10 @@
 			</div>
 
 			<div class="ml-nav">
+				<button type="button" class="btn btn-sm btn-outline-dark ml-up-btn" data-ml-up disabled title="{'Parent folder'|adminT}">
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 15-6-6-6 6"/></svg>
+					{'Parent folder'|adminT}
+				</button>
 				<div class="ml-breadcrumbs" data-ml-crumbs></div>
 				<button type="button" class="btn btn-sm btn-outline-secondary" data-ml-refresh>{'Refresh'|adminT}</button>
 			</div>
@@ -737,6 +757,8 @@ window.productCatalogQuickConfig = {
 	var saleUnitWrap = document.getElementById('saleUnitWrap');
 	var saleQtyMinWrap = document.getElementById('saleQtyMinWrap');
 	var saleQtyStepWrap = document.getElementById('saleQtyStepWrap');
+	var saleQtyMinEl = document.getElementById('saleQtyMin');
+	var saleQtyStepEl = document.getElementById('saleQtyStep');
 	var m2StockHint = document.getElementById('m2StockHint');
 	var priceLabel = document.getElementById('productPriceLabel');
 	var stockLabel = document.getElementById('productStockLabel');
@@ -759,6 +781,70 @@ window.productCatalogQuickConfig = {
 		tabPanes.forEach(function (pane) {
 			var isActive = pane.getAttribute('data-tab') === tabName;
 			pane.classList.toggle('pe-tab-pane--active', isActive);
+		});
+	}
+
+	function fieldLabel(el) {
+		if (!el) {
+			return '';
+		}
+		if (el.id) {
+			var forLabel = document.querySelector('label[for="' + el.id + '"]');
+			if (forLabel) {
+				return forLabel.textContent.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+			}
+		}
+		var wrap = el.closest('.col-md-3, .col-md-4, .col-md-6, .col-md-8, .mb-3, .pe-card');
+		var label = wrap ? wrap.querySelector('.form-label, label') : null;
+		if (label) {
+			return label.textContent.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+		}
+		return (el.getAttribute('placeholder') || '').trim();
+	}
+
+	function revealInvalidField(el) {
+		var pane = el.closest('.pe-tab-pane');
+		if (pane && pane.getAttribute('data-tab')) {
+			switchTab(pane.getAttribute('data-tab'));
+		}
+		var langPane = el.closest('.tab-pane');
+		if (langPane && !langPane.classList.contains('active') && langPane.id) {
+			var langBtn = document.querySelector('[data-bs-target="#' + langPane.id + '"]');
+			if (langBtn) {
+				langBtn.click();
+			}
+		}
+	}
+
+	var productForm = document.getElementById('productForm');
+	var requiredMsg = {'This field is required'|adminT|@json_encode nofilter};
+	if (productForm) {
+		productForm.setAttribute('novalidate', 'novalidate');
+		productForm.addEventListener('submit', function (e) {
+			if (productForm.checkValidity()) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			var invalid = productForm.querySelector(':invalid');
+			if (!invalid) {
+				return;
+			}
+			revealInvalidField(invalid);
+			window.setTimeout(function () {
+				try {
+					invalid.focus();
+					invalid.scrollIntoView({ block: 'center', behavior: 'smooth' });
+				} catch (err) {}
+				if (typeof invalid.reportValidity === 'function') {
+					invalid.reportValidity();
+				}
+				var label = fieldLabel(invalid);
+				var message = label ? (label + ' — ' + requiredMsg) : requiredMsg;
+				if (window.AdminToast) {
+					AdminToast.show(message, 'warning');
+				}
+			}, 60);
 		});
 	}
 
@@ -789,6 +875,8 @@ window.productCatalogQuickConfig = {
 		if (saleUnitWrap) saleUnitWrap.style.display = isPhysical ? '' : 'none';
 		if (saleQtyMinWrap) saleQtyMinWrap.style.display = isM2 ? '' : 'none';
 		if (saleQtyStepWrap) saleQtyStepWrap.style.display = isM2 ? '' : 'none';
+		if (saleQtyMinEl) saleQtyMinEl.disabled = !isM2;
+		if (saleQtyStepEl) saleQtyStepEl.disabled = !isM2;
 		if (m2StockHint) m2StockHint.style.display = isM2 ? '' : 'none';
 		if (priceLabel) {
 			priceLabel.textContent = isM2
@@ -955,5 +1043,33 @@ window.productCatalogQuickConfig = {
 			});
 		});
 	});
+})();
+</script>
+<script>
+(function () {
+	function syncProductExtraCategories() {
+		var main = document.getElementById('productCategorySelect');
+		var extras = document.getElementById('extraCategoryList');
+		if (!main || !extras) {
+			return;
+		}
+		var id = String(main.value || '');
+		extras.querySelectorAll('[data-extra-cat]').forEach(function (row) {
+			var isMain = String(row.getAttribute('data-extra-cat')) === id;
+			row.style.display = isMain ? 'none' : '';
+			if (isMain) {
+				var cb = row.querySelector('input[type="checkbox"]');
+				if (cb) {
+					cb.checked = false;
+				}
+			}
+		});
+	}
+	window.syncProductExtraCategories = syncProductExtraCategories;
+	var main = document.getElementById('productCategorySelect');
+	if (main) {
+		main.addEventListener('change', syncProductExtraCategories);
+	}
+	syncProductExtraCategories();
 })();
 </script>

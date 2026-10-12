@@ -28,6 +28,7 @@ class ApiKey
 					`id_api_key` int(11) NOT NULL AUTO_INCREMENT,
 					`name` varchar(128) NOT NULL,
 					`api_key` varchar(128) NOT NULL,
+					`ws_key` varchar(32) NOT NULL DEFAULT '',
 					`permissions` text NOT NULL,
 					`active` tinyint(1) NOT NULL DEFAULT 1,
 					`last_used_at` datetime DEFAULT NULL,
@@ -35,12 +36,44 @@ class ApiKey
 					`date_upd` datetime NOT NULL,
 					PRIMARY KEY (`id_api_key`),
 					UNIQUE KEY `api_key` (`api_key`),
+					UNIQUE KEY `ws_key` (`ws_key`),
 					KEY `active` (`active`)
 				) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
 			);
 		}
 
+		$wsCol = DB::execute("SHOW COLUMNS FROM `api_keys` LIKE 'ws_key'");
+		if (empty($wsCol)) {
+			DB::execute(
+				"ALTER TABLE `api_keys`
+				 ADD COLUMN `ws_key` varchar(32) NOT NULL DEFAULT '' AFTER `api_key`"
+			);
+		}
+
+		self::backfillWsKeys();
 		self::migrateLegacyKey();
+	}
+
+	private static function backfillWsKeys(): void
+	{
+		$rows = DB::execute('SELECT id_api_key, api_key, ws_key FROM api_keys') ?: [];
+
+		foreach ($rows as $row) {
+			$current = trim((string) ($row['ws_key'] ?? ''));
+			if ($current !== '') {
+				continue;
+			}
+
+			$apiKey = (string) ($row['api_key'] ?? '');
+			$ws = strlen($apiKey) >= 32 ? substr($apiKey, 0, 32) : self::generateWsKey();
+
+			DB::update(
+				'api_keys',
+				['ws_key' => $ws],
+				'id_api_key = :where_id',
+				['where_id' => (int) $row['id_api_key']]
+			);
+		}
 	}
 
 	/** Eski tek WEBAPI_KEY ayarını çoklu tabloya aktarır */
@@ -62,6 +95,7 @@ class ApiKey
 		DB::insert('api_keys', [
 			'name' => 'Varsayılan',
 			'api_key' => $legacy,
+			'ws_key' => substr($legacy, 0, 32),
 			'permissions' => json_encode(array_keys(self::permissionCatalog()), JSON_UNESCAPED_UNICODE),
 			'active' => Settings::get('WEBAPI_ENABLED') === '1' ? 1 : 0,
 			'date_add' => $now,
@@ -101,6 +135,12 @@ class ApiKey
 		return bin2hex(random_bytes(32));
 	}
 
+	/** PrestaShop / Prapazar: 32 karakter (PS webservice anahtar uzunluğu) */
+	public static function generateWsKey(): string
+	{
+		return bin2hex(random_bytes(16));
+	}
+
 	/**
 	 * @param array<int, string> $permissions
 	 * @return array{ok:bool,message:string,id?:int,api_key?:string}
@@ -122,11 +162,13 @@ class ApiKey
 		}
 
 		$key = self::generateKey();
+		$wsKey = substr($key, 0, 32);
 		$now = date('Y-m-d H:i:s');
 
 		DB::insert('api_keys', [
 			'name' => mb_substr($name, 0, 128),
 			'api_key' => $key,
+			'ws_key' => $wsKey,
 			'permissions' => json_encode($permissions, JSON_UNESCAPED_UNICODE),
 			'active' => $active ? 1 : 0,
 			'date_add' => $now,
@@ -144,6 +186,7 @@ class ApiKey
 			'message' => self::t('API key created'),
 			'id' => $id,
 			'api_key' => $key,
+			'ws_key' => $wsKey,
 		];
 	}
 
@@ -191,13 +234,15 @@ class ApiKey
 		}
 
 		$key = self::generateKey();
+		$wsKey = substr($key, 0, 32);
 
 		DB::update('api_keys', [
 			'api_key' => $key,
+			'ws_key' => $wsKey,
 			'date_upd' => date('Y-m-d H:i:s'),
 		], 'id_api_key = :where_id', ['where_id' => $id]);
 
-		return ['ok' => true, 'message' => self::t('The key has been renewed'), 'api_key' => $key];
+		return ['ok' => true, 'message' => self::t('The key has been renewed'), 'api_key' => $key, 'ws_key' => $wsKey];
 	}
 
 	/** @return array{ok:bool,message:string} */
@@ -240,6 +285,14 @@ class ApiKey
 		}
 
 		$row = DB::getRowSafe('api_keys', 'api_key = ?', [$key]);
+
+		if (!$row) {
+			$row = DB::getRowSafe('api_keys', 'ws_key = ?', [$key]);
+		}
+
+		if (!$row && strlen($key) === 32) {
+			$row = DB::getRowSafe('api_keys', 'api_key LIKE ?', [$key . '%']);
+		}
 
 		return is_array($row) ? self::hydrate($row) : null;
 	}
@@ -345,6 +398,10 @@ class ApiKey
 		$decoded = json_decode((string) ($row['permissions'] ?? '[]'), true);
 		$row['permissions'] = is_array($decoded) ? self::sanitizePermissions($decoded) : [];
 		$row['id_api_key'] = (int) ($row['id_api_key'] ?? 0);
+		$row['ws_key'] = trim((string) ($row['ws_key'] ?? ''));
+		if ($row['ws_key'] === '' && isset($row['api_key'])) {
+			$row['ws_key'] = substr((string) $row['api_key'], 0, 32);
+		}
 		$row['active'] = (int) ($row['active'] ?? 0);
 		$row['permission_labels'] = [];
 

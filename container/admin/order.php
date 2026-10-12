@@ -154,7 +154,58 @@
 		$trackingUrl = Cargo::buildTrackingUrl($trackingNumber, $cargoCompany);
 	}
 
+	$contactRedirectUrl = '';
+
+	if (Tools::isSubmit('sendOrderCustomerNotify')) {
+		$postToken = (string) Tools::getValue('token');
+
+		if (!hash_equals($adminToken, $postToken)) {
+			$flash = adminT('Invalid request');
+			$flashType = 'danger';
+		} else {
+			$message = trim((string) Tools::getValue('contact_message'));
+			if ($message === '') {
+				$message = Order::buildCustomerNotifyMessage($order, $trackingUrl);
+			}
+
+			$email = trim((string) ($order['customer_email'] ?? ''));
+			if ($email === '' && (int) ($order['id_user'] ?? 0) > 0) {
+				$email = (string) (DB::getValue('SELECT email FROM users WHERE id_user = ?', [(int) $order['id_user']]) ?: '');
+			}
+
+			$customer = [
+				'user_full_name' => (string) ($order['customer_name'] ?? ''),
+				'phone' => (string) ($order['customer_phone'] ?? ''),
+				'email' => $email,
+			];
+
+			$siteName = Settings::get('SITE_NAME') ?: 'FShop';
+			$subject = $siteName . ' - ' . adminT('Order details') . ' ' . (string) ($order['reference'] ?? '');
+
+			$result = CustomerContact::send(
+				$customer,
+				(string) Tools::getValue('contact_channel'),
+				$message,
+				$subject
+			);
+			$flash = $result['message'];
+			$flashType = !empty($result['success']) ? 'success' : 'danger';
+
+			if (!empty($result['success']) && ($result['mode'] ?? '') === 'redirect' && !empty($result['url'])) {
+				$contactRedirectUrl = (string) $result['url'];
+			}
+		}
+	}
+
 	$canEditOrder = !in_array((int) $order['status'], [Order::STATUS_CANCELLED, Order::STATUS_RETURNED], true);
+
+	$orderNotifyMessage = Order::buildCustomerNotifyMessage($order, $trackingUrl);
+	$orderHasPhone = trim((string) ($order['customer_phone'] ?? '')) !== '';
+	$orderEmail = trim((string) ($order['customer_email'] ?? ''));
+	if ($orderEmail === '' && (int) ($order['id_user'] ?? 0) > 0) {
+		$orderEmail = (string) (DB::getValue('SELECT email FROM users WHERE id_user = ?', [(int) $order['id_user']]) ?: '');
+	}
+	$orderHasEmail = $orderEmail !== '' && (bool) filter_var($orderEmail, FILTER_VALIDATE_EMAIL);
 
 	$smarty->assign([
 		'order' => $order,
@@ -166,6 +217,13 @@
 		'cargoOptions' => class_exists('Cargo') ? Cargo::getList(true) : [],
 		'trackingUrl' => $trackingUrl,
 		'orderProductSearchUrl' => rtrim($domain, '/') . '/api/admin-order-products.php',
+		'orderNotifyMessage' => $orderNotifyMessage,
+		'orderHasPhone' => $orderHasPhone,
+		'orderHasEmail' => $orderHasEmail,
+		'orderContactEmail' => $orderEmail,
+		'orderContactWapioReady' => CustomerContact::isWapioReady(),
+		'contactRedirectUrl' => $contactRedirectUrl,
+		'orderPaymentLog' => Order::getGatewayPaymentDetails($order),
 		'adminHooks' => [
 			'admin_order_detail' => Module::renderDisplayHook('admin_order_detail', [
 				'id_order' => $idOrder,

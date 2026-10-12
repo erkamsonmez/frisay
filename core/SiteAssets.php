@@ -8,7 +8,25 @@ class SiteAssets
 		'bar' => ['file' => 'logo2.png', 'label' => 'Üst bar logosu'],
 		'footer' => ['file' => 'logoFooter.png', 'label' => 'Footer logosu'],
 		'admin' => ['file' => 'shopLogo.png', 'label' => 'Admin panel logosu'],
+		'etbis' => ['file' => 'etbis.png', 'label' => 'ETBİS / güven damgası'],
+		'play_store' => ['file' => 'google-play.png', 'label' => 'Google Play'],
+		'app_store' => ['file' => 'app-store.png', 'label' => 'App Store'],
 	];
+	private const OPTIONAL_LOGOS = ['etbis', 'play_store', 'app_store'];
+	public static function logoExists(string $key): bool
+	{
+		if (!isset(self::LOGOS[$key])) {
+			return false;
+		}
+
+		$stored = trim((string) Settings::get('LOGO_' . strtoupper($key)));
+
+		if ($stored !== '' && is_file(self::imgDir() . '/' . $stored)) {
+			return true;
+		}
+
+		return is_file(self::imgDir() . '/' . self::LOGOS[$key]['file']);
+	}
 
 	public static function imgDir(): string
 	{
@@ -22,11 +40,14 @@ class SiteAssets
 		$list = [];
 
 		foreach (self::LOGOS as $key => $meta) {
+			$exists = self::logoExists($key);
 			$list[$key] = [
 				'key' => $key,
 				'label' => $meta['label'],
 				'file' => self::resolveLogoFile($key),
-				'url' => self::resolveLogoUrl($key),
+				'url' => $exists ? self::resolveLogoUrl($key) : '',
+				'exists' => $exists,
+				'optional' => in_array($key, self::OPTIONAL_LOGOS, true),
 			];
 		}
 

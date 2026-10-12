@@ -67,7 +67,7 @@
 
 					if ($result['success']) {
 						// Ödeme alındığı için sipariş "Hazırlanıyor" durumuna geçer
-						Order::updateStatus((int) $result['id_order'], Order::STATUS_PROCESSING);
+						Order::markPaidByGateway((int) $result['id_order']);
 
 						header('Location: ' . $domain . 'checkout-success?id=' . (int) $result['id_order']);
 						exit;

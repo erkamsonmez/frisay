@@ -1,4 +1,7 @@
-<div class="ai-assist-header" id="aiAssistHeader"{if !$configured} data-locked="1"{/if}>
+<div class="ai-assist-header ai-assist-header--dock" id="aiAssistHeader"{if !$configured} data-locked="1"{/if}>
+	<button type="button" class="ai-assist-dock__fab" id="aiAssistDockFab" aria-label="{$primaryLabel|escape}" title="{$primaryLabel|escape}">
+		<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v3"/><path d="m16.5 5.5-1.5 2"/><path d="M19 10h-3"/><path d="m16.5 14.5-1.5-2"/><path d="M12 15v3"/><path d="m7.5 14.5 1.5-2"/><path d="M5 10h3"/><path d="m7.5 5.5 1.5 2"/><circle cx="12" cy="10" r="2.5"/></svg>
+	</button>
 	<div class="ai-assist-header__main">
 		<span class="ai-assist-header__brand">
 			<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v3"/><path d="m16.5 5.5-1.5 2"/><path d="M19 10h-3"/><path d="m16.5 14.5-1.5-2"/><path d="M12 15v3"/><path d="m7.5 14.5 1.5-2"/><path d="M5 10h3"/><path d="m7.5 5.5 1.5 2"/><circle cx="12" cy="10" r="2.5"/></svg>

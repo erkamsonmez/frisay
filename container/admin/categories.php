@@ -36,11 +36,49 @@
 	}
 
 	$activeFilter = Tools::getIsset('active') ? (int) Tools::getValue('active') : -1;
-	$categories = Category::getAdminList($activeFilter);
+	$queryParams = array_filter([
+		'active' => $activeFilter >= 0 ? $activeFilter : null,
+	], static fn($v) => $v !== null && $v !== '');
+
+	$explicitSort = trim((string) Tools::getValue('sort', ''));
+	$explicitDir = trim((string) Tools::getValue('dir', ''));
+
+	$sortState = Pagination::adminColumnSort(
+		[
+			'id' => 'c.id_category',
+			'name' => 'c.category_name',
+			'parent' => 'p.category_name',
+			'home' => 'c.show_on_home',
+			'status' => 'c.active',
+		],
+		'id',
+		'asc',
+		Admin::url('categories'),
+		$queryParams,
+		$explicitSort !== '' ? $explicitSort : 'id',
+		$explicitDir !== '' ? $explicitDir : 'asc'
+	);
+
+	if ($explicitSort === '') {
+		foreach ($sortState['links'] as $key => $link) {
+			$sortState['links'][$key]['active'] = false;
+			$sortState['links'][$key]['dir'] = '';
+		}
+		$orderBy = '';
+		$sortState['sort'] = '';
+		$sortState['dir'] = '';
+	} else {
+		$orderBy = $sortState['order_by'];
+	}
+
+	$categories = Category::getAdminList($activeFilter, 500, 0, $orderBy);
 
 	$smarty->assign([
 		'categories' 	=> $categories,
 		'activeFilter' 	=> $activeFilter,
+		'sortLinks' 	=> $sortState['links'],
+		'listSort' 		=> $sortState['sort'],
+		'listDir' 		=> $sortState['dir'],
 		'sonuc' 		=> $sonuc,
 	]);
 

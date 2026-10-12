@@ -5,6 +5,10 @@
 
 	$error = '';
 
+	if ((int) Tools::getValue('timeout') === 1) {
+		$error = adminT('Your session expired. Please sign in again.');
+	}
+
 	if (Tools::isSubmit('adminLogin')) {
 		$postToken = (string) Tools::getValue('token');
 

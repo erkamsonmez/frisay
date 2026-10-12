@@ -12,7 +12,7 @@
 		exit;
 	}
 
-	$ordersPending = Order::countAdmin(Order::STATUS_PENDING) + Order::countAdmin(Order::STATUS_PROCESSING);
+	$ordersPending = Order::countAdmin(Order::STATUS_PENDING) + Order::countAdmin(Order::STATUS_PAID) + Order::countAdmin(Order::STATUS_PROCESSING);
 	$returnsPending = class_exists('ReturnRequest', false) ? ReturnRequest::countPending() : 0;
 	$cancellationsPending = class_exists('CancelRequest', false) ? CancelRequest::countPending() : 0;
 	$messagesUnread = Contact::countUnread();
@@ -25,9 +25,11 @@
 		$latestMessageId = (int) DB::getValue('SELECT MAX(id_message) FROM contact_messages');
 	}
 	$latestNotificationId = 0;
+	$latestNotification = null;
 	$notifTable = DB::execute("SHOW TABLES LIKE 'admin_notifications'");
 	if (!empty($notifTable)) {
-		$latestNotificationId = (int) DB::getValue('SELECT MAX(id_notification) FROM admin_notifications');
+		$latestNotification = AdminNotification::getLatest();
+		$latestNotificationId = (int) ($latestNotification['id_notification'] ?? 0);
 	}
 
 	$latestOrderRef = '';
@@ -53,6 +55,15 @@
 			'message_id' => $latestMessageId,
 			'notification_id' => $latestNotificationId,
 		],
+		'notification' => $latestNotification ? [
+			'id' => (int) ($latestNotification['id_notification'] ?? 0),
+			'type' => (string) ($latestNotification['type'] ?? 'info'),
+			'title' => (string) ($latestNotification['title'] ?? ''),
+			'type_label' => (string) ($latestNotification['type_label'] ?? ''),
+			'message' => (string) ($latestNotification['message'] ?? ''),
+			'link' => (string) ($latestNotification['link'] ?? ''),
+			'color' => (string) ($latestNotification['color'] ?? ''),
+		] : null,
 		'ts' => time(),
 	], JSON_UNESCAPED_UNICODE);
 	exit;

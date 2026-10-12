@@ -32,9 +32,11 @@
 	}
 
 	Performance::ensureDefaults();
+	SecuritySettings::ensureDefaults();
 	App::configureErrors();
 
 	App::sendSecurityHeaders();
+	App::sendNoStoreHeaders();
 
 	date_default_timezone_set('Europe/Istanbul');
 
@@ -62,6 +64,9 @@
 
 	$adminToken = $_SESSION['admin_csrf_token'];
 	Security::enforcePostCsrf('admin');
+
+	SecuritySettings::enforceAdminIdleTimeout();
+
 	$adminUser = Admin::getCurrent();
 
 	Module::bootstrap('admin');
@@ -69,7 +74,7 @@
 	Marketplace::ensureSchema();
 
 	$adminNavBadges = [
-		'orders' => Order::countAdmin(Order::STATUS_PENDING) + Order::countAdmin(Order::STATUS_PROCESSING),
+		'orders' => Order::countAdmin(Order::STATUS_PENDING) + Order::countAdmin(Order::STATUS_PAID) + Order::countAdmin(Order::STATUS_PROCESSING),
 		'returns' => ReturnRequest::countPending(),
 		'cancellations' => CancelRequest::countPending(),
 		'notifications' => AdminNotification::countUnread(),
@@ -86,6 +91,24 @@
 	}
 
 	$adminMenuItems = Module::getAdminMenuItems();
+	$adminPageName = Security::sanitizeContainerSlug((string) Tools::getValue('container'));
+
+	if ($adminPageName === '') {
+		$adminPageName = 'dashboard';
+	}
+
+	$adminFavoriteCatalog = AdminMenuFavorites::catalog(
+		$adminUrl,
+		$adminNavBadges,
+		$adminMenuItems,
+		Module::isEnabled('pos')
+			? rtrim((string) $adminUrl, '/') . '/pos'
+			: rtrim((string) $domain, '/') . '/pos',
+		Module::isInstalled('pos')
+	);
+	$adminFavoriteKeys = AdminMenuFavorites::getKeys();
+	$adminFavoriteItems = AdminMenuFavorites::resolveItems($adminFavoriteCatalog, $adminFavoriteKeys, $adminPageName);
+
 	$smarty->assign([
 		'domain' => $domain,
 		'adminUrl' => $adminUrl,
@@ -103,6 +126,10 @@
 			: rtrim((string) $domain, '/') . '/pos',
 		'adminPosAvailable' => Module::isInstalled('pos'),
 		'adminMenuItems' => $adminMenuItems,
+		'adminFavoriteItems' => $adminFavoriteItems,
+		'adminFavoriteCatalog' => array_values($adminFavoriteCatalog),
+		'adminFavoriteKeys' => $adminFavoriteKeys,
+		'adminFavoritesApiUrl' => rtrim($domain, '/') . '/api/admin-favorites.php',
 		'marketplaceAdminAssets' => ['css' => [], 'js' => []],
 		'year' => date('Y'),
 		'moduleAdminAssets' => ['css' => [], 'js' => []],
@@ -121,6 +148,16 @@
 			'confirmMessage' => adminT('Are you sure you want to perform this action?'),
 			'confirmYes' => adminT('Yes, confirm'),
 			'confirmCancel' => adminT('Cancel'),
+			'favoritesAdd' => adminT('Added to favorites'),
+			'favoritesRemove' => adminT('Removed from favorites'),
+			'favoritesUnstar' => adminT('Remove from favorites'),
+			'favoritesAddBtn' => adminT('Add menu'),
+			'favoritesStar' => adminT('Add to favorites'),
+			'favoritesSearch' => adminT('Search menu'),
+			'justNow' => adminT('just now'),
+			'newOrderTitle' => adminT('New order'),
+			'newMessageTitle' => adminT('New message'),
+			'newNotificationTitle' => adminT('New notification'),
 		],
 	]);
 	$smarty->registerPlugin('modifier', 'adminT', 'adminT');

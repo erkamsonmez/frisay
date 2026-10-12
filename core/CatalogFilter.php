@@ -191,11 +191,7 @@ class CatalogFilter
 		$categoryIds = $this->getCategoryIds();
 
 		if ($categoryIds !== []) {
-			$placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-			$sql .= ' AND p.id_category IN (' . $placeholders . ')';
-			foreach ($categoryIds as $id) {
-				$params[] = $id;
-			}
+			Product::appendInCategoriesSql($sql, $params, $categoryIds);
 		}
 
 		if ($this->brandId > 0) {
@@ -281,14 +277,13 @@ class CatalogFilter
 		}
 
 		ProductVariation::ensureSchema();
-		$placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-		$rows = DB::execute(
-			'SELECT pv.options_json
+		$sql = 'SELECT pv.options_json
 			 FROM product_variations pv
 			 INNER JOIN products p ON p.id_product = pv.id_product AND p.active = 1
-			 WHERE pv.active = 1 AND p.id_category IN (' . $placeholders . ')',
-			$categoryIds
-		) ?: [];
+			 WHERE pv.active = 1';
+		$params = [];
+		Product::appendInCategoriesSql($sql, $params, $categoryIds);
+		$rows = DB::execute($sql, $params) ?: [];
 
 		/** @var array<string, array<string, int>> */
 		$groups = [];
@@ -340,13 +335,12 @@ class CatalogFilter
 		}
 
 		ProductVariation::ensureSchema();
-		$placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
-		$params = $categoryIds;
 
-		$inStock = (int) DB::getValue(
-			'SELECT COUNT(*) FROM products p
-			 WHERE p.active = 1 AND p.id_category IN (' . $placeholders . ')
-			 AND (
+		$inStockSql = 'SELECT COUNT(*) FROM products p
+			 WHERE p.active = 1';
+		$inStockParams = [];
+		Product::appendInCategoriesSql($inStockSql, $inStockParams, $categoryIds);
+		$inStockSql .= ' AND (
 				(p.product_type != \'pack\' AND NOT EXISTS (
 					SELECT 1 FROM product_variations pv0
 					WHERE pv0.id_product = p.id_product AND pv0.active = 1
@@ -355,14 +349,14 @@ class CatalogFilter
 					SELECT 1 FROM product_variations pv1
 					WHERE pv1.id_product = p.id_product AND pv1.active = 1 AND pv1.stock > 0
 				)
-			 )',
-			$params
-		);
+			 )';
+		$inStock = (int) DB::getValue($inStockSql, $inStockParams);
 
-		$outOfStock = (int) DB::getValue(
-			'SELECT COUNT(*) FROM products p
-			 WHERE p.active = 1 AND p.id_category IN (' . $placeholders . ')
-			 AND (
+		$outSql = 'SELECT COUNT(*) FROM products p
+			 WHERE p.active = 1';
+		$outParams = [];
+		Product::appendInCategoriesSql($outSql, $outParams, $categoryIds);
+		$outSql .= ' AND (
 				(p.product_type != \'pack\' AND NOT EXISTS (
 					SELECT 1 FROM product_variations pv0
 					WHERE pv0.id_product = p.id_product AND pv0.active = 1
@@ -377,9 +371,8 @@ class CatalogFilter
 						WHERE pv2.id_product = p.id_product AND pv2.active = 1 AND pv2.stock > 0
 					)
 				)
-			 )',
-			$params
-		);
+			 )';
+		$outOfStock = (int) DB::getValue($outSql, $outParams);
 
 		return ['in_stock' => $inStock, 'out_of_stock' => $outOfStock];
 	}
@@ -393,21 +386,19 @@ class CatalogFilter
 			return ['yes' => 0, 'no' => 0];
 		}
 
-		$placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
+		$yesSql = 'SELECT COUNT(*) FROM products p
+			 WHERE p.active = 1';
+		$yesParams = [];
+		Product::appendInCategoriesSql($yesSql, $yesParams, $categoryIds);
+		$yesSql .= ' AND p.old_price > 0 AND p.old_price > p.price';
+		$yes = (int) DB::getValue($yesSql, $yesParams);
 
-		$yes = (int) DB::getValue(
-			'SELECT COUNT(*) FROM products p
-			 WHERE p.active = 1 AND p.id_category IN (' . $placeholders . ')
-			 AND p.old_price > 0 AND p.old_price > p.price',
-			$categoryIds
-		);
-
-		$no = (int) DB::getValue(
-			'SELECT COUNT(*) FROM products p
-			 WHERE p.active = 1 AND p.id_category IN (' . $placeholders . ')
-			 AND (p.old_price <= 0 OR p.old_price <= p.price)',
-			$categoryIds
-		);
+		$noSql = 'SELECT COUNT(*) FROM products p
+			 WHERE p.active = 1';
+		$noParams = [];
+		Product::appendInCategoriesSql($noSql, $noParams, $categoryIds);
+		$noSql .= ' AND (p.old_price <= 0 OR p.old_price <= p.price)';
+		$no = (int) DB::getValue($noSql, $noParams);
 
 		return ['yes' => $yes, 'no' => $no];
 	}

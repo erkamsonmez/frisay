@@ -1,10 +1,11 @@
 # FShop — Open-Source PHP E-Commerce, Built for Real Stores
 
-**FShop** is a self-hosted e-commerce platform written in plain PHP. No Laravel, no Symfony, no npm build step — just a fast, readable codebase you can deploy on any shared host, VPS, or local stack like WAMP/XAMPP.
+**FriSay (FShop)** is a self-hosted e-commerce platform written in plain PHP. No Laravel, no Symfony, no npm build step — just a fast, readable codebase you can deploy on any shared host, VPS, or local stack like WAMP/XAMPP.
 
 It is designed for merchants who want full control: your data stays on your server, themes and modules extend the shop without forking core files, and a modern admin panel keeps day-to-day operations simple.
 
-🔗 **Repository:** https://github.com/bera65/fshop
+🔗 **Repository:** https://github.com/bera65/frisay  
+📦 **Current release:** 3.0.0
 
 ---
 
@@ -14,8 +15,8 @@ Most e-commerce platforms are either heavyweight frameworks or closed SaaS produ
 
 - **Lightweight architecture** — `container/` for page logic, `core/` for domain classes, Smarty for views. No `controllers/` / `models/` maze.
 - **Theme-safe modules** — plugins live in `modules/` and hook into the storefront without editing theme files.
-- **Production-ready defaults** — 4-step install wizard, demo data, Blue storefront theme, bilingual UI out of the box.
-- **Integration-friendly** — REST Web API, module API endpoints, and cron hooks for automation.
+- **Production-ready defaults** — 4-step install wizard, demo data, `default` storefront theme, bilingual UI out of the box.
+- **Integration-friendly** — REST Web API (`/api/v1`), PrestaShop-compatible WebService (`/api/orders?ws_key=`), module API endpoints, and cron hooks for automation.
 
 If you can run PHP + MySQL on Apache, you can run FShop.
 
@@ -66,6 +67,7 @@ A clean, SaaS-inspired admin UI built with Bootstrap — not a legacy back offic
 
 ### Catalog management
 - Products with images, variants, stock, barcodes, short & long descriptions
+- Admin product list: active switch, copy/preview/delete menu, SKU search, column sort
 - Categories, brands, multi-language tabs per entity
 - **Excel import** for bulk product uploads
 - Virtual product configuration
@@ -80,7 +82,8 @@ A clean, SaaS-inspired admin UI built with Bootstrap — not a legacy back offic
 - Coupon codes (percentage or fixed discount)
 - CMS page editor
 - SEO tools
-- Theme customizer: colors, fonts, header layout, container width (Blue theme)
+- Theme customizer: colors, fonts, header layout, container width
+- **Theme Edit** (`theme4`) — click sections on the live storefront to edit (modal; save to apply; container rows for category / image / text)
 
 ### Bilingual admin
 - Turkish & English admin interface
@@ -89,7 +92,7 @@ A clean, SaaS-inspired admin UI built with Bootstrap — not a legacy back offic
 
 ### Modules & themes
 - Install, enable, and configure modules from the panel
-- Switch storefront themes (`default`, `blue`, `prime`, and more)
+- Switch storefront themes (`default`, `shopnova`, `healt`, `blue`, `prime`, and more)
 - Per-theme appearance options without touching code
 
 ---
@@ -102,6 +105,7 @@ Modules are first-class citizens. Each module is a self-contained folder with it
 
 | Module | Purpose |
 |--------|---------|
+| `iyzico` | iyzico Checkout Form |
 | `paytr` | PayTR payment gateway |
 | `bankwire` | Bank transfer / EFT |
 | `cashondelivery` | Pay on delivery |
@@ -117,6 +121,7 @@ Modules are first-class citizens. Each module is a self-contained folder with it
 | `socials` | Social media links |
 | `question` | Product Q&A |
 | `same-category-products` | Related products block |
+| `theme4` | Theme Edit — click-to-edit homepage / chrome |
 
 **Extension points:**
 - Display hooks: `footer`, `home_slider`, `product_tab`, `order_payment`, and more
@@ -134,6 +139,7 @@ Connect external systems — ERP, mobile apps, marketplaces — via a REST API.
 
 - **Orders:** list, filter by date/status, update shipping & tracking
 - **Products:** CRUD, quick price/stock updates, image upload (file, URL, or base64)
+- **PrestaShop WebService:** cargo/marketplace clients (`docs/PRESTASHOP_WEBSERVICE.md`)
 - **Categories & brands:** list; auto-create on product import
 
 Authenticate with `X-API-Key` or `Authorization: Bearer`.  
@@ -196,7 +202,7 @@ Detailed guide: `install/README.md`
 ## Get Started
 
 ```bash
-git clone https://github.com/bera65/fshop.git
+git clone https://github.com/bera65/frisay.git
 # Point your vhost to the project folder, create a database, then visit /install/
 ```
 

@@ -93,7 +93,7 @@ $responseCode = (string) ($result['response_code'] ?? '');
 $responseMsg = (string) ($result['response_message'] ?? '');
 
 $helper->updateTransactionLog($merchantOrderId, [
-	'response_data' => mb_substr((string) ($result['response'] ?? ''), 0, 4000),
+	'response_data' => mb_substr((string) ($result['response'] ?? ''), 0, 16000),
 	'response_code' => $responseCode,
 	'response_message' => $responseMsg,
 	'status' => (!empty($result['success']) && $responseCode === '00') ? 'completed' : 'failed',
@@ -127,7 +127,7 @@ if (!empty($result['success']) && $responseCode === '00') {
 
 		if (!empty($createResult['success']) && !empty($createResult['id_order'])) {
 			$idOrder = (int) $createResult['id_order'];
-			Order::updateStatus($idOrder, Order::STATUS_PROCESSING);
+			Order::markPaidByGateway($idOrder);
 
 			$helper->updateTransactionLog($merchantOrderId, ['id_order' => $idOrder]);
 			KuveytturkModule::removePendingCheckout($merchantOrderId);

@@ -283,6 +283,7 @@ $this->hasFrontTemplate('footer')        // front şablonu var mı?
 | `home` | `{$hooks.home}` | Ana sayfa | — |
 | `home_slider` | `{$hooks.home_slider}` | Ana sayfa header | — |
 | `home_promo_slider` | `{$hooks.home_promo_slider}` | Ana sayfa | — |
+| `home_bottom` | `{$hooks.home_bottom}` | Ana sayfa altı (theme4 Tema Edit + yedek şablon) | — |
 | `product` | `{$hooks.product}` | Ürün sayfası | `id_product` |
 | `product_detail` | `{$hooks.product_detail}` | Ürün sayfası | `id_product` |
 | `product_tab` | `{$hooks.product_tab}` | Ürün sekmesi butonu | `id_product` |

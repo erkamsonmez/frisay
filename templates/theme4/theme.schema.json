@@ -1,0 +1,51 @@
+{
+	"label": "Theme4",
+	"description": "Dijital lisans tarzı modern e-ticaret teması — mavi vurgu, pill arama, servis bandı footer.",
+	"preview": "theme-preview.png",
+	"edit": "theme4",
+	"color_groups": {
+		"marka": "Marka & Renkler"
+	},
+	"options": {
+		"header": {
+			"label": "Header stili",
+			"type": "select",
+			"default": "header1",
+			"source": "header_variants"
+		},
+		"font": {
+			"label": "Yazı tipi",
+			"type": "select",
+			"default": "inter",
+			"source": "fonts"
+		},
+		"container_width": {
+			"label": "Site genişliği",
+			"type": "select",
+			"default": "1320",
+			"source": "container_widths"
+		}
+	},
+	"colors": {
+		"sm-primary": {
+			"label": "Ana mavi",
+			"default": "#3D47D9",
+			"group": "marka"
+		},
+		"sm-accent": {
+			"label": "Vurgu",
+			"default": "#3D47D9",
+			"group": "marka"
+		},
+		"sm-bg": {
+			"label": "Sayfa arka planı",
+			"default": "#F8F9FA",
+			"group": "marka"
+		}
+	},
+	"color_aliases": {
+		"primary": "sm-primary",
+		"background": "sm-bg"
+	},
+	"color_extra_css": ":root {\n\t--primary-hover: #3239C4;\n\t--primary-light: #EBEBFF;\n\t--secondary: #1A1A1A;\n\t--text: #1A1A1A;\n\t--text-muted: #7E7E7E;\n\t--border: #EDEDED;\n\t--surface: #FFFFFF;\n\t--white: #FFFFFF;\n\t--danger: #EF4444;\n\t--radius: 12px;\n\t--radius-lg: 16px;\n\t--radius-pill: 999px;\n\t--shadow: 0 4px 20px rgba(26, 26, 26, 0.06);\n\t--shadow-nav: 0 -4px 24px rgba(26, 26, 26, 0.08);\n\t--container: 1320px;\n\t--transition: 250ms ease;\n\t--font: 'Inter', system-ui, -apple-system, sans-serif;\n\t--sm-primary-soft: #EBEBFF;\n\t--sm-text: #1A1A1A;\n\t--sm-muted: #7E7E7E;\n\t--sm-border: #EDEDED;\n\t--sm-radius: 12px;\n\t--sm-radius-lg: 16px;\n\t--sm-shadow: var(--shadow);\n\t--sm-shadow-nav: var(--shadow-nav);\n\t--sm-surface: #FFFFFF;\n}\nbody.sm-body {\n\tbackground-color: var(--sm-bg, #F8F9FA);\n\tfont-family: 'Inter', system-ui, sans-serif;\n}"
+}

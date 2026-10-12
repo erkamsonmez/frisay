@@ -1,8 +1,33 @@
-<div class="ps-order-filters mb-3">
-	<a href="{$adminUrl}returns" class="ps-filter-pill{if $statusFilter == 0} active{/if}">{'All'|adminT}</a>
-	{foreach $statusOptions as $statusId => $statusLabel}
-	<a href="{$adminUrl}returns?status={$statusId}" class="ps-filter-pill{if $statusFilter == $statusId} active{/if}">{$statusLabel|escape}</a>
-	{/foreach}
+<div class="admin-panel p-3 mb-3">
+	<div class="mp-filter-card mb-0">
+		<div class="mp-filter-header">
+			<div>
+				<div class="mp-filter-title">
+					{include file='admin/partials/filter-funnel-icon.tpl'}
+					{'Filters'|adminT}
+				</div>
+			</div>
+		</div>
+		<form method="get" action="{$adminUrl}returns" id="admReturnsFilterForm">
+			<div class="row">
+				<div class="col-md-4 mb-3">
+					<label for="rt_status">{'Status'|adminT}</label>
+					<select id="rt_status" name="status" class="form-select form-select-sm">
+						<option value="0"{if $statusFilter == 0} selected{/if}>{'All'|adminT}</option>
+						{foreach $statusOptions as $statusId => $statusLabel}
+						<option value="{$statusId}"{if $statusFilter == $statusId} selected{/if}>{$statusLabel|escape}</option>
+						{/foreach}
+					</select>
+				</div>
+			</div>
+		</form>
+		<div class="mp-filter-actions">
+			<div class="mp-filter-actions__btns">
+				<button type="submit" form="admReturnsFilterForm" class="btn btn-warning">{'Filter'|adminT}</button>
+				<a href="{$adminUrl}returns" class="btn btn-outline-secondary">{'Clear'|adminT}</a>
+			</div>
+		</div>
+	</div>
 </div>
 
 <div class="ps-panel">
