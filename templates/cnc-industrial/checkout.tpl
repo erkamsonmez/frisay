@@ -41,7 +41,7 @@
 					<h2 class="checkout-auth-card__title">{'Checkout member title'|translate}</h2>
 					<p class="checkout-auth-card__text">{'Checkout member text'|translate}</p>
 					<button type="button" class="prime-btn prime-btn--outline w-100" data-auth-modal="login">{'Checkout member btn'|translate}</button>
-					{include file='shopmore/plugin/google-login-btn.tpl' googleLoginCompact=true}
+					{include file='cnc-industrial/plugin/google-login-btn.tpl' googleLoginCompact=true}
 					<button type="button" class="checkout-auth-card__sub btn btn-link" data-auth-modal="register">{'No account yet'|translate} {'Sign Up'|translate}</button>
 				</div>
 				<div class="checkout-auth-card is-active" id="checkoutGuestCard">

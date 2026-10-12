@@ -81,6 +81,6 @@
 	</nav>
 
 	<div class="dress-mobile-menu__lang">
-		{include file='shopmore/plugin/lang-switcher-pills.tpl'}
+		{include file='cnc-industrial/plugin/lang-switcher-pills.tpl'}
 	</div>
 </div>

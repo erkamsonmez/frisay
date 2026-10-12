@@ -88,7 +88,7 @@
 					{/if}
 				</div>
 			</div>
-			{include file='shopmore/partials/virtual-order-item.tpl' item=$item}
+			{include file='cnc-industrial/partials/virtual-order-item.tpl' item=$item}
 		</div>
 		{/foreach}
 	</div>
@@ -170,6 +170,6 @@
 	</div>
 	{/if}
 
-	{include file='shopmore/partials/order-contact.tpl'}
+	{include file='cnc-industrial/partials/order-contact.tpl'}
 </div>
 {/if}

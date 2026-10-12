@@ -75,7 +75,7 @@
 						</form>
 					</div>
 				</div>
-				{include file='shopmore/plugin/google-login-btn.tpl'}
+				{include file='cnc-industrial/plugin/google-login-btn.tpl'}
 			</div>
 		</div>
 	</div>

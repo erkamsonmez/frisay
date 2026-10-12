@@ -60,7 +60,7 @@
 				<button type="submit" class="btn btn-details w-100" id="loginPageSubmit">{'Sign In'|translate}</button>
 			</form>
 
-			{include file='shopmore/plugin/google-login-btn.tpl'}
+			{include file='cnc-industrial/plugin/google-login-btn.tpl'}
 		</div>
 	</div>
 

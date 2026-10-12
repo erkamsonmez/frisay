@@ -154,7 +154,7 @@
 			<div class="dress-account-main">
 
 				<div class="dress-account-panel{if $activeTab == 'orders'} is-active{/if}" data-account-panel="orders">
-					{include file='shopmore/partials/account-orders.tpl'}
+					{include file='cnc-industrial/partials/account-orders.tpl'}
 				</div>
 
 				{* Profil *}

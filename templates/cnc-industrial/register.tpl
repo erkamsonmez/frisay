@@ -94,7 +94,7 @@
 				<button type="submit" class="btn btn-details w-100" id="registerPageSubmit">{'Create account'|translate}</button>
 			</form>
 
-			{include file='shopmore/plugin/google-login-btn.tpl'}
+			{include file='cnc-industrial/plugin/google-login-btn.tpl'}
 			{/if}
 		</div>
 	</div>
