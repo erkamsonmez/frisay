@@ -1,0 +1,40 @@
+name: Normalize CNC Industrial theme references
+on:
+  push:
+    branches: [staging]
+    paths:
+      - .github/workflows/cnc-theme-normalize.yml
+permissions:
+  contents: write
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          persist-credentials: true
+      - name: Rewrite internal theme paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path("templates/cnc-industrial")
+          files = list(root.rglob("*.tpl"))
+          assert len(files) >= 25, f"Unexpectedly small theme: {len(files)} tpl files"
+          changed = []
+          for path in files:
+              old = path.read_text(encoding="utf-8")
+              new = old.replace("shopmore/", "cnc-industrial/")
+              if new != old:
+                  path.write_text(new, encoding="utf-8")
+                  changed.append(str(path))
+          print(f"Checked {len(files)} templates; rewrote {len(changed)} internal references")
+          PY
+          git add templates/cnc-industrial
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix(theme): isolate CNC Industrial template includes'
+            git push origin HEAD:staging
+          fi
