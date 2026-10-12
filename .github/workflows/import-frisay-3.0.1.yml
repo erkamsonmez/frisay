@@ -1,0 +1,59 @@
+name: Import FriSay 3.0.1 release
+
+on:
+  push:
+    branches:
+      - staging
+    paths:
+      - .github/workflows/import-frisay-3.0.1.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+          persist-credentials: true
+      - name: Download verified upstream release
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            'https://github.com/bera65/frisay/releases/download/3.0.1/frisay-3.0.1.zip' \
+            --output /tmp/frisay-3.0.1.zip
+          echo '238ea534d7121f0927cc06cc8f438ac0bad800451d035f0d5d0b093cd095bce1  /tmp/frisay-3.0.1.zip' | sha256sum -c -
+          mkdir -p /tmp/frisay-release
+          unzip -q /tmp/frisay-3.0.1.zip -d /tmp/frisay-release
+          test -f /tmp/frisay-release/core/FShop.php
+          grep -Eq "VERSION = '3\\.0\\.1'" /tmp/frisay-release/core/FShop.php
+      - name: Bring release source into staging without overwriting Coolify configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='docker/' \
+            --exclude='Dockerfile' \
+            --exclude='.dockerignore' \
+            --exclude='config/env.php' \
+            --exclude='config/installed.lock' \
+            --exclude='img/products/' \
+            --exclude='img/returns/' \
+            --exclude='img/invoices/' \
+            --exclude='storage/digital/' \
+            /tmp/frisay-release/ ./
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Release files already up to date.'
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -m 'chore: upgrade FriSay sources to official 3.0.1'
+          git push origin HEAD:staging
