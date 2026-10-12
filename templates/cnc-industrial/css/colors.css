@@ -1,24 +1,16 @@
-/**
- * Tema renkleri — Admin > Temalar ekranından düzenlenir.
- */
 :root {
-	--sm-primary: #333333;
-	--sm-accent: #f97316;
-	--sm-bg: #f4f6fb;
-	--sm-primary-dark: #4f46e5;
-	--sm-primary-soft: #eef2ff;
-	--sm-accent-dark: #ea580c;
-	--sm-surface: #ffffff;
-	--sm-text: #0f172a;
-	--sm-muted: #64748b;
-	--sm-border: #e5e7eb;
-	--sm-radius: 12px;
-	--sm-radius-lg: 16px;
-	--sm-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
-	--sm-shadow-nav: 0 -4px 24px rgba(15, 23, 42, 0.08);
+  --sm-primary: #f47b39;
+  --sm-primary-dark: #d96124;
+  --sm-primary-soft: #fff0e6;
+  --sm-accent: #f47b39;
+  --sm-bg: #f2f4f6;
+  --sm-surface: #ffffff;
+  --sm-text: #172431;
+  --sm-muted: #647181;
+  --sm-border: #dde2e6;
+  --sm-radius: 8px;
+  --sm-radius-lg: 12px;
+  --sm-shadow: 0 12px 34px rgba(20, 35, 48, .06);
+  --sm-shadow-nav: 0 -4px 24px rgba(20, 35, 48, .08);
 }
-
-body.sm-body {
-	background-color: var(--sm-bg, #f4f6fb);
-	font-family: 'Poppins', system-ui, sans-serif;
-}
+body.sm-body { background-color: var(--sm-bg); font-family: 'Inter', system-ui, sans-serif; }
