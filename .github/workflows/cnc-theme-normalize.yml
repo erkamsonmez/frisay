@@ -26,10 +26,10 @@ jobs:
           assert len(files) >= 25, f"Unexpectedly small theme: {len(files)} tpl files"
           changed = []
           for path in files:
-              old = path.read_text(encoding="utf-8")
-              new = old.replace("shopmore/", "cnc-industrial/")
+              old = path.read_bytes()
+              new = old.replace(b"shopmore/", b"cnc-industrial/")
               if new != old:
-                  path.write_text(new, encoding="utf-8")
+                  path.write_bytes(new)
                   changed.append(str(path))
           print(f"Checked {len(files)} templates; rewrote {len(changed)} internal references")
           PY
