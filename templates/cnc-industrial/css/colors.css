@@ -1,11 +1,11 @@
 :root {
-  --sm-primary: #f47b39;
-  --sm-primary-dark: #d96124;
-  --sm-primary-soft: #fff0e6;
-  --sm-accent: #f47b39;
-  --sm-bg: #f2f4f6;
+  --sm-primary: #A3CB64;
+  --sm-accent: #A3CB64;
+  --sm-primary-dark: #86AB4B;
+  --sm-primary-soft: #EFF5E6;
+  --sm-bg: #F4F5F2;
   --sm-surface: #ffffff;
-  --sm-text: #172431;
+  --sm-text: #202A32;
   --sm-muted: #647181;
   --sm-border: #dde2e6;
   --sm-radius: 8px;

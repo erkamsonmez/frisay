@@ -1,27 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="580" viewBox="0 0 960 580">
-<rect width="960" height="580" fill="#f2f4f6"/>
-<rect width="960" height="32" fill="#132130"/>
+<rect width="960" height="580" fill="#F4F5F2"/>
+<rect width="960" height="32" fill="#202A32"/>
 <text x="44" y="21" fill="#bac8d6" font-family="Arial" font-size="11" letter-spacing="2">PROFESYONEL TALAŞLI İMALAT EKİPMANLARI</text>
 <rect y="32" width="960" height="100" fill="white"/>
-<rect x="42" y="50" width="49" height="49" rx="6" fill="#1a2a39"/>
-<path d="M56 87V63h24M56 76h16" fill="none" stroke="#f47b39" stroke-width="4"/>
-<text x="105" y="75" fill="#172431" font-family="Arial" font-size="24" font-weight="bold">CNC STORE</text>
+<rect x="42" y="50" width="49" height="49" rx="6" fill="#202A32"/>
+<path d="M56 87V63h24M56 76h16" fill="none" stroke="#A3CB64" stroke-width="4"/>
+<text x="105" y="75" fill="#202A32" font-family="Arial" font-size="24" font-weight="bold">CNC STORE</text>
 <text x="106" y="93" fill="#789" font-family="Arial" font-size="9" letter-spacing="2">ENDÜSTRİYEL EKİPMANLAR</text>
 <rect x="377" y="58" width="380" height="40" rx="5" fill="#f1f3f5" stroke="#dce2e6"/>
 <text x="397" y="83" fill="#97a4b1" font-family="Arial" font-size="13">Ürün kodu, ölçü veya marka arayın...</text>
 <rect y="132" width="960" height="38" fill="white"/>
-<text x="44" y="155" fill="#182838" font-family="Arial" font-size="12" font-weight="bold">☷  TÜM ÜRÜNLER</text>
+<text x="44" y="155" fill="#202A32" font-family="Arial" font-size="12" font-weight="bold">☷  TÜM ÜRÜNLER</text>
 <text x="218" y="155" fill="#647181" font-family="Arial" font-size="12">TAKIM TUTUCULAR</text>
 <text x="404" y="155" fill="#647181" font-family="Arial" font-size="12">KESİCİ TAKIMLAR</text>
 <text x="591" y="155" fill="#647181" font-family="Arial" font-size="12">ÖLÇÜM EKİPMANLARI</text>
-<rect x="26" y="188" width="908" height="330" rx="9" fill="#162635"/>
-<rect x="490" y="188" width="444" height="330" rx="9" fill="#22384b"/>
-<text x="64" y="238" fill="#f47b39" font-family="Arial" letter-spacing="2" font-size="13">CNC / TAKIMLAMA / ÖLÇÜM</text>
+<rect x="26" y="188" width="908" height="330" rx="9" fill="#202A32"/>
+<rect x="490" y="188" width="444" height="330" rx="9" fill="#303D46"/>
+<text x="64" y="238" fill="#A3CB64" font-family="Arial" letter-spacing="2" font-size="13">CNC / TAKIMLAMA / ÖLÇÜM</text>
 <text x="62" y="305" fill="white" font-family="Arial" font-size="40" font-weight="bold">Üretimin ritmini</text>
-<text x="62" y="352" fill="#f47b39" font-family="Arial" font-size="40" font-weight="bold">doğru ekipman</text>
+<text x="62" y="352" fill="#A3CB64" font-family="Arial" font-size="40" font-weight="bold">doğru ekipman</text>
 <text x="62" y="399" fill="white" font-family="Arial" font-size="40" font-weight="bold">belirler.</text>
-<rect x="62" y="440" width="184" height="45" rx="5" fill="#f47b39"/>
-<text x="82" y="468" fill="#162635" font-family="Arial" font-size="15" font-weight="bold">Ürünleri keşfet ↗</text>
-<g transform="translate(565 218)" stroke="#aac1d1" fill="none"><circle cx="170" cy="138" r="128" opacity=".22"/><circle cx="170" cy="138" r="96" opacity=".25" stroke-dasharray="5 8"/><path d="M170 2V270M20 138H310" stroke-dasharray="6 8" opacity=".3"/><path d="M148 42h44l10 55-8 32v40l20 13v24h-20v43h-48v-43h-20v-24l20-13v-40l-8-32z" fill="#3a5063" stroke-width="2"/><path d="M126 190h88" stroke="#f47b39" stroke-width="7"/></g>
+<rect x="62" y="440" width="184" height="45" rx="5" fill="#A3CB64"/>
+<text x="82" y="468" fill="#202A32" font-family="Arial" font-size="15" font-weight="bold">Ürünleri keşfet ↗</text>
+<g transform="translate(565 218)" stroke="#aac1d1" fill="none"><circle cx="170" cy="138" r="128" opacity=".22"/><circle cx="170" cy="138" r="96" opacity=".25" stroke-dasharray="5 8"/><path d="M170 2V270M20 138H310" stroke-dasharray="6 8" opacity=".3"/><path d="M148 42h44l10 55-8 32v40l20 13v24h-20v43h-48v-43h-20v-24l20-13v-40l-8-32z" fill="#3a5063" stroke-width="2"/><path d="M126 190h88" stroke="#A3CB64" stroke-width="7"/></g>
 <text x="32" y="556" fill="#667787" font-family="Arial" font-size="14">01 / KATEGORİLER     •     TEKNİK ODAKLI MAĞAZA</text>
 </svg>

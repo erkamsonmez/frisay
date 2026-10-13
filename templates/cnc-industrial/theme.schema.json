@@ -1,6 +1,6 @@
 {
-  "label": "CNC Industrial",
-  "description": "CNC takımlama, kesici takımlar ve endüstriyel ekipmanlar için teknik odaklı mağaza teması.",
+  "label": "Usta Rafı — CNC Industrial",
+  "description": "Usta Rafı kurumsal renkleri: antrasit, yeşil, kırık beyaz; mobil uyumlu CNC ekipman mağazası.",
   "preview": "theme-preview.svg",
   "options": {
     "header": {
@@ -24,23 +24,23 @@
   },
   "colors": {
     "sm-primary": {
-      "label": "Ana kurumsal renk",
-      "default": "#f47b39",
+      "label": "Marka yeşili",
+      "default": "#A3CB64",
       "group": "marka"
     },
     "sm-accent": {
-      "label": "Vurgu rengi",
-      "default": "#f47b39",
+      "label": "Vurgu yeşili",
+      "default": "#A3CB64",
       "group": "marka"
     },
     "sm-bg": {
-      "label": "Arka plan",
-      "default": "#f2f4f6",
+      "label": "Kırık beyaz sayfa zemini",
+      "default": "#F4F5F2",
       "group": "marka"
     }
   },
   "color_groups": {
     "marka": "Kurumsal renkler"
   },
-  "color_extra_css": "body.sm-body { background-color: var(--sm-bg, #f2f4f6); font-family: 'Inter', system-ui, sans-serif; }"
+  "color_extra_css": "body.sm-body { background-color: var(--sm-bg, #F4F5F2); font-family: 'Inter', system-ui, sans-serif; }"
 }

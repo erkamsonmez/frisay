@@ -30,3 +30,11 @@
 - Tasarımın ana CSS dosyası: templates/cnc-industrial/css/cnc-industrial.css.
 - Mevcut Shopmore ürün, sepet ve API işlevleri korunmuştur.
 - Güncellemeler GitHub staging üzerinden yapılmalıdır.
+
+## Marka paleti — Usta Rafı
+
+- Antrasit: `#202A32` (üst menü, koyu banner, metin)
+- Yeşil: `#A3CB64` (buton, vurgu, etkileşim)
+- Kırık beyaz: `#F4F5F2` (sayfa arka planı)
+- Beyaz: `#FFFFFF` (ürün kartları, formlar)
+- Küçük metinlerde beyaz/kırık beyaz üzerinde açık yeşil yerine koyu yeşil kullanılır.
