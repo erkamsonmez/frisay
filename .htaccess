@@ -37,6 +37,8 @@ RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 # Sensitive paths / VCS — never serve from docroot
 RewriteRule ^\.git(/|$) - [F,L]
 RewriteRule ^\.svn(/|$) - [F,L]
+# SEO/Performance: public versioned stylesheet bundles must be crawlable.
+RewriteRule ^cache/assets/css/[^/]+\.css$ - [L]
 RewriteRule ^(logs|upgrade|cache|backups|config|core|container|storage|lang|tools)(/|$) - [F,L]
 RewriteRule ^install/.*\.sql$ - [F,L]
 RewriteRule ^modules/.*\.php$ - [F,L]
@@ -62,7 +64,11 @@ RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
 # 4b. Sitemap
-RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteRule ^sitemap\.xml$ sitemap.php?section=index [L,QSA]
+RewriteRule ^sitemap-pages\.xml$ sitemap.php?section=pages [L,QSA]
+RewriteRule ^sitemap-categories\.xml$ sitemap.php?section=categories [L,QSA]
+RewriteRule ^sitemap-products-([1-9][0-9]*)\.xml$ sitemap.php?section=products&page=$1 [L,QSA]
+RewriteRule ^robots\.txt$ robots.php [L]
 
 # 4b1. LLMs.txt
 RewriteRule ^llms\.txt$ index.php?container=llms [L,QSA]
