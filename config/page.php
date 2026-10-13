@@ -34,6 +34,13 @@
 
 			$pageSchemas = $smarty->getTemplateVars('schemaJsonLd');
 			$pageSchemas = is_array($pageSchemas) ? $pageSchemas : [];
+			$breadcrumb = $smarty->getTemplateVars('breadcrumb');
+			if ($pageName !== 'product' && $seoMeta['robots'] === 'index, follow' && is_array($breadcrumb)) {
+				$breadcrumbSchema = SchemaOrg::getBreadcrumbScript($breadcrumb, $seoMeta['canonical']);
+				if ($breadcrumbSchema !== '') {
+					$pageSchemas[] = $breadcrumbSchema;
+				}
+			}
 			$smarty->assign('schemaJsonLd', array_merge(
 				SchemaOrg::getGlobalScripts((string) $documentTitle, (string) $pageDesc, $seoMeta['canonical']),
 				$pageSchemas

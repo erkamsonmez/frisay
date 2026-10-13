@@ -43,6 +43,15 @@ class SchemaOrg
 		return array_values(array_filter($scripts));
 	}
 
+	/** Breadcrumb JSON-LD for public listing and content pages. */
+	public static function getBreadcrumbScript(array $breadcrumb, string $canonicalUrl): string
+	{
+		if (count($breadcrumb) < 2) {
+			return '';
+		}
+		return self::encode(self::buildBreadcrumbList($breadcrumb, $canonicalUrl));
+	}
+
 	public static function currentUrl(): string
 	{
 		return Seo::requestPageUrl();
@@ -254,7 +263,7 @@ class SchemaOrg
 	}
 
 	/** @param array<int, array{name: string, url: string}> $breadcrumb */
-	private static function buildBreadcrumbList(array $breadcrumb): array
+	private static function buildBreadcrumbList(array $breadcrumb, ?string $canonicalUrl = null): array
 	{
 		global $domain;
 		$items = [];
@@ -264,7 +273,7 @@ class SchemaOrg
 			$url = trim((string) ($crumb['url'] ?? ''));
 
 			if ($url === '') {
-				$url = self::currentUrl();
+				$url = $canonicalUrl ?: self::currentUrl();
 			} elseif (!preg_match('#^https?://#i', $url)) {
 				$url = rtrim($domain, '/') . '/' . ltrim($url, '/');
 			}
