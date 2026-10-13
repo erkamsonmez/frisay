@@ -105,7 +105,9 @@ class SiteAssets
 			$uploadExt = 'svg';
 		}
 
-		$dir = self::imgDir();
+		// Brand uploads belong to the persisted Docker volume, not the image layer.
+		// The public img/branding path is a symlink created by frisay-entrypoint.
+		$dir = self::imgDir() . '/branding';
 
 		if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
 			return ['success' => false, 'message' => 'img klasörü oluşturulamadı'];
@@ -133,7 +135,7 @@ class SiteAssets
 			return ['success' => false, 'message' => 'Logo kaydedilemedi'];
 		}
 
-		Settings::set('LOGO_' . strtoupper($key), $targetName);
+		Settings::set('LOGO_' . strtoupper($key), 'branding/' . $targetName);
 
 		return [
 			'success' => true,

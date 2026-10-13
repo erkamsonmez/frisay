@@ -11,7 +11,4 @@
 {if $css}<link rel="stylesheet" href="{($css_dir|cat:$css)|asset_url}">{/if}
 {if $themeOptions.header == 'header2'}<link rel="stylesheet" href="{($css_dir|cat:'header2.css')|asset_url}">{/if}
 {/if}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{($css_dir|cat:'cnc-industrial.css')|asset_url}">
