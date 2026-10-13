@@ -11,4 +11,7 @@
 {if $css}<link rel="stylesheet" href="{($css_dir|cat:$css)|asset_url}">{/if}
 {if $themeOptions.header == 'header2'}<link rel="stylesheet" href="{($css_dir|cat:'header2.css')|asset_url}">{/if}
 {/if}
+{* Always load the editable files after any CSS bundle; changes survive cached bundle assets. *}
+<link rel="stylesheet" href="{($css_dir|cat:'colors.css')|asset_url}">
+<link rel="stylesheet" href="{($css_dir|cat:'custom.css')|asset_url}">
 <link rel="stylesheet" href="{($css_dir|cat:'cnc-industrial.css')|asset_url}">
