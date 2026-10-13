@@ -33,16 +33,12 @@ class SchemaOrg
 			self::encode(self::buildBreadcrumbList($breadcrumb)),
 		];
 
+		// Structured FAQ entries only when actually published; never synthesize
+		// shipping/return answers that a customer may not see on the product page.
 		$questions = self::getPublishedQuestions((int) $product['id_product']);
-		$faq = $questions !== []
-			? self::buildFaqFromQuestions($questions)
-			: self::buildProductFaq($product, $freeShippingMin, $shippingFee);
-
-		if ($faq === []) {
-			$faq = self::buildProductFaq($product, $freeShippingMin, $shippingFee);
+		if ($questions !== []) {
+			$scripts[] = self::encode(self::buildFaqFromQuestions($questions));
 		}
-
-		$scripts[] = self::encode($faq);
 
 		return array_values(array_filter($scripts));
 	}
@@ -123,14 +119,7 @@ class SchemaOrg
 			];
 		}
 
-		$org['openingHoursSpecification'] = [
-			'@type' => 'OpeningHoursSpecification',
-			'dayOfWeek' => [
-				'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
-			],
-			'opens' => self::hourSpec(self::firstSetting('OPEN_HOUR'), '00:00'),
-			'closes' => self::hourSpec(self::firstSetting('CLOSE_HOUR'), '23:59'),
-		];
+		// Opening days are not configured in FriSay. Avoid claiming 24/7 hours.
 
 		$sameAs = self::socialLinks();
 

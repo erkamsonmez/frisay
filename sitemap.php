@@ -25,7 +25,7 @@ function sitemapLastmod(array $row): string
         $candidate = (string) ($row[$key] ?? '');
         $ts = $candidate !== '' ? strtotime($candidate) : false;
         if ($ts !== false && $ts > 0 && $ts <= time()) {
-            return gmdate('Y-m-d', $ts);
+            return date('Y-m-d', $ts);
         }
     }
     return '';
