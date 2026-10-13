@@ -35,7 +35,7 @@ jobs:
           ht=pathlib.Path('.htaccess').read_text()
           sitemap=pathlib.Path('sitemap.php').read_text()
           robots=pathlib.Path('robots.php').read_text()
-          for path in ('sitemap.xml', 'sitemap-pages', 'sitemap-categories', 'sitemap-products-'):
+          for path in (r'sitemap\.xml', 'sitemap-pages', 'sitemap-categories', 'sitemap-products-'):
               assert path in ht, 'Sitemap rewrite missing: '+path
           assert 'sitemapindex' in sitemap and 'urlset' in sitemap
           assert 'SITEMAP_SIZE = 1000' in sitemap
