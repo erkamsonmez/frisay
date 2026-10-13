@@ -55,6 +55,8 @@ jobs:
           assert "theme-customize" in (Path("container/admin/theme-customize.php").read_text()), "Missing admin editor"
           print("Schema validation passed:",len(schema["colors"]),"colors,",len(schema["options"]),"options")
           PY
+      - name: Render actual Smarty homepage and headers
+        run: php tests/cnc-theme-smarty-smoke.php
       - name: Test saving and reloading theme options and colors
         run: |
           cat >/tmp/test-cnc-theme.php <<'PHP'
