@@ -7,6 +7,13 @@ class Settings
     public static function get(string $key): string { return self::$data[$key] ?? ''; }
     public static function set(string $key, string $val): bool { self::$data[$key] = $val; return true; }
 }
+class Security
+{
+    public static function jsonForHtmlScript($data): string
+    {
+        return json_encode($data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+}
 class SiteAssets
 {
     public static function resolveLogoUrl(string $name): string { return 'https://ustarafi.com/img/logo.png'; }
