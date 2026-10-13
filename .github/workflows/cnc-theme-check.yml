@@ -1,0 +1,93 @@
+name: Check CNC Industrial customization
+on:
+  push:
+    branches: [staging]
+    paths:
+      - .github/workflows/cnc-theme-check.yml
+      - templates/cnc-industrial/**
+      - core/Theme.php
+      - core/SiteAssets.php
+      - container/admin/theme-customize.php
+      - templates/admin/theme-customize.tpl
+      - docker/frisay-entrypoint.sh
+      - config/settings.php
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout staging
+        uses: actions/checkout@v4
+      - name: PHP and shell syntax
+        run: |
+          set -e
+          php -l core/Theme.php
+          php -l core/SiteAssets.php
+          php -l config/settings.php
+          php -l container/admin/theme-customize.php
+          sh -n docker/frisay-entrypoint.sh
+      - name: Verify theme schema and all editable fields
+        run: |
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          root=Path("templates/cnc-industrial")
+          schema=json.loads((root/"theme.schema.json").read_text(encoding="utf-8"))
+          assert len(schema["options"]) >= 35, "Missing content fields"
+          assert len(schema["colors"]) >= 20, "Missing color definitions"
+          colors=(root/"css/colors.css").read_text(encoding="utf-8")
+          ui=(root/"css/cnc-industrial.css").read_text(encoding="utf-8")
+          home=(root/"home.tpl").read_text(encoding="utf-8")
+          header=(root/"_mini/header1.tpl").read_text(encoding="utf-8")
+          for key in schema["colors"]:
+              assert "--"+key+":" in colors, "Missing CSS definition: "+key
+          for alias,origin in schema["color_aliases"].items():
+              assert origin in schema["colors"], "Invalid color alias: "+alias
+              assert "--"+alias+":" in colors, "Missing color alias: "+alias
+          for option,definition in schema["options"].items():
+              assert definition["group"] in ("home","advanced"), "Unknown option group: "+option
+              assert definition["type"] in ("select","text","textarea","switch"), "Unknown option type: "+option
+              if option not in ("font","container_width","header"):
+                  assert ("themeOptions."+option) in home or ("themeOptions."+option) in header, "Unconnected admin option: "+option
+          assert not re.search(r"#[a-fA-F0-9]{3,8}\\b",ui), "Hard-coded CSS color still present"
+          assert "var(--sm-primary)" in home, "SVG accent not bound"
+          assert "theme-customize" in (Path("container/admin/theme-customize.php").read_text()), "Missing admin editor"
+          print("Schema validation passed:",len(schema["colors"]),"colors,",len(schema["options"]),"options")
+          PY
+      - name: Test saving and reloading theme options and colors
+        run: |
+          cat >/tmp/test-cnc-theme.php <<'PHP'
+          <?php
+          class Settings {
+              public static array $store=[];
+              public static function get($key) { return self::$store[$key] ?? ''; }
+              public static function set($key,$val) { self::$store[$key]=(string)$val; return true; }
+          }
+          require getcwd() . '/core/Theme.php';
+          $name='cnc-industrial';
+          $defs=Theme::getOptionDefinitions($name);
+          if (count($defs)<35 || !isset($defs['hero_description']) || $defs['hero_description']['type']!=='textarea') throw new RuntimeException('Schema fields invalid');
+          $options=Theme::getOptions($name);
+          $options['hero_title_first']='Test banner title';
+          $options['hero_show']='0';
+          $options['font']='roboto';
+          $options['container_width']='1440';
+          $res=Theme::saveOptions($name,$options);
+          if (!$res['success']) throw new RuntimeException('Save options failed: '.$res['message']);
+          $loaded=Theme::getResolvedOptions($name);
+          if ($loaded['hero_title_first']!=='Test banner title' || $loaded['hero_show']!=='0' || $loaded['font']!=='roboto') throw new RuntimeException('Option reload failed');
+          $defaults=Theme::getColors($name);
+          $defaults['sm-primary']='#80AB50';
+          $defaults['sm-bg']='#EFEFEF';
+          $result=Theme::saveColors($name,$defaults);
+          if (!$result['success']) throw new RuntimeException('Save colors failed: '.$result['message']);
+          $loadedColors=Theme::getColors($name);
+          if ($loadedColors['sm-primary']!=='#80AB50' || $loadedColors['sm-bg']!=='#EFEFEF') throw new RuntimeException('Colors not reloaded');
+          $css=file_get_contents('templates/cnc-industrial/css/colors.css');
+          if (!str_contains($css,'--cnc-accent: var(--sm-primary)') || !str_contains($css,'--sm-primary: #80AB50')) throw new RuntimeException('Dynamic aliases not produced');
+          $css=file_get_contents('templates/cnc-industrial/css/custom.css');
+          if (!str_contains($css,'1440px') || !str_contains($css,'Roboto')) throw new RuntimeException('Font/container settings not applied');
+          echo "Theme save/reload passed",PHP_EOL;
+          PHP
+          php /tmp/test-cnc-theme.php
