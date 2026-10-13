@@ -101,6 +101,22 @@ $pageSchema = array_values(array_filter($structured, static fn($data) => $data['
 assertSameSeo('https://ustarafi.com/problar/prob-34', $pageSchema['url'], 'WebPage JSON-LD canonical');
 if (count($smarty->displays) !== 3) throw new RuntimeException('Page render layout changed');
 
+// Category breadcrumb structured data must point at its canonical page.
+$_SERVER['REQUEST_URI'] = '/problar?page=2';
+$smarty = new FakeSmarty();
+$smarty->assign('catalogBaseUrl', 'https://ustarafi.com/problar');
+$smarty->assign('pagination', ['page' => 2]);
+$smarty->assign('breadcrumb', [
+    ['name' => 'Ana Sayfa', 'url' => 'https://ustarafi.com/'],
+    ['name' => 'Problar', 'url' => ''],
+]);
+Page::add('category', 'Problar');
+$structured = array_map(static fn($json) => json_decode($json, true, 512, JSON_THROW_ON_ERROR), $smarty->vars['schemaJsonLd']);
+$crumbs = array_values(array_filter($structured, static fn($data) => $data['@type'] === 'BreadcrumbList'));
+if (count($crumbs) !== 1) throw new RuntimeException('Category breadcrumb JSON-LD missing');
+assertSameSeo('https://ustarafi.com/problar?page=2', $crumbs[0]['itemListElement'][1]['item'], 'Breadcrumb canonical');
+
+
 $ht = file_get_contents(dirname(__DIR__) . '/.htaccess');
 $robotsAt = strpos($ht, 'RewriteRule ^robots\.txt$ robots.php [L]');
 $staticAt = strpos($ht, '# 3. Gerçek dosya');
