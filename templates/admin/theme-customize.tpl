@@ -122,6 +122,9 @@
 
 			<div class="tab-pane fade" id="tc-home" role="tabpanel" aria-labelledby="tc-home-tab" tabindex="0">
 				{assign var=hasHomeOpts value=false}
+				{foreach $themeOptionDefs as $optKey => $optMeta}
+					{if $optMeta.group|default:'' == 'home'}{assign var=hasHomeOpts value=true}{/if}
+				{/foreach}
 				{if isset($themeOptionDefs.header) || isset($themeOptionDefs.announcement) || isset($themeOptionDefs.tagline) || isset($themeOptionDefs.delivery_regions) || isset($themeOptionDefs.home_slider) || isset($themeOptionDefs.etbis_url) || isset($themeOptionDefs.play_store_url) || isset($themeOptionDefs.app_store_url)}
 					{assign var=hasHomeOpts value=true}
 				{/if}
@@ -132,7 +135,7 @@
 					<p class="text-muted small mb-3">{'Header, homepage messaging and related storefront options.'|adminT}</p>
 					<div class="row g-3">
 						{foreach $themeOptionDefs as $optKey => $optMeta}
-						{if $optKey == 'header' || $optKey == 'announcement' || $optKey == 'tagline' || $optKey == 'delivery_regions' || $optKey == 'home_slider' || $optKey == 'etbis_url' || $optKey == 'play_store_url' || $optKey == 'app_store_url'}
+						{if $optMeta.group|default:'' == 'home' || $optKey == 'header' || $optKey == 'announcement' || $optKey == 'tagline' || $optKey == 'delivery_regions' || $optKey == 'home_slider' || $optKey == 'etbis_url' || $optKey == 'play_store_url' || $optKey == 'app_store_url'}
 						<div class="col-md-6">
 							<label class="form-label small mb-1" for="opt_{$optKey|escape}">{$optMeta.label|escape}</label>
 							{if $optMeta.type == 'select'}
@@ -143,6 +146,8 @@
 							</select>
 							{elseif $optMeta.type == 'text'}
 							<input type="text" name="opt_{$optKey|escape}" id="opt_{$optKey|escape}" class="form-control form-control-sm" value="{$themeOptions[$optKey]|default:''|escape}" form="themeCustomizeForm">
+							{elseif $optMeta.type == 'textarea'}
+							<textarea name="opt_{$optKey|escape}" id="opt_{$optKey|escape}" class="form-control form-control-sm" rows="3" maxlength="2000" form="themeCustomizeForm">{$themeOptions[$optKey]|default:''|escape}</textarea>
 							{elseif $optMeta.type == 'switch'}
 							<div class="form-check form-switch mt-1">
 								<input type="checkbox" class="form-check-input" name="opt_{$optKey|escape}" id="opt_{$optKey|escape}" value="1"{if $themeOptions[$optKey]|default:'0' == '1'} checked{/if} form="themeCustomizeForm">
@@ -180,7 +185,7 @@
 			<div class="tab-pane fade" id="tc-advanced" role="tabpanel" aria-labelledby="tc-advanced-tab" tabindex="0">
 				{assign var=hasAdvanced value=false}
 				{foreach $themeOptionDefs as $optKey => $optMeta}
-				{if $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider' && $optKey != 'etbis_url' && $optKey != 'play_store_url' && $optKey != 'app_store_url'}
+				{if $optMeta.group|default:'' != 'home' && $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider' && $optKey != 'etbis_url' && $optKey != 'play_store_url' && $optKey != 'app_store_url'}
 					{assign var=hasAdvanced value=true}
 				{/if}
 				{/foreach}
@@ -191,7 +196,7 @@
 					<p class="text-muted small mb-3">{'Width, radius and less-used options. Saved to the <code>custom.css</code> file.'|adminT}</p>
 					<div class="row g-3">
 						{foreach $themeOptionDefs as $optKey => $optMeta}
-						{if $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider' && $optKey != 'etbis_url' && $optKey != 'play_store_url' && $optKey != 'app_store_url'}
+						{if $optMeta.group|default:'' != 'home' && $optKey != 'font' && $optKey != 'header' && $optKey != 'announcement' && $optKey != 'tagline' && $optKey != 'delivery_regions' && $optKey != 'home_slider' && $optKey != 'etbis_url' && $optKey != 'play_store_url' && $optKey != 'app_store_url'}
 						<div class="col-md-6">
 							<label class="form-label small mb-1" for="opt_{$optKey|escape}">{$optMeta.label|escape}</label>
 							{if $optMeta.type == 'select'}
@@ -202,6 +207,8 @@
 							</select>
 							{elseif $optMeta.type == 'text'}
 							<input type="text" name="opt_{$optKey|escape}" id="opt_{$optKey|escape}" class="form-control form-control-sm" value="{$themeOptions[$optKey]|default:''|escape}" form="themeCustomizeForm">
+							{elseif $optMeta.type == 'textarea'}
+							<textarea name="opt_{$optKey|escape}" id="opt_{$optKey|escape}" class="form-control form-control-sm" rows="3" maxlength="2000" form="themeCustomizeForm">{$themeOptions[$optKey]|default:''|escape}</textarea>
 							{elseif $optMeta.type == 'switch'}
 							<div class="form-check form-switch mt-1">
 								<input type="checkbox" class="form-check-input" name="opt_{$optKey|escape}" id="opt_{$optKey|escape}" value="1"{if $themeOptions[$optKey]|default:'0' == '1'} checked{/if} form="themeCustomizeForm">

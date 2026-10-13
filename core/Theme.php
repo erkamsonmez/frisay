@@ -390,6 +390,7 @@ class Theme
 				$defs[$key] = [
 					'label' => (string) ($field['label'] ?? $key),
 					'type' => $type,
+					'group' => (string) ($field['group'] ?? ''),
 					'default' => (string) ($field['default'] ?? ($type === 'switch' ? '0' : '')),
 					'options' => $options,
 				];

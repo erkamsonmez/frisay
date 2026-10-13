@@ -1,7 +1,7 @@
-<header class="sm-header cnc-header">
+<header class="sm-header cnc-header{if $themeOptions.header|default:'header1' == 'header2'} cnc-header--compact{/if}">
   <div class="cnc-utility">
     <div class="sm-container cnc-utility__inner">
-      <span class="cnc-utility__eyebrow"><span class="cnc-pulse"></span> PROFESYONEL TALAŞLI İMALAT EKİPMANLARI</span>
+      <span class="cnc-utility__eyebrow"><span class="cnc-pulse"></span> {$themeOptions.announcement|escape}</span>
       <div class="cnc-utility__links">
         <a href="{$domain}contact">İletişim</a><span aria-hidden="true">/</span>
         <a href="{$domain}truck">Sipariş takibi</a>
@@ -13,11 +13,11 @@
       <div class="sm-header-desktop__top cnc-header__main">
         <a href="{$domain}" class="cnc-brand" aria-label="{$siteName|escape} ana sayfa">
           <span class="cnc-brand__symbol" aria-hidden="true"><svg viewBox="0 0 44 44" fill="none"><path d="M8 8h28v28H8z" stroke="currentColor" stroke-width="1.5"/><path d="M14 30V14h16M14 24h11M30 14v16" stroke="currentColor" stroke-width="3"/><circle cx="30" cy="30" r="3" fill="currentColor"/></svg></span>
-          <span class="cnc-brand__wordmark">{$siteName|escape}<small>ENDÜSTRİYEL EKİPMANLAR</small></span>
+          {if $themeOptions.brand_logo_show|default:"0" == "1" && $siteLogos.header}<img class="cnc-brand__uploaded-logo" src="{$siteLogos.header|escape}" alt="{$siteName|escape}">{else}<span class="cnc-brand__wordmark">{$siteName|escape}<small>{$themeOptions.tagline|escape}</small></span>{/if}
         </a>
         <div class="sm-search-desktop cnc-header__search">
           {include file='cnc-industrial/plugin/header-search.tpl' smSearchInputId='cncSearchDesktop'}
-          <span class="cnc-header__search-note">ÜRÜN KODU / ÖLÇÜ / MARKA</span>
+          <span class="cnc-header__search-note">{$themeOptions.header_search_hint|escape}</span>
         </div>
         <div class="sm-header__actions cnc-header__actions">
           {if $isLoggedIn}
@@ -42,7 +42,7 @@
         </button>
         <a href="{$domain}" class="cnc-brand cnc-brand--mobile" aria-label="{$siteName|escape} ana sayfa">
           <span class="cnc-brand__symbol" aria-hidden="true"><svg viewBox="0 0 44 44" fill="none"><path d="M8 8h28v28H8z" stroke="currentColor" stroke-width="1.5"/><path d="M14 30V14h16M14 24h11M30 14v16" stroke="currentColor" stroke-width="3"/><circle cx="30" cy="30" r="3" fill="currentColor"/></svg></span>
-          <span class="cnc-brand__wordmark">{$siteName|escape}</span>
+          {if $themeOptions.brand_logo_show|default:"0" == "1" && $siteLogos.header}<img class="cnc-brand__uploaded-logo" src="{$siteLogos.header|escape}" alt="{$siteName|escape}">{else}<span class="cnc-brand__wordmark">{$siteName|escape}</span>{/if}
         </a>
         <div class="sm-header__actions">
           <a class="sm-icon-btn" href="{$domain}my-account" aria-label="Hesabım">
@@ -70,7 +70,7 @@
             {/if}
           {/foreach}
         {/if}
-        <li class="cnc-nav-contact"><a href="{$domain}contact">TEKNİK DESTEK <span aria-hidden="true">↗</span></a></li>
+        <li class="cnc-nav-contact"><a href="{$domain}contact">{$themeOptions.header_support_label|escape} <span aria-hidden="true">↗</span></a></li>
       </ul>
     </nav>
   </div>

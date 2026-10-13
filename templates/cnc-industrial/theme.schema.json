@@ -1,46 +1,389 @@
 {
   "label": "Usta Rafı — CNC Industrial",
-  "description": "Usta Rafı kurumsal renkleri: antrasit, yeşil, kırık beyaz; mobil uyumlu CNC ekipman mağazası.",
+  "description": "Antrasit ve yeşil Usta Rafı teması; renkler, logo tercihi ve ana sayfa içerikleri yönetim panelinden düzenlenir.",
   "preview": "theme-preview.svg",
+  "color_groups": {
+    "brand": "Marka renkleri",
+    "surface": "Yüzey, metin ve kenarlıklar",
+    "buttons": "Buton ve bağlantılar"
+  },
   "options": {
     "header": {
       "label": "Üst menü stili",
       "type": "select",
       "default": "header1",
+      "group": "home",
       "source": "header_variants"
     },
     "font": {
       "label": "Yazı tipi",
       "type": "select",
       "default": "inter",
+      "group": "advanced",
       "source": "fonts"
     },
     "container_width": {
       "label": "Site genişliği",
       "type": "select",
       "default": "1320",
+      "group": "advanced",
       "source": "container_widths"
+    },
+    "brand_logo_show": {
+      "label": "Yüklenen logoyu üst menüde göster",
+      "type": "switch",
+      "default": "0",
+      "group": "home"
+    },
+    "announcement": {
+      "label": "Üst şerit açıklaması",
+      "type": "text",
+      "default": "PROFESYONEL TALAŞLI İMALAT EKİPMANLARI",
+      "group": "home"
+    },
+    "tagline": {
+      "label": "Logo altı slogan",
+      "type": "text",
+      "default": "ENDÜSTRİYEL EKİPMANLAR",
+      "group": "home"
+    },
+    "header_search_hint": {
+      "label": "Arama kutusu teknik ipucu",
+      "type": "text",
+      "default": "ÜRÜN KODU / ÖLÇÜ / MARKA",
+      "group": "home"
+    },
+    "header_support_label": {
+      "label": "Menü teknik destek bağlantısı",
+      "type": "text",
+      "default": "TEKNİK DESTEK",
+      "group": "home"
+    },
+    "hero_show": {
+      "label": "Ana bannerı göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "hero_kicker": {
+      "label": "Banner üst etiketi",
+      "type": "text",
+      "default": "CNC / TAKIMLAMA / ÖLÇÜM",
+      "group": "home"
+    },
+    "hero_title_first": {
+      "label": "Banner başlığı: ilk satır",
+      "type": "text",
+      "default": "Üretimin ritmini",
+      "group": "home"
+    },
+    "hero_title_accent": {
+      "label": "Banner başlığı: vurgulu metin",
+      "type": "text",
+      "default": "doğru ekipman",
+      "group": "home"
+    },
+    "hero_title_last": {
+      "label": "Banner başlığı: son metin",
+      "type": "text",
+      "default": "belirler.",
+      "group": "home"
+    },
+    "hero_description": {
+      "label": "Banner açıklaması",
+      "type": "textarea",
+      "default": "Kesici takımlar, takım tutucular ve hassas ölçüm ekipmanları. Aradığınız ürüne teknik özellikleriyle ulaşın.",
+      "group": "home"
+    },
+    "hero_primary_label": {
+      "label": "Birinci banner butonu",
+      "type": "text",
+      "default": "Ürünleri keşfet",
+      "group": "home"
+    },
+    "hero_secondary_label": {
+      "label": "İkinci banner butonu",
+      "type": "text",
+      "default": "Bize ulaşın",
+      "group": "home"
+    },
+    "hero_visual_caption": {
+      "label": "Teknik çizim başlığı",
+      "type": "text",
+      "default": "TOOL HOLDER / SECTION A-A",
+      "group": "home"
+    },
+    "hero_visual_code": {
+      "label": "Teknik çizim referansı",
+      "type": "text",
+      "default": "REF. BT40",
+      "group": "home"
+    },
+    "benefits_show": {
+      "label": "Üç avantaj kartını göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "benefit1_title": {
+      "label": "Birinci avantaj başlığı",
+      "type": "text",
+      "default": "Teknik odaklı katalog",
+      "group": "home"
+    },
+    "benefit1_text": {
+      "label": "Birinci avantaj açıklaması",
+      "type": "text",
+      "default": "Ölçü ve özelliklerle seçim",
+      "group": "home"
+    },
+    "benefit2_title": {
+      "label": "İkinci avantaj başlığı",
+      "type": "text",
+      "default": "Profesyonel ekipmanlar",
+      "group": "home"
+    },
+    "benefit2_text": {
+      "label": "İkinci avantaj açıklaması",
+      "type": "text",
+      "default": "CNC ve talaşlı imalat için",
+      "group": "home"
+    },
+    "benefit3_title": {
+      "label": "Üçüncü avantaj başlığı",
+      "type": "text",
+      "default": "Kolay sipariş takibi",
+      "group": "home"
+    },
+    "benefit3_text": {
+      "label": "Üçüncü avantaj açıklaması",
+      "type": "text",
+      "default": "Sipariş durumunu görüntüleyin",
+      "group": "home"
+    },
+    "categories_show": {
+      "label": "Kategori kartlarını göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "categories_kicker": {
+      "label": "Kategori üst etiketi",
+      "type": "text",
+      "default": "01 / ÜRÜN GRUPLARI",
+      "group": "home"
+    },
+    "categories_title": {
+      "label": "Kategori bölüm başlığı",
+      "type": "text",
+      "default": "Kategoriler",
+      "group": "home"
+    },
+    "featured_show": {
+      "label": "Öne çıkan ürünleri göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "featured_kicker": {
+      "label": "Öne çıkanlar üst etiketi",
+      "type": "text",
+      "default": "02 / ÖNE ÇIKAN SEÇİMLER",
+      "group": "home"
+    },
+    "featured_title": {
+      "label": "Öne çıkanlar başlığı",
+      "type": "text",
+      "default": "Öne çıkan ürünler",
+      "group": "home"
+    },
+    "deals_show": {
+      "label": "Fırsat ürünlerini göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "deals_kicker": {
+      "label": "Fırsatlar üst etiketi",
+      "type": "text",
+      "default": "03 / AVANTAJLI ÜRÜNLER",
+      "group": "home"
+    },
+    "deals_title": {
+      "label": "Fırsat ürünleri başlığı",
+      "type": "text",
+      "default": "Fırsat ürünleri",
+      "group": "home"
+    },
+    "category_blocks_show": {
+      "label": "Kategori ürün bloklarını göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "category_blocks_kicker": {
+      "label": "Kategori blokları üst etiketi",
+      "type": "text",
+      "default": "SEÇİLİ KATEGORİLER",
+      "group": "home"
+    },
+    "empty_title": {
+      "label": "Boş mağaza başlığı",
+      "type": "text",
+      "default": "Ürün kataloğumuz hazırlanıyor.",
+      "group": "home"
+    },
+    "empty_description": {
+      "label": "Boş mağaza açıklaması",
+      "type": "textarea",
+      "default": "Teknik ürün gruplarımız yakında burada olacak.",
+      "group": "home"
+    },
+    "help_show": {
+      "label": "Yardım bannerını göster",
+      "type": "switch",
+      "default": "1",
+      "group": "home"
+    },
+    "help_kicker": {
+      "label": "Yardım banner üst etiketi",
+      "type": "text",
+      "default": "DOĞRU EKİPMANI BULUN",
+      "group": "home"
+    },
+    "help_title": {
+      "label": "Yardım banner başlığı",
+      "type": "text",
+      "default": "Aradığınız ürün kataloğumuzda yok mu?",
+      "group": "home"
+    },
+    "help_description": {
+      "label": "Yardım banner açıklaması",
+      "type": "textarea",
+      "default": "Ürün kodunu veya teknik ihtiyacınızı bize iletin.",
+      "group": "home"
+    },
+    "help_button_label": {
+      "label": "Yardım banner butonu",
+      "type": "text",
+      "default": "İletişime geçin",
+      "group": "home"
     }
   },
   "colors": {
     "sm-primary": {
       "label": "Marka yeşili",
       "default": "#A3CB64",
-      "group": "marka"
+      "group": "brand"
     },
     "sm-accent": {
       "label": "Vurgu yeşili",
       "default": "#A3CB64",
-      "group": "marka"
+      "group": "brand"
+    },
+    "sm-primary-dark": {
+      "label": "Yeşil koyu",
+      "default": "#53742F",
+      "group": "brand"
+    },
+    "sm-primary-soft": {
+      "label": "Yeşil açık zemin",
+      "default": "#EFF5E6",
+      "group": "brand"
     },
     "sm-bg": {
-      "label": "Kırık beyaz sayfa zemini",
+      "label": "Sayfa arka planı (kırık beyaz)",
       "default": "#F4F5F2",
-      "group": "marka"
+      "group": "surface"
+    },
+    "sm-surface": {
+      "label": "Kart ve üst menü (beyaz)",
+      "default": "#FFFFFF",
+      "group": "surface"
+    },
+    "sm-text": {
+      "label": "Ana metin (antrasit)",
+      "default": "#202A32",
+      "group": "surface"
+    },
+    "sm-muted": {
+      "label": "İkincil metin",
+      "default": "#647181",
+      "group": "surface"
+    },
+    "sm-border": {
+      "label": "Kenarlıklar",
+      "default": "#DEE2E6",
+      "group": "surface"
+    },
+    "cnc-dark": {
+      "label": "Koyu banner/üst şerit",
+      "default": "#202A32",
+      "group": "surface"
+    },
+    "cnc-dark-alt": {
+      "label": "Koyu alan geçiş rengi",
+      "default": "#35454E",
+      "group": "surface"
+    },
+    "cnc-dark-text": {
+      "label": "Koyu alan yazıları",
+      "default": "#FFFFFF",
+      "group": "surface"
+    },
+    "cnc-dark-muted": {
+      "label": "Koyu alandaki açıklamalar",
+      "default": "#CBD5D9",
+      "group": "surface"
+    },
+    "cnc-accent-hover": {
+      "label": "Yeşil buton hover",
+      "default": "#B5D784",
+      "group": "buttons"
+    },
+    "cnc-accent-text": {
+      "label": "Yeşil buton metni",
+      "default": "#202A32",
+      "group": "buttons"
+    },
+    "cnc-dark-button-text": {
+      "label": "Koyu buton metni",
+      "default": "#FFFFFF",
+      "group": "buttons"
+    },
+    "cnc-link": {
+      "label": "Açık zemin bağlantı",
+      "default": "#53742F",
+      "group": "buttons"
+    },
+    "cnc-panel": {
+      "label": "Bilgi alanı arka plan",
+      "default": "#E9EEEB",
+      "group": "surface"
+    },
+    "cnc-product-image": {
+      "label": "Ürün görseli arka planı",
+      "default": "#F7F9FA",
+      "group": "surface"
+    },
+    "cnc-border-strong": {
+      "label": "Kart vurgu kenarlığı",
+      "default": "#CBD5DF",
+      "group": "surface"
+    },
+    "cnc-muted-light": {
+      "label": "Açık zeminde ikincil detay",
+      "default": "#94A3B0",
+      "group": "surface"
     }
   },
-  "color_groups": {
-    "marka": "Kurumsal renkler"
+  "color_aliases": {
+    "cnc-ink": "sm-text",
+    "cnc-navy": "cnc-dark",
+    "cnc-accent": "sm-primary",
+    "cnc-border": "sm-border",
+    "cnc-muted": "sm-muted",
+    "cnc-white": "sm-surface"
   },
-  "color_extra_css": "body.sm-body { background-color: var(--sm-bg, #F4F5F2); font-family: 'Inter', system-ui, sans-serif; }"
+  "color_extra_css": "body.sm-body { background: var(--sm-bg); color: var(--sm-text); }"
 }
