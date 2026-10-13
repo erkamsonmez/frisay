@@ -1,0 +1,44 @@
+name: Verify Technical SEO
+on:
+  push:
+    branches: [staging]
+    paths:
+      - .github/workflows/seo-check.yml
+      - tests/seo-technical-smoke.php
+      - core/Seo.php
+      - core/SchemaOrg.php
+      - config/page.php
+      - templates/cnc-industrial/header.tpl
+      - sitemap.php
+      - robots.php
+      - .htaccess
+      - container/front/catalog.php
+permissions:
+  contents: read
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax checks
+        run: |
+          set -eu
+          for file in core/Seo.php core/SchemaOrg.php config/page.php sitemap.php robots.php container/front/catalog.php tests/seo-technical-smoke.php; do
+            php -l "$file"
+          done
+      - name: Test canonical, index directives, OG and JSON-LD
+        run: php tests/seo-technical-smoke.php
+      - name: Check XML sitemap and robots routes
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          ht=pathlib.Path('.htaccess').read_text()
+          sitemap=pathlib.Path('sitemap.php').read_text()
+          robots=pathlib.Path('robots.php').read_text()
+          for path in ('sitemap.xml', 'sitemap-pages', 'sitemap-categories', 'sitemap-products-'):
+              assert path in ht, 'Sitemap rewrite missing: '+path
+          assert 'sitemapindex' in sitemap and 'urlset' in sitemap
+          assert 'SITEMAP_SIZE = 1000' in sitemap
+          assert 'Sitemap: ' in robots and 'Allow: /cache/assets/css/' in robots
+          print('Sitemap and robots routes passed')
+          PY
