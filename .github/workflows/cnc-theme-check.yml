@@ -11,6 +11,7 @@ on:
       - templates/admin/theme-customize.tpl
       - docker/frisay-entrypoint.sh
       - config/settings.php
+      - tests/cnc-theme-smarty-smoke.php
 permissions:
   contents: read
 jobs:
