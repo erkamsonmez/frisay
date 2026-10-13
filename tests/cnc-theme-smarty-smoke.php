@@ -47,4 +47,33 @@ if (!str_contains($changed, 'KİŞİSEL BAŞLIK') || str_contains($changed, '<sc
 }
 $second=$smarty->fetch('cnc-industrial/_mini/header2.tpl');
 if (!str_contains($second, 'cnc-header--compact')) throw new RuntimeException('Compact header is not selected');
-echo 'Smarty templates compile and dynamic homepage options render correctly',PHP_EOL;
+// Render the actual admin edit form, not just the storefront.
+$smarty->registerPlugin('modifier', 'adminT', static fn($s) => $s);
+$smarty->assign([
+    'flash'=>'',
+    'adminUrl'=>'/admin/',
+    'adminToken'=>'test-token',
+    'editTheme'=>'cnc-industrial',
+    'activeTheme'=>'cnc-industrial',
+    'themeMeta'=>Theme::getMeta('cnc-industrial'),
+    'themeOptionDefs'=>Theme::getOptionDefinitions('cnc-industrial'),
+    'themeOptions'=>Theme::getOptions('cnc-industrial'),
+    'headerVariants'=>Theme::discoverHeaderVariants('cnc-industrial'),
+    'colorDefs'=>Theme::getColorDefinitions('cnc-industrial'),
+    'colorGroups'=>Theme::getColorGroups('cnc-industrial'),
+    'themeColors'=>Theme::getColors('cnc-industrial'),
+    'colorPickerValues'=>Theme::getColors('cnc-industrial'),
+    'previewUrl'=>'https://ustarafi.com/templates/cnc-industrial/theme-preview.svg',
+    'siteLogos'=>[
+       ['key'=>'header','file'=>'logo.png','url'=>'','exists'=>false,'label'=>'Ana logo'],
+       ['key'=>'hero','file'=>'cnc-hero.webp','url'=>'','exists'=>false,'label'=>'Banner'],
+    ],
+    'footerDescription'=>'',
+    'footerDescriptionDefault'=>'',
+]);
+$admin=$smarty->fetch('admin/theme-customize.tpl');
+foreach (['id="opt_hero_title_first"', 'id="opt_hero_description"', 'id="opt_hero_image_show"', 'id="color_sm-primary"', 'id="opt_tagline"'] as $needle) {
+    if (!str_contains($admin,$needle)) throw new RuntimeException('Admin field not rendered: '.$needle);
+}
+if (!str_contains($admin,'<textarea name="opt_hero_description"')) throw new RuntimeException('Textarea field not rendered');
+echo 'Smarty storefront and admin customization tests passed',PHP_EOL;
