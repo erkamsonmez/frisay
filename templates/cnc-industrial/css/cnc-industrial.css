@@ -1,64 +1,64 @@
 /* CNC Industrial — storefront layer on top of FriSay/Shopmore.
    All controls, cart handlers and product templates remain native. */
 :root {
-  --cnc-ink: #202A32;
-  --cnc-navy: #202A32;
-  --cnc-dark: #202A32;
-  --cnc-accent: #A3CB64;
-  --cnc-border: #dee4e9;
-  --cnc-muted: #748292;
-  --cnc-white: #fff;
+  --cnc-ink: var(--sm-text);
+  --cnc-navy: var(--cnc-dark);
+  --cnc-navy-legacy: var(--cnc-dark);
+  --cnc-accent-legacy: var(--sm-primary);
+  --cnc-border-legacy: var(--sm-border);
+  --cnc-muted-legacy: var(--sm-muted);
+  --cnc-white-legacy: var(--sm-surface);
 }
 html { scroll-behavior: smooth; }
-body.sm-body { color: var(--cnc-ink); background: var(--sm-bg, #F4F5F2); font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+body.sm-body { color: var(--sm-text); background: var(--sm-bg); font-family: var(--theme-font-family, Inter, system-ui, sans-serif); }
 body.sm-body.sm-header-collapsed { padding-top: var(--sm-header-offset, 128px); }
 body.sm-body a { transition: color .16s ease, background .16s ease, border-color .16s ease, transform .16s ease; }
 body.sm-body a:focus-visible,
 body.sm-body button:focus-visible,
 body.sm-body input:focus-visible { outline: 2px solid var(--cnc-accent); outline-offset: 3px; }
 .sm-container { max-width: 1360px; padding-left: clamp(18px, 3vw, 36px); padding-right: clamp(18px, 3vw, 36px); }
-.cnc-header { padding: 0; border-bottom: 1px solid var(--cnc-border); box-shadow: 0 2px 18px rgba(7, 23, 36, .035); font-family: Inter, system-ui, sans-serif; }
-.cnc-utility { background: #202A32; color: #bccbd8; font-size: 10px; font-weight: 700; letter-spacing: .13em; }
+.cnc-header { padding: 0; border-bottom: 1px solid var(--cnc-border); box-shadow: 0 2px 18px rgba(7, 23, 36, .035); font-family: var(--theme-font-family, Inter, system-ui, sans-serif); }
+.cnc-utility { background: var(--sm-text); color: var(--cnc-dark-muted); font-size: 10px; font-weight: 700; letter-spacing: .13em; }
 .cnc-utility__inner { display: flex; min-height: 35px; justify-content: space-between; align-items: center; gap: 12px; }
 .cnc-utility__eyebrow { display: flex; align-items: center; gap: 10px; }
-.cnc-pulse { width: 6px; height: 6px; border-radius: 50%; background: #A3CB64; box-shadow: 0 0 0 3px rgba(163,203,100,.15); }
+.cnc-pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--sm-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sm-primary) 15%, transparent); }
 .cnc-utility__links { display: flex; gap: 13px; align-items: center; letter-spacing: .03em; }
-.cnc-utility__links a { color: #ccd7e0; text-decoration: none; }
-.cnc-utility__links a:hover { color: #fff; }
+.cnc-utility__links a { color: var(--cnc-dark-muted); text-decoration: none; }
+.cnc-utility__links a:hover { color: var(--sm-surface); }
 .cnc-header__main { min-height: 92px; padding: 15px 0; gap: 35px; }
-.cnc-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; color: #202A32; max-width: 270px; }
-.cnc-brand:hover { color: #202A32; }
-.cnc-brand__symbol { display: grid; place-items: center; color: #A3CB64; background: #202A32; width: 44px; height: 44px; border-radius: 7px; flex-shrink: 0; }
+.cnc-brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; color: var(--sm-text); max-width: 270px; }
+.cnc-brand:hover { color: var(--sm-text); }
+.cnc-brand__symbol { display: grid; place-items: center; color: var(--sm-primary); background: var(--sm-text); width: 44px; height: 44px; border-radius: 7px; flex-shrink: 0; }
 .cnc-brand__symbol svg { width: 38px; height: 38px; }
 .cnc-brand__wordmark { font-size: 19px; font-weight: 900; letter-spacing: -.06em; line-height: 1.13; overflow-wrap: anywhere; }
-.cnc-brand__wordmark small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .17em; color: #7b8794; margin-top: 6px; white-space: nowrap; }
+.cnc-brand__wordmark small { display: block; font-size: 9px; font-weight: 800; letter-spacing: .17em; color: var(--sm-muted); margin-top: 6px; white-space: nowrap; }
 .cnc-header__search { max-width: 540px; flex: 1; min-width: 230px; position: relative; margin: 0; }
 .cnc-header__search .sm-header-search { width: 100%; }
 .cnc-header__search .sm-search, .cnc-header-mobile .sm-search {
-  background: #F4F5F2; border: 1px solid #e0e5e9; border-radius: 7px; padding: 12px 16px; min-height: 46px;
+  background: var(--sm-bg); border: 1px solid var(--sm-border); border-radius: 7px; padding: 12px 16px; min-height: 46px;
 }
 .cnc-header__search .sm-search:focus-within, .cnc-header-mobile .sm-search:focus-within {
-  background: #fff; border-color: var(--cnc-accent); box-shadow: 0 0 0 3px rgba(163,203,100,.1);
+  background: var(--sm-surface); border-color: var(--cnc-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sm-primary) 10%, transparent);
 }
-.cnc-header__search .sm-search input::placeholder { color: #7b8794; }
-.cnc-header__search-note { position: absolute; right: 15px; top: 16px; color: #9aa5af; font-size: 9px; font-weight: 800; pointer-events: none; letter-spacing: .09em; }
+.cnc-header__search .sm-search input::placeholder { color: var(--sm-muted); }
+.cnc-header__search-note { position: absolute; right: 15px; top: 16px; color: var(--cnc-muted-light); font-size: 9px; font-weight: 800; pointer-events: none; letter-spacing: .09em; }
 .cnc-header__search input { padding-right: 155px; }
 .cnc-header__actions { gap: 17px; flex-shrink: 0; }
-.cnc-account-link, .cnc-cart-link { display: flex; gap: 8px; align-items: center; color: #344455; text-decoration: none; font-weight: 700; font-size: 12px; position: relative; white-space: nowrap; }
-.cnc-account-link:hover, .cnc-cart-link:hover { color: #86AB4B; }
-.cnc-cart-link { background: #A3CB64; color: #202A32; padding: 13px 14px; border-radius: 7px; }
-.cnc-cart-link:hover { background: #B5D784; color: #202A32; }
-.cnc-cart-link__count { display: inline-grid; place-items: center; min-width: 21px; height: 21px; border-radius: 4px; color: #fff; background: #202A32; font-size: 10px; }
+.cnc-account-link, .cnc-cart-link { display: flex; gap: 8px; align-items: center; color: var(--sm-muted); text-decoration: none; font-weight: 700; font-size: 12px; position: relative; white-space: nowrap; }
+.cnc-account-link:hover, .cnc-cart-link:hover { color: var(--cnc-link); }
+.cnc-cart-link { background: var(--sm-primary); color: var(--sm-text); padding: 13px 14px; border-radius: 7px; }
+.cnc-cart-link:hover { background: var(--cnc-accent-hover); color: var(--sm-text); }
+.cnc-cart-link__count { display: inline-grid; place-items: center; min-width: 21px; height: 21px; border-radius: 4px; color: var(--sm-surface); background: var(--sm-text); font-size: 10px; }
 .cnc-header-nav { border-top: 1px solid var(--cnc-border); min-height: 48px; display: block; }
 .cnc-header-nav .sm-header-menu__list { min-height: 47px; display: flex; gap: clamp(10px, 2vw, 35px); align-items: center; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-left: 0; }
 .cnc-header-nav .sm-header-menu__list::-webkit-scrollbar { display: none; }
 .cnc-header-nav .sm-header-menu__list > li { flex-shrink: 0; }
-.cnc-header-nav a { font-size: 11px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; text-decoration: none; color: #536171; }
-.cnc-header-nav a:hover { color: #53742F; }
-.cnc-nav-all { display: inline-flex; align-items: center; gap: 10px; color: #202A32 !important; }
+.cnc-header-nav a { font-size: 11px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; text-decoration: none; color: var(--sm-muted); }
+.cnc-header-nav a:hover { color: var(--cnc-link); }
+.cnc-nav-all { display: inline-flex; align-items: center; gap: 10px; color: var(--sm-text) !important; }
 .cnc-nav-all span { color: var(--cnc-accent); font-size: 19px; }
 .cnc-nav-contact { margin-left: auto; }
-.cnc-nav-contact a { color: #53742F; }
+.cnc-nav-contact a { color: var(--cnc-link); }
 .cnc-nav-contact a span { font-size: 15px; margin-left: 5px; }
 .cnc-header-mobile { padding-top: 12px; }
 .cnc-brand--mobile .cnc-brand__wordmark { font-size: 16px; max-width: 155px; }
@@ -67,100 +67,100 @@ body.sm-body input:focus-visible { outline: 2px solid var(--cnc-accent); outline
 .cnc-header-mobile .sm-search-wrap { padding: 10px 0 13px; }
 .cnc-header-mobile .sm-search { min-height: 43px; padding: 8px 12px; }
 .cnc-home { padding-top: 18px; padding-bottom: 40px; }
-.cnc-hero { min-height: 450px; border-radius: 10px; display: grid; grid-template-columns: 52% 48%; overflow: hidden; background: #202A32; color: #fff; position: relative; box-shadow: 0 22px 38px rgba(21,34,47,.1); }
+.cnc-hero { min-height: 450px; border-radius: 10px; display: grid; grid-template-columns: 52% 48%; overflow: hidden; background: var(--cnc-dark); color: var(--cnc-dark-text); position: relative; box-shadow: 0 22px 38px rgba(21,34,47,.1); }
 .cnc-hero__text { z-index: 2; position: relative; padding: clamp(36px, 5vw, 74px); padding-right: 12px; display: flex; flex-direction: column; align-items: flex-start; }
-.cnc-hero__index { font-size: 10px; letter-spacing: .19em; font-weight: 800; color: #e8a279; display: flex; align-items: center; gap: 12px; }
-.cnc-hero__dash { width: 22px; height: 1px; background: #A3CB64; display: inline-block; }
-.cnc-hero h1 { color: #fff; margin: 28px 0 19px; max-width: 690px; font-size: clamp(35px, 3.4vw, 60px); font-weight: 800; letter-spacing: -.055em; line-height: 1.17; }
+.cnc-hero__index { font-size: 10px; letter-spacing: .19em; font-weight: 800; color: var(--sm-primary); display: flex; align-items: center; gap: 12px; }
+.cnc-hero__dash { width: 22px; height: 1px; background: var(--sm-primary); display: inline-block; }
+.cnc-hero h1 { color: var(--sm-surface); margin: 28px 0 19px; max-width: 690px; font-size: clamp(35px, 3.4vw, 60px); font-weight: 800; letter-spacing: -.055em; line-height: 1.17; }
 .cnc-hero h1 em { color: var(--cnc-accent); font-style: normal; }
-.cnc-hero p { color: #bcc7d0; line-height: 1.8; font-size: 14px; max-width: 470px; margin: 0 0 27px; }
+.cnc-hero p { color: var(--cnc-dark-muted); line-height: 1.8; font-size: 14px; max-width: 470px; margin: 0 0 27px; }
 .cnc-hero__buttons { display: flex; flex-wrap: wrap; gap: 12px; }
 .cnc-btn { min-height: 48px; display: inline-flex; align-items: center; gap: 23px; justify-content: center; border-radius: 5px; text-decoration: none; padding: 13px 23px; font-size: 12px; font-weight: 800; }
-.cnc-btn--primary { background: var(--cnc-accent); color: #202A32; }
-.cnc-btn--primary:hover { background: #B5D784; color: #202A32; transform: translateY(-2px); }
-.cnc-btn--ghost { border: 1px solid #62717f; color: #e7edf2; }
-.cnc-btn--ghost:hover { border-color: #e7edf2; color: #fff; }
-.cnc-hero__foot { display: flex; gap: 13px; align-items: center; margin-top: auto; padding-top: 30px; font-size: 9px; font-weight: 700; letter-spacing: .14em; color: #a7b9c9; }
-.cnc-hero__line { display: block; width: 35px; height: 1px; background: #627688; }
-.cnc-hero__visual { position: relative; min-width: 0; background: radial-gradient(ellipse at 64% 47%, #34495d 0, #233548 35%, #1a2a3a 64%, transparent 84%); overflow: hidden; }
-.cnc-blueprint__grid { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(167,196,217,.065) 1px, transparent 1px) 0 0/28px 28px,linear-gradient(rgba(167,196,217,.065) 1px, transparent 1px) 0 0/28px 28px; mask-image: linear-gradient(90deg,transparent,#000 35%); }
+.cnc-btn--primary { background: var(--cnc-accent); color: var(--sm-text); }
+.cnc-btn--primary:hover { background: var(--cnc-accent-hover); color: var(--sm-text); transform: translateY(-2px); }
+.cnc-btn--ghost { border: 1px solid var(--cnc-dark-muted); color: var(--cnc-dark-text); }
+.cnc-btn--ghost:hover { border-color: var(--cnc-dark-text); color: var(--sm-surface); }
+.cnc-hero__foot { display: flex; gap: 13px; align-items: center; margin-top: auto; padding-top: 30px; font-size: 9px; font-weight: 700; letter-spacing: .14em; color: var(--cnc-dark-muted); }
+.cnc-hero__line { display: block; width: 35px; height: 1px; background: var(--cnc-dark-muted); }
+.cnc-hero__visual { position: relative; min-width: 0; background: radial-gradient(ellipse at 64% 47%, var(--cnc-dark-alt) 0, var(--cnc-dark) 35%, var(--cnc-dark) 64%, transparent 84%); overflow: hidden; }
+.cnc-blueprint__grid { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(167,196,217,.065) 1px, transparent 1px) 0 0/28px 28px,linear-gradient(rgba(167,196,217,.065) 1px, transparent 1px) 0 0/28px 28px; mask-image: linear-gradient(90deg,transparent,var(--cnc-dark) 35%); }
 .cnc-blueprint__art { position: absolute; height: 105%; width: 113%; left: -5%; top: 1%; filter: drop-shadow(25px 24px 22px rgba(0,0,0,.16)); }
-.cnc-blueprint__caption { position: absolute; top: 28px; left: 25px; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: #a2b6c5; }
-.cnc-blueprint__serial { position: absolute; bottom: 28px; right: 32px; text-align: right; font: 10px/1.8 monospace; letter-spacing: .08em; color: #8399a9; }
-.cnc-blueprint__marker { position: absolute; font: 11px monospace; color: #A3CB64; background: rgba(20,32,43,.5); padding: 4px 8px; z-index: 1; }
+.cnc-blueprint__caption { position: absolute; top: 28px; left: 25px; font-size: 10px; font-weight: 700; letter-spacing: .12em; color: var(--cnc-dark-muted); }
+.cnc-blueprint__serial { position: absolute; bottom: 28px; right: 32px; text-align: right; font: 10px/1.8 monospace; letter-spacing: .08em; color: var(--cnc-dark-muted); }
+.cnc-blueprint__marker { position: absolute; font: 11px monospace; color: var(--sm-primary); background: rgba(20,32,43,.5); padding: 4px 8px; z-index: 1; }
 .cnc-blueprint__marker--one { left: 25px; top: 36%; }
 .cnc-blueprint__marker--two { right: 25px; bottom: 36%; }
-.cnc-trust-strip { display: grid; grid-template-columns: repeat(3,1fr); margin: 16px 0 56px; background: #fff; border: 1px solid #e5e9ec; border-radius: 9px; }
+.cnc-trust-strip { display: grid; grid-template-columns: repeat(3,1fr); margin: 16px 0 56px; background: var(--sm-surface); border: 1px solid var(--sm-border); border-radius: 9px; }
 .cnc-trust-strip > div { min-height: 86px; display: grid; align-content: center; grid-template-columns: 34px auto; column-gap: 13px; padding: 15px clamp(12px,2.5vw,30px); }
-.cnc-trust-strip > div + div { border-left: 1px solid #e5e9ec; }
-.cnc-trust-strip__icon { grid-row: 1/3; align-self: center; color: #53742F; font-size: 22px; font-weight: 800; font-style: italic; letter-spacing: -.075em; }
+.cnc-trust-strip > div + div { border-left: 1px solid var(--sm-border); }
+.cnc-trust-strip__icon { grid-row: 1/3; align-self: center; color: var(--cnc-link); font-size: 22px; font-weight: 800; font-style: italic; letter-spacing: -.075em; }
 .cnc-trust-strip strong { font-size: 12px; font-weight: 800; }
-.cnc-trust-strip small { font-size: 11px; color: #748292; margin-top: 4px; }
+.cnc-trust-strip small { font-size: 11px; color: var(--sm-muted); margin-top: 4px; }
 .cnc-section-heading { display: flex; justify-content: space-between; gap: 22px; align-items: end; margin-bottom: 22px; }
-.cnc-section-heading h2 { color: #192838; font-size: clamp(24px,2.3vw,32px); line-height: 1.25; letter-spacing: -.035em; margin: 7px 0 0; font-weight: 800; }
-.cnc-kicker { color: #53742F; font-size: 10px; font-weight: 800; letter-spacing: .13em; }
-.cnc-text-link { color: #30465b; text-decoration: none; font-size: 12px; font-weight: 800; white-space: nowrap; padding-bottom: 4px; }
-.cnc-text-link span { color: #53742F; font-size: 17px; margin-left: 9px; }
-.cnc-text-link:hover { color: #456428; }
+.cnc-section-heading h2 { color: var(--sm-text); font-size: clamp(24px,2.3vw,32px); line-height: 1.25; letter-spacing: -.035em; margin: 7px 0 0; font-weight: 800; }
+.cnc-kicker { color: var(--cnc-link); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.cnc-text-link { color: var(--sm-text); text-decoration: none; font-size: 12px; font-weight: 800; white-space: nowrap; padding-bottom: 4px; }
+.cnc-text-link span { color: var(--cnc-link); font-size: 17px; margin-left: 9px; }
+.cnc-text-link:hover { color: var(--cnc-link); }
 .cnc-categories, .cnc-products { margin-bottom: 54px; }
 .cnc-categories__grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
-.cnc-category-tile { min-height: 145px; background: #fff; border: 1px solid #e0e6ec; border-radius: 8px; padding: 21px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; text-decoration: none; position: relative; color: #273747; overflow: hidden; }
-.cnc-category-tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #A3CB64; transform: scaleY(0); transform-origin: bottom; transition: transform .2s; }
-.cnc-category-tile:hover { box-shadow: 0 10px 28px rgba(19,36,52,.065); transform: translateY(-3px); color: #202A32; border-color: #cbd5df; }
+.cnc-category-tile { min-height: 145px; background: var(--sm-surface); border: 1px solid var(--sm-border); border-radius: 8px; padding: 21px; display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; text-decoration: none; position: relative; color: var(--sm-text); overflow: hidden; }
+.cnc-category-tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--sm-primary); transform: scaleY(0); transform-origin: bottom; transition: transform .2s; }
+.cnc-category-tile:hover { box-shadow: 0 10px 28px rgba(19,36,52,.065); transform: translateY(-3px); color: var(--sm-text); border-color: var(--cnc-border-strong); }
 .cnc-category-tile:hover::before { transform: scaleY(1); }
-.cnc-category-tile__serial { color: #aeb8c2; font-family: monospace; font-size: 11px; grid-column: 1; }
-.cnc-category-tile__icon { color: #b4c0ca; position: absolute; right: 22px; top: 22px; opacity: .65; }
+.cnc-category-tile__serial { color: var(--cnc-muted-light); font-family: monospace; font-size: 11px; grid-column: 1; }
+.cnc-category-tile__icon { color: var(--cnc-muted-light); position: absolute; right: 22px; top: 22px; opacity: .65; }
 .cnc-category-tile strong { grid-column: 1/3; grid-row: 3; font-size: 15px; max-width: 220px; line-height: 1.35; font-weight: 800; padding-right: 20px; }
-.cnc-category-tile__arrow { position: absolute; right: 20px; bottom: 18px; color: #53742F; font-size: 18px; }
+.cnc-category-tile__arrow { position: absolute; right: 20px; bottom: 18px; color: var(--cnc-link); font-size: 18px; }
 .cnc-home .slider-wrapper { position: relative; }
 .cnc-home .sicakFirsatlar { gap: 14px !important; padding-bottom: 22px !important; }
 .cnc-home .produtDiv { width: clamp(220px, 24%, 290px); max-width: 290px; }
 .cnc-home .product-card, .cnc-home .panel.product-card,
 .sm-body .prime-catalog .product-card, .sm-body .panel.product-card {
-  height: 100%; border-radius: 8px; border: 1px solid #e1e6eb; background: #fff;
+  height: 100%; border-radius: 8px; border: 1px solid var(--sm-border); background: var(--sm-surface);
   box-shadow: none; overflow: hidden; padding: 0; transition: border-color .18s, box-shadow .18s, transform .18s;
 }
 .cnc-home .product-card:hover, .sm-body .prime-catalog .product-card:hover {
-  border-color: #c6d2db; box-shadow: 0 10px 30px rgba(20,34,47,.07); transform: translateY(-2px);
+  border-color: var(--cnc-border-strong); box-shadow: 0 10px 30px rgba(20,34,47,.07); transform: translateY(-2px);
 }
-.cnc-home .product-image-wrapper, .sm-body .prime-catalog .product-image-wrapper { background: #f7f9fa; height: 208px; padding: 22px !important; }
+.cnc-home .product-image-wrapper, .sm-body .prime-catalog .product-image-wrapper { background: var(--cnc-product-image); height: 208px; padding: 22px !important; }
 .cnc-home .product-image { max-height: 170px !important; }
 .cnc-home .product-info, .sm-body .prime-catalog .product-info { padding: 17px; text-align: left; }
-.cnc-home .product-title, .sm-body .prime-catalog .product-title { font: 750 13px/1.55 Inter, system-ui,sans-serif; color: #1f2c39 !important; text-align: left; min-height: 40px; }
+.cnc-home .product-title, .sm-body .prime-catalog .product-title { font: 750 13px/1.55 var(--theme-font-family, Inter, system-ui, sans-serif); color: var(--sm-text) !important; text-align: left; min-height: 40px; }
 .cnc-home .productDiscount, .sm-body .prime-catalog .productDiscount { justify-content: flex-start !important; text-align: left; margin: auto 0 16px; }
-.cnc-home .current-price, .sm-body .prime-catalog .current-price { font-size: 18px; font-weight: 850; letter-spacing: -.02em; color: #152637; }
+.cnc-home .current-price, .sm-body .prime-catalog .current-price { font-size: 18px; font-weight: 850; letter-spacing: -.02em; color: var(--sm-text); }
 .cnc-home .product-card .btn-details, .sm-body .prime-catalog .product-card .btn-details, .sm-body .product-purchase-card .btn-details {
-  color: #fff; background: #202A32; border: 1px solid #202A32; border-radius: 5px; font-size: 12px; font-weight: 750; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 12px;
+  color: var(--sm-surface); background: var(--sm-text); border: 1px solid var(--sm-text); border-radius: 5px; font-size: 12px; font-weight: 750; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 12px;
 }
-.cnc-home .product-card .btn-details:hover, .sm-body .prime-catalog .product-card .btn-details:hover, .sm-body .product-purchase-card .btn-details:hover { color:#202A32; background: #A3CB64; border-color: #A3CB64; }
+.cnc-home .product-card .btn-details:hover, .sm-body .prime-catalog .product-card .btn-details:hover, .sm-body .product-purchase-card .btn-details:hover { color:var(--sm-text); background: var(--sm-primary); border-color: var(--sm-primary); }
 .cnc-home .miniDiscount, .sm-body .prime-catalog .miniDiscount { border-radius: 4px; }
-.cnc-home .slider-nav-btn { background: #fff; border: 1px solid #dce4e9; color: #263b4e; box-shadow: 0 4px 14px rgba(22,35,47,.08); }
-.cnc-home .slider-nav-btn:hover { background: #172635; color: #fff; }
+.cnc-home .slider-nav-btn { background: var(--sm-surface); border: 1px solid var(--sm-border); color: var(--sm-text); box-shadow: 0 4px 14px rgba(22,35,47,.08); }
+.cnc-home .slider-nav-btn:hover { background: var(--cnc-dark); color: var(--cnc-dark-text); }
 .cnc-home-hooks { margin: 36px 0; }
-.cnc-help-banner { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: clamp(26px,4vw,48px); border-radius: 9px; background: #e6edf1; border: 1px solid #d8e2e7; margin: 52px 0 20px; position: relative; overflow: hidden; }
-.cnc-help-banner::after { content: ""; position: absolute; width: 300px; height: 300px; border: 1px solid #cfdce4; border-radius: 50%; right: 12%; top: -130px; pointer-events: none; }
-.cnc-help-banner h2 { color: #182736; font-size: clamp(21px,2.3vw,28px); font-weight: 800; letter-spacing: -.035em; margin: 9px 0; }
-.cnc-help-banner p { color: #667789; font-size: 13px; margin: 0; }
-.cnc-help-banner a { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 22px; border-radius: 5px; background: #202A32; color: #fff; padding: 14px 20px; font-size: 12px; font-weight: 750; white-space: nowrap; text-decoration: none; }
-.cnc-help-banner a:hover { background: #A3CB64; color: #101d28; }
-.cnc-empty-shop { padding: 45px; border-radius: 8px; background: #fff; margin-bottom: 40px; border: 1px solid #e3e7ed; }
-.cnc-empty-shop > span { color: #53742F; font-size: 10px; letter-spacing: .14em; font-weight: 800; }
+.cnc-help-banner { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: clamp(26px,4vw,48px); border-radius: 9px; background: var(--cnc-panel); border: 1px solid var(--cnc-border-strong); margin: 52px 0 20px; position: relative; overflow: hidden; }
+.cnc-help-banner::after { content: ""; position: absolute; width: 300px; height: 300px; border: 1px solid var(--cnc-border-strong); border-radius: 50%; right: 12%; top: -130px; pointer-events: none; }
+.cnc-help-banner h2 { color: var(--sm-text); font-size: clamp(21px,2.3vw,28px); font-weight: 800; letter-spacing: -.035em; margin: 9px 0; }
+.cnc-help-banner p { color: var(--sm-muted); font-size: 13px; margin: 0; }
+.cnc-help-banner a { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 22px; border-radius: 5px; background: var(--cnc-dark); color: var(--cnc-dark-text); padding: 14px 20px; font-size: 12px; font-weight: 750; white-space: nowrap; text-decoration: none; }
+.cnc-help-banner a:hover { background: var(--sm-primary); color: var(--sm-text); }
+.cnc-empty-shop { padding: 45px; border-radius: 8px; background: var(--sm-surface); margin-bottom: 40px; border: 1px solid var(--sm-border); }
+.cnc-empty-shop > span { color: var(--cnc-link); font-size: 10px; letter-spacing: .14em; font-weight: 800; }
 .cnc-empty-shop h2 { font-size: 27px; font-weight: 800; letter-spacing: -.035em; margin: 10px 0; }
-.cnc-empty-shop p { color: #677888; font-size: 13px; }
-.cnc-empty-shop a { text-decoration: none; font-weight: 750; color: #53742F; }
-.sm-body .sm-breadcrumb__list, .sm-body .sm-breadcrumb__list a { font-size: 12px; color: #71808e; }
-.sm-body .prime-catalog__sidebar { border: 1px solid #e0e7ec; border-radius: 8px; }
-.sm-body .prime-filter-link.is-active { background: #202A32; color:#fff; }
-.sm-body .prime-pagination__current { background: #202A32; border-color: #202A32; }
-.sm-body .prime-catalog__main > div > h1, .sm-body .prime-catalog__main > h1 { font-family: Inter,system-ui,sans-serif; font-weight: 800; color: #202A32; }
+.cnc-empty-shop p { color: var(--sm-muted); font-size: 13px; }
+.cnc-empty-shop a { text-decoration: none; font-weight: 750; color: var(--cnc-link); }
+.sm-body .sm-breadcrumb__list, .sm-body .sm-breadcrumb__list a { font-size: 12px; color: var(--sm-muted); }
+.sm-body .prime-catalog__sidebar { border: 1px solid var(--sm-border); border-radius: 8px; }
+.sm-body .prime-filter-link.is-active { background: var(--sm-text); color:var(--sm-surface); }
+.sm-body .prime-pagination__current { background: var(--sm-text); border-color: var(--sm-text); }
+.sm-body .prime-catalog__main > div > h1, .sm-body .prime-catalog__main > h1 { font-family: var(--theme-font-family, Inter, system-ui, sans-serif); font-weight: 800; color: var(--sm-text); }
 .sm-body .product-gallery__stage, .sm-body .product-purchase-card { border-radius: 9px; }
-.sm-body .product-price-panel .current-price { color: #192938; }
-.sm-body .product-brand-link { color: #53742F; font-weight: 750; }
+.sm-body .product-price-panel .current-price { color: var(--sm-text); }
+.sm-body .product-brand-link { color: var(--cnc-link); font-weight: 750; }
 .sm-body .product-buy-main .btn-details { border-radius: 5px; }
-.sm-body .sm-bottom-nav { border-top: 1px solid #dbe2e8; background: #fff; }
-.sm-body footer.bg-brand-900 { background: #202A32 !important; color: #aab9c7; border-top-color: #202A32 !important; }
+.sm-body .sm-bottom-nav { border-top: 1px solid var(--sm-border); background: var(--sm-surface); }
+.sm-body footer.bg-brand-900 { background: var(--sm-text) !important; color: var(--cnc-dark-muted); border-top-color: var(--sm-text) !important; }
 .sm-body footer .bg-primary { background: var(--sm-primary)!important; }
-.sm-body footer a:hover { color: #A3CB64 !important; }
+.sm-body footer a:hover { color: var(--sm-primary) !important; }
 @media (min-width: 992px) {
   .cnc-header-mobile { display: none; }
 }
@@ -197,7 +197,7 @@ body.sm-body input:focus-visible { outline: 2px solid var(--cnc-accent); outline
   .cnc-blueprint__serial { bottom: 15px; font-size: 9px; }
   .cnc-trust-strip { grid-template-columns: 1fr; margin-bottom: 40px; }
   .cnc-trust-strip > div { min-height: 68px; padding: 12px 19px; }
-  .cnc-trust-strip > div + div { border-left: 0; border-top: 1px solid #e5e9ec; }
+  .cnc-trust-strip > div + div { border-left: 0; border-top: 1px solid var(--sm-border); }
   .cnc-categories, .cnc-products { margin-bottom: 40px; }
   .cnc-section-heading { align-items: start; }
   .cnc-section-heading h2 { font-size: 24px; }
@@ -220,18 +220,28 @@ body.sm-body input:focus-visible { outline: 2px solid var(--cnc-accent); outline
   html { scroll-behavior: auto; }
   .cnc-home .product-card, .cnc-category-tile, .cnc-btn { transition: none !important; }
 }
-/* Usta Rafi brand tokens: deep anthracite + lime-green + warm neutral surfaces */
-:root {
-  --usta-anthracite: #202A32;
-  --usta-green: #A3CB64;
-  --usta-ivory: #F4F5F2;
-  --usta-white: #FFFFFF;
-  --cnc-accent: var(--usta-green);
-}
-.cnc-hero { background: var(--usta-anthracite); }
-.cnc-hero__visual { background: radial-gradient(ellipse at 64% 47%, #40514C 0%, #34423F 38%, #283631 69%, var(--usta-anthracite) 100%); }
-.cnc-hero__index, .cnc-hero h1 em { color: var(--usta-green); }
-.cnc-hero .cnc-btn--primary, .cnc-cart-link, .cnc-help-banner a:hover { background: var(--usta-green); color: var(--usta-anthracite); }
-.cnc-home .product-card .btn-details:hover, .sm-body .prime-catalog .product-card .btn-details:hover, .sm-body .product-purchase-card .btn-details:hover { background: var(--usta-green); border-color: var(--usta-green); color: var(--usta-anthracite); }
-.cnc-hero__buttons a:focus-visible, .cnc-header button:focus-visible { outline-color: var(--usta-green); }
-.cnc-home .product-card, .sm-body .prime-catalog .product-card { background: var(--usta-white); }
+
+/* Explicit live design tokens; all brand/UI colors originate from theme.schema.json */
+.sm-body .sm-container,
+.sm-body .cnc-home.sm-container { max-width: var(--theme-container-max, 1320px); }
+.sm-body .cnc-header { background: var(--sm-surface); }
+.sm-body .cnc-utility, .sm-body .cnc-hero { background: var(--cnc-dark); color: var(--cnc-dark-text); }
+.sm-body .cnc-hero__visual { background: radial-gradient(ellipse at 64% 47%, var(--cnc-dark-alt) 0%, var(--cnc-dark) 85%); }
+.sm-body .cnc-hero h1, .sm-body .cnc-blueprint__serial { color: var(--cnc-dark-text); }
+.sm-body .cnc-hero__index, .sm-body .cnc-hero h1 em { color: var(--sm-primary); }
+.sm-body .cnc-brand__symbol { background: var(--cnc-dark); color: var(--sm-primary); }
+.sm-body .cnc-hero p, .sm-body .cnc-utility, .sm-body .cnc-hero__foot { color: var(--cnc-dark-muted); }
+.sm-body .cnc-btn--primary, .sm-body .cnc-cart-link { background: var(--sm-primary); color: var(--cnc-accent-text); }
+.sm-body .cnc-btn--primary:hover, .sm-body .cnc-cart-link:hover { background: var(--cnc-accent-hover); color: var(--cnc-accent-text); }
+.sm-body .cnc-home .product-card .btn-details:hover,
+.sm-body .prime-catalog .product-card .btn-details:hover,
+.sm-body .product-purchase-card .btn-details:hover { background: var(--sm-primary); border-color: var(--sm-primary); color: var(--cnc-accent-text); }
+.sm-body .cnc-help-banner a { background: var(--cnc-dark); color: var(--cnc-dark-button-text); }
+.sm-body .cnc-help-banner a:hover { background: var(--sm-primary); color: var(--cnc-accent-text); }
+.sm-body footer.bg-brand-900 { background: var(--cnc-dark) !important; border-top-color: var(--cnc-dark) !important; color: var(--cnc-dark-muted); }
+.sm-body footer a:hover { color: var(--sm-primary) !important; }
+.sm-body .cnc-header--compact .cnc-utility { display: none; }
+.sm-body .cnc-header--compact .cnc-header__main { min-height: 72px; }
+.sm-body .cnc-brand__uploaded-logo { width: auto; height: 44px; max-width: 225px; object-fit: contain; }
+.sm-body .cnc-brand--mobile .cnc-brand__uploaded-logo { height: 34px; max-width: 150px; }
+.sm-body .cnc-brand:has(.cnc-brand__uploaded-logo) .cnc-brand__symbol { display: none; }

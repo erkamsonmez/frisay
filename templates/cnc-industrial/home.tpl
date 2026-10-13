@@ -24,15 +24,15 @@
           <path d="M86 26h48l10 60-10 26v40l29 21v27h-29v50l-16 25v74H102v-74l-16-25v-50H57v-27l29-21v-40L76 86z" fill="#263443" stroke="#708095" stroke-width="2"/>
           <path d="M94 35h32l7 49H87z" fill="#354759"/>
           <path d="M86 153h48l27 20H59z" fill="#40566B"/>
-          <path d="M63 186h94" stroke="#A3CB64" stroke-width="7"/>
+          <path d="M63 186h94" stroke="var(--sm-primary)" stroke-width="7"/>
           <path d="M98 200h24v55h-24z" fill="#60758A"/>
           <path d="M106 270h8v80h-8z" fill="#8FA6B9"/>
           <path d="M84 112h52M75 221h70M101 257h18M102 286h16" stroke="#a5bacb" stroke-opacity=".45"/>
-          <path d="M101 62h18" stroke="#A3CB64" stroke-width="3"/>
+          <path d="M101 62h18" stroke="var(--sm-primary)" stroke-width="3"/>
         </g>
-        <path d="M105 69H38v94M457 338h82v-94" stroke="#A3CB64" stroke-opacity=".6"/>
-        <circle cx="105" cy="69" r="3" fill="#A3CB64"/>
-        <circle cx="457" cy="338" r="3" fill="#A3CB64"/>
+        <path d="M105 69H38v94M457 338h82v-94" stroke="var(--sm-primary)" stroke-opacity=".6"/>
+        <circle cx="105" cy="69" r="3" fill="var(--sm-primary)"/>
+        <circle cx="457" cy="338" r="3" fill="var(--sm-primary)"/>
         <path d="M45 365h116M45 358v14M161 358v14" stroke="#94A3B8" stroke-opacity=".5"/>
         <text x="103" y="382" text-anchor="middle" fill="#94A3B8" font-family="monospace" font-size="11">{$themeOptions.hero_visual_code|escape}</text>
       </svg>

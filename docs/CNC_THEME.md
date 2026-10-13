@@ -38,3 +38,14 @@
 - Kırık beyaz: `#F4F5F2` (sayfa arka planı)
 - Beyaz: `#FFFFFF` (ürün kartları, formlar)
 - Küçük metinlerde beyaz/kırık beyaz üzerinde açık yeşil yerine koyu yeşil kullanılır.
+
+## Şema ile düzenlenen alanlar
+
+- Yönetim paneli → Temalar → Usta Rafı → Özelleştir
+- Marka sekmesi: renkler; yazı tipi; logo yükleme
+- Ana Sayfa sekmesi: üst bant, slogan, banner başlığı ve açıklama, butonlar, avantaj alanları, kategori/ürün bloklarını göster/gizle, ürün yok mesajı, yardım bannerı
+- Gelişmiş sekmesi: içerik genişliği
+- Tüm metin alanları `themeOptions` üzerinden escaped Smarty olarak görüntülenir.
+- Değişkenler `theme.schema.json` → `colors.css` → `cnc-industrial.css` şeklinde bağlanır.
+- Yönetim panelinden düzenlenen `colors.css` ve `custom.css` sunucuda kalıcı volume'de saklanır; redeploy sonrası korunur.
+- Yüklenen yeni logolar `img/branding/` üzerinden kalıcı volume'de saklanır; `SiteAssets` veritabanı ayarını burada tutar.

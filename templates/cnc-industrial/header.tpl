@@ -17,7 +17,7 @@
 	{if $pageDesc}
 	<meta name="twitter:description" content="{$pageDesc|escape}">
 	{/if}
-	<meta name="author" content="FriSay">
+	<meta name="author" content="{$siteName|escape}">
 	<link rel="canonical" href="{$domain|escape}">
 	<meta name="robots" content="index, follow">
 	<meta name="publisher" content="{$siteName|escape}" />
@@ -30,7 +30,7 @@
 	{if $hooks.head.top}
 	{$hooks.head.top nofilter}
 	{else}
-	<meta name="theme-color" content="#6366f1">
+	<meta name="theme-color" content="{$themeColors['cnc-dark']|default:'#202A32'|escape}">
 	<link rel="manifest" href="{$domain}manifest.php">
 	<script>
 		if ('serviceWorker' in navigator) {

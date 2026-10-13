@@ -3,7 +3,7 @@
  * Kaynak: settings.THEME_OPTIONS_{tema} (JSON) + bu dosya.
  */
 :root {
-	--theme-font-family: 'Poppins', sans-serif;
+	--theme-font-family: 'Inter', sans-serif;
 	--theme-container-max: 1320px;
 	--theme-container-padding-x: 12px;
 	--container: var(--theme-container-max);

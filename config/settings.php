@@ -204,6 +204,7 @@
 		'cartI18nJson' 		=> Security::jsonForHtmlScript($cartI18n),
 		'newsletterApiUrl' 	=> rtrim($domain, '/') . '/api/module.php?m=newsletter&action=subscribe',
 		'themeOptions'		=> $themeOptions,
+		'themeColors'       => Theme::getColors($theme),
 		'activeTheme'		=> $theme,
 	));
 
