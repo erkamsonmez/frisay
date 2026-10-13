@@ -9,17 +9,22 @@
 	<meta property="og:description" content="{$pageDesc|escape}">
 	{/if}
 	<meta property="og:title" content="{$documentTitle|default:$siteName|escape}">
-	<meta property="og:type" content="website">
+	<meta property="og:type" content="{$seoMeta.ogType|default:'website'|escape}">
 	<meta property="og:site_name" content="{$siteName|escape}">
 	<meta name="application-name" content="{$siteName|escape}">
-	<meta property="og:url" content="{$domain|escape}">
+	<meta property="og:url" content="{$seoMeta.canonical|escape}">
+	<meta name="twitter:card" content="{if $seoMeta.ogImage}summary_large_image{else}summary{/if}">
 	<meta name="twitter:title" content="{$documentTitle|default:$siteName|escape}">
+	{if $seoMeta.ogImage}
+	<meta property="og:image" content="{$seoMeta.ogImage|escape}">
+	<meta name="twitter:image" content="{$seoMeta.ogImage|escape}">
+	{/if}
 	{if $pageDesc}
 	<meta name="twitter:description" content="{$pageDesc|escape}">
 	{/if}
 	<meta name="author" content="{$siteName|escape}">
-	<link rel="canonical" href="{$domain|escape}">
-	<meta name="robots" content="index, follow">
+	<link rel="canonical" href="{$seoMeta.canonical|escape}">
+	<meta name="robots" content="{$seoMeta.robots|escape}">
 	<meta name="publisher" content="{$siteName|escape}" />
 	<meta name="language" content="{$selectLang}">
 	<link rel="icon" type="image/x-icon" href="{$domain}img/favicon.ico?v=1">

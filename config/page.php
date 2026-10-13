@@ -10,6 +10,19 @@
 				? Seo::formatDocumentTitle((string) $pageTitle, (string) $pageName)
 				: (string) $pageTitle;
 
+			$seoMeta = Seo::technicalMeta((string) $pageName, [
+				'productUrl' => $smarty->getTemplateVars('productUrl'),
+				'catalogBaseUrl' => $smarty->getTemplateVars('catalogBaseUrl'),
+				'catalogFilter' => $smarty->getTemplateVars('catalogFilter'),
+				'pagination' => $smarty->getTemplateVars('pagination'),
+				'imageUrl' => $smarty->getTemplateVars('imageUrl'),
+			], $_GET);
+			if ($seoMeta['robots'] !== 'index, follow' && !headers_sent()) {
+				header('X-Robots-Tag: ' . $seoMeta['robots']);
+			}
+			$smarty->assign('seoMeta', $seoMeta);
+
+
 			$smarty->assign([            
 				'pageName'  => $pageName,            
 				'css'       => $css,            
@@ -22,7 +35,7 @@
 			$pageSchemas = $smarty->getTemplateVars('schemaJsonLd');
 			$pageSchemas = is_array($pageSchemas) ? $pageSchemas : [];
 			$smarty->assign('schemaJsonLd', array_merge(
-				SchemaOrg::getGlobalScripts((string) $documentTitle, (string) $pageDesc),
+				SchemaOrg::getGlobalScripts((string) $documentTitle, (string) $pageDesc, $seoMeta['canonical']),
 				$pageSchemas
 			));
 

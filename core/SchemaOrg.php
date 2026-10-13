@@ -3,10 +3,10 @@
 class SchemaOrg
 {
 	/** @return string[] */
-	public static function getGlobalScripts(string $pageTitle, string $pageDesc): array
+	public static function getGlobalScripts(string $pageTitle, string $pageDesc, ?string $canonicalUrl = null): array
 	{
 		$scripts = [
-			self::encode(self::buildWebPage($pageTitle, $pageDesc)),
+			self::encode(self::buildWebPage($pageTitle, $pageDesc, $canonicalUrl)),
 			self::encode(self::buildOrganization()),
 			self::encode(self::buildWebSite()),
 		];
@@ -49,14 +49,10 @@ class SchemaOrg
 
 	public static function currentUrl(): string
 	{
-		$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-		$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-		$uri = $_SERVER['REQUEST_URI'] ?? '/';
-
-		return $scheme . '://' . $host . $uri;
+		return Seo::requestPageUrl();
 	}
 
-	private static function buildWebPage(string $name, string $description): array
+	private static function buildWebPage(string $name, string $description, ?string $canonicalUrl = null): array
 	{
 		$siteName = Settings::get('SITE_NAME') ?: 'FShop';
 		$title = trim($name) !== '' ? $name : $siteName;
@@ -65,7 +61,7 @@ class SchemaOrg
 		return [
 			'@context' => 'https://schema.org',
 			'@type' => 'WebPage',
-			'url' => self::currentUrl(),
+			'url' => $canonicalUrl ?: self::currentUrl(),
 			'name' => $title,
 			'description' => self::plainText($desc, 500),
 		];
@@ -208,12 +204,6 @@ class SchemaOrg
 				'@type' => 'Brand',
 				'name' => (string) ($product['brand_name'] ?? ''),
 			],
-			'hasMerchantReturnPolicy' => [
-				'@type' => 'MerchantReturnPolicy',
-				'returnPolicyCategory' => 'https://schema.org/MerchantReturnFiniteReturnWindow',
-				'merchantReturnDays' => 14,
-				'returnMethod' => 'https://schema.org/ReturnByMail',
-			],
 			'additionalProperty' => [
 				[
 					'@type' => 'PropertyValue',
@@ -234,7 +224,6 @@ class SchemaOrg
 				'availability' => $inStock
 					? 'https://schema.org/InStock'
 					: 'https://schema.org/OutOfStock',
-				'priceValidUntil' => date('Y-m-d', strtotime('+1 year')),
 				'shippingDetails' => [
 					'@type' => 'OfferShippingDetails',
 					'shippingRate' => [

@@ -205,4 +205,93 @@ class Seo
 
 		return true;
 	}
+
+	/**
+	 * Technical indexing metadata, independent from the merchant-edited title/description.
+	 * Category pagination uses self-referencing canonical URLs; filtered/sorted variants
+	 * are excluded from the index without blocking their links.
+	 *
+	 * @param array<string, mixed> $context
+	 * @param array<string, mixed> $query
+	 * @return array{canonical: string, robots: string, ogType: string, ogImage: string}
+	 */
+	public static function technicalMeta(string $pageName, array $context = [], array $query = []): array
+	{
+		$root = rtrim((string) Settings::get('DOMAIN'), '/');
+		$requestUrl = self::requestPageUrl();
+		$canonical = $requestUrl;
+		$private = [
+			'404', 'search', 'cart', 'checkout', 'checkout-success', 'login',
+			'register', 'logout', 'forgot-password', 'reset-password', 'my-account',
+			'orders', 'order', 'favorites', 'returns', 'return', 'return-request',
+			'cancel-request', 'gate', 'truck', 'card-payment', 'payment', 'cancel',
+		];
+		$noindex = in_array($pageName, $private, true)
+			|| str_contains($pageName, 'payment')
+			|| str_contains($pageName, 'callback')
+			|| http_response_code() === 404;
+
+		if ($pageName === 'home') {
+			$canonical = $root . '/';
+		} elseif ($pageName === 'product') {
+			$canonical = self::sameSiteUrl((string) ($context['productUrl'] ?? ''), $requestUrl);
+		} elseif (in_array($pageName, ['category', 'brand', 'catalog', 'special'], true)) {
+			$base = self::sameSiteUrl((string) ($context['catalogBaseUrl'] ?? ''), $requestUrl);
+			$canonical = $base;
+			$filters = $context['catalogFilter'] ?? [];
+			$filtered = is_array($filters) && !empty($filters['hasActive']);
+			foreach (['subcat', 'brand', 'price_min', 'price_max', 'stock', 'discount', 'var'] as $filterKey) {
+				if (isset($query[$filterKey]) && $query[$filterKey] !== '') {
+					$filtered = true;
+				}
+			}
+			$sort = (string) ($query['sort'] ?? '');
+			$defaultSort = $pageName === 'special' ? 'discount' : 'newest';
+			$sorted = $sort !== '' && $sort !== $defaultSort;
+			$noindex = $noindex || $filtered || $sorted;
+
+			$pagination = $context['pagination'] ?? [];
+			$page = is_array($pagination) ? (int) ($pagination['page'] ?? 1) : 1;
+			if (!$filtered && !$sorted && $page > 1) {
+				$canonical = $base . (str_contains($base, '?') ? '&' : '?') . 'page=' . $page;
+			}
+		}
+		// Preserve only approved pagination. Tracking, session and campaign
+		// parameters are always excluded from canonical URLs.
+		$image = (string) ($context['imageUrl'] ?? '');
+		return [
+			'canonical' => $canonical,
+			'robots' => $noindex ? 'noindex, follow' : 'index, follow',
+			'ogType' => $pageName === 'product' ? 'product' : 'website',
+			'ogImage' => $pageName === 'product' ? $image : '',
+		];
+	}
+
+	/** Absolute request path resolved against the configured public DOMAIN (proxy-safe). */
+	public static function requestPageUrl(): string
+	{
+		$root = rtrim((string) Settings::get('DOMAIN'), '/');
+		$request = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+		$path = (string) (parse_url($request, PHP_URL_PATH) ?: '/');
+		$path = '/' . ltrim(preg_replace('~/+~', '/', $path), '/');
+		if ($path === '/index.php') {
+			$path = '/';
+		}
+		return $root . $path;
+	}
+
+	/** Restrict canonical overrides to the configured shop origin. */
+	private static function sameSiteUrl(string $candidate, string $fallback): string
+	{
+		$shop = parse_url((string) Settings::get('DOMAIN'));
+		$url = parse_url($candidate);
+		if (!is_array($shop) || !is_array($url)
+			|| !isset($shop['host'], $url['host'])
+			|| strcasecmp((string) $shop['host'], (string) $url['host']) !== 0) {
+			return $fallback;
+		}
+		$path = (string) ($url['path'] ?? '/');
+		return rtrim((string) Settings::get('DOMAIN'), '/') . '/' . ltrim($path, '/');
+	}
+
 }
