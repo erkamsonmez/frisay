@@ -11,7 +11,10 @@
       </div>
       <div class="cnc-hero__foot"><span>01 / 03</span><span class="cnc-hero__line"></span><span>ENDÜSTRİYEL ÇÖZÜMLER</span></div>
     </div>
-    <div class="cnc-hero__visual" aria-hidden="true">
+    <div class="cnc-hero__visual"{if $themeOptions.hero_image_show|default:"0" != "1" || !$siteLogos.hero} aria-hidden="true"{/if}>
+      {if $themeOptions.hero_image_show|default:"0" == "1" && $siteLogos.hero}
+        <img class="cnc-hero__custom-img" src="{$siteLogos.hero|escape}" alt="{$themeOptions.hero_image_alt|escape}" loading="eager" decoding="async">
+      {else}
       <div class="cnc-blueprint__grid"></div>
       <span class="cnc-blueprint__caption">{$themeOptions.hero_visual_caption|escape}</span>
       <span class="cnc-blueprint__marker cnc-blueprint__marker--one">Ø 40</span>
@@ -37,6 +40,7 @@
         <text x="103" y="382" text-anchor="middle" fill="#94A3B8" font-family="monospace" font-size="11">{$themeOptions.hero_visual_code|escape}</text>
       </svg>
       <span class="cnc-blueprint__serial">FIG — 001 <br> PRECISION COMPONENT</span>
+      {/if}
     </div>
   </section>
   {/if}

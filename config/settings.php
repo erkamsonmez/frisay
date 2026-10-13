@@ -192,6 +192,7 @@
 		'shopCurrencyCode' 	=> Currency::getShopCurrency(),
 		'siteLogos' => [
 			'header' => SiteAssets::resolveLogoUrl('header'),
+			'hero' => SiteAssets::logoExists('hero') ? SiteAssets::resolveLogoUrl('hero') : '',
 			'bar' => SiteAssets::resolveLogoUrl('bar'),
 			'footer' => SiteAssets::resolveLogoUrl('footer'),
 			'etbis' => SiteAssets::logoExists('etbis') ? SiteAssets::resolveLogoUrl('etbis') : '',

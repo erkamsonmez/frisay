@@ -49,3 +49,5 @@
 - Değişkenler `theme.schema.json` → `colors.css` → `cnc-industrial.css` şeklinde bağlanır.
 - Yönetim panelinden düzenlenen `colors.css` ve `custom.css` sunucuda kalıcı volume'de saklanır; redeploy sonrası korunur.
 - Yüklenen yeni logolar `img/branding/` üzerinden kalıcı volume'de saklanır; `SiteAssets` veritabanı ayarını burada tutar.
+
+- Logo yükleme bölümüne CNC Industrial banner görseli eklendi. Bu görseli yükledikten sonra Ana Sayfa sekmesinden 'Yüklenen banner görselini kullan' ayarını etkinleştirebilirsiniz.

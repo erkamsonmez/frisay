@@ -65,6 +65,18 @@
       "default": "1",
       "group": "home"
     },
+    "hero_image_show": {
+      "label": "Yüklenen banner görselini kullan (SVG yerine)",
+      "type": "switch",
+      "default": "0",
+      "group": "home"
+    },
+    "hero_image_alt": {
+      "label": "Banner görseli alternatif açıklaması",
+      "type": "text",
+      "default": "CNC ekipmanları",
+      "group": "home"
+    },
     "hero_kicker": {
       "label": "Banner üst etiketi",
       "type": "text",

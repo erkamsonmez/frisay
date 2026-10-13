@@ -5,6 +5,7 @@ class SiteAssets
 	/** @var array<string, array{file: string, label: string}> */
 	private const LOGOS = [
 		'header' => ['file' => 'logo.png', 'label' => 'Ana logo (mobil)'],
+		'hero' => ['file' => 'cnc-hero.webp', 'label' => 'Ana sayfa banner görseli (CNC Industrial)'],
 		'bar' => ['file' => 'logo2.png', 'label' => 'Üst bar logosu'],
 		'footer' => ['file' => 'logoFooter.png', 'label' => 'Footer logosu'],
 		'admin' => ['file' => 'shopLogo.png', 'label' => 'Admin panel logosu'],
